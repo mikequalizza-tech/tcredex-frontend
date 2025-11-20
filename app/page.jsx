@@ -1,0 +1,1 @@
+export default function Home(){return <div>tCredex Frontend with Sample UI</div>}

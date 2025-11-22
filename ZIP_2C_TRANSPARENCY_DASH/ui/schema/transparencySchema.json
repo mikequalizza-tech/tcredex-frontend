@@ -1,0 +1,18 @@
+{
+  "title": "TransparencyPayload",
+  "type": "object",
+  "properties": {
+    "total": {"type": "number"},
+    "rule": {"type": "number"},
+    "ai": {"type": "number"},
+    "reasons": {"type": "array", "items": {"type": "string"}},
+    "snapshot": {
+      "type": "object",
+      "properties": {
+        "timestamp": {"type": "string"},
+        "confidence": {"type": "string"},
+        "suggestions": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

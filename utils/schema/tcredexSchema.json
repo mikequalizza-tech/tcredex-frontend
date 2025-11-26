@@ -1,0 +1,134 @@
+{
+  "projectId": "string",
+  "name": "string",
+  "type": "NMTC | HTC | LIHTC | OZ | MULTI_CREDIT",
+
+  "location": {
+    "address": "string",
+    "city": "string",
+    "state": "string",
+    "zip": "string",
+    "censusTract": "string",
+
+    "povertyRate": "number",
+    "medianIncomeRatio": "number",
+    "unemploymentRate": "number",
+
+    "severelyDistressed": "boolean",
+    "nonMetro": "boolean",
+    "opportunityZone": "boolean",
+    "qctDda": "boolean",
+
+    "metadata": {
+      "licEligible": "boolean",
+      "status": "Urban | Rural | Tribal | Island",
+      "priorNmtcActivity": "boolean"
+    }
+  },
+
+  "sponsor": {
+    "name": "string",
+    "entityType": "Nonprofit | ForProfit",
+    "yearsOperating": "number",
+    "netAssets": "number",
+    "priorNMTCDeals": "number",
+    "managementStrength": "Low | Medium | High",
+    "guaranteeCapacity": "Low | Medium | High"
+  },
+
+  "qalicb": {
+    "entityName": "string",
+    "entityType": "LLC | Nonprofit | Corporation | Partnership",
+    "businessType": "string",
+    "naics": "string",
+    "activeConduct": "boolean",
+    "eligibleBusiness": "boolean"
+  },
+
+  "impact": {
+    "jobsCreated": "number",
+    "jobsRetained": "number",
+    "percentLowIncomeServed": "number",
+    "essentialService": "boolean",
+    "catalyticImpact": "boolean",
+    "revitalizationArea": "boolean"
+  },
+
+  "readiness": {
+    "siteControl": "boolean",
+    "permitsSecured": "boolean",
+    "dscr": "number",
+    "fundingGapPercent": "number",
+    "otherFinancingCommitted": "boolean"
+  },
+
+  "complexity": {
+    "numCDEs": "number",
+    "stateNMTC": "boolean",
+    "federalNMTC": "boolean",
+    "htcFederal": "boolean",
+    "htcState": "boolean",
+    "brownfield": "boolean",
+    "bridgeFinancing": "boolean",
+    "mezzFinancing": "boolean",
+    "intercreditorAgreements": "boolean"
+  },
+
+  "allocations": [
+    {
+      "CDE": "string",
+      "allocationType": "Federal NMTC | State NMTC",
+      "QEI_amount": "number",
+      "investorEquity": "number",
+      "leverageLoan": {
+        "source": "string",
+        "amount": "number"
+      },
+      "pricing": "number",
+      "QLICIs": [
+        {
+          "note": "A | B | C",
+          "amount": "number",
+          "interestRate": "string",
+          "forgivable": "boolean"
+        }
+      ]
+    }
+  ],
+
+  "credits": {
+    "nmtc": "boolean",
+    "htcFederal": "boolean",
+    "htcState": "boolean",
+    "lihtc": "boolean",
+    "oz": "boolean"
+  },
+
+  "scoring": {
+    "distress": "number",
+    "impact": "number",
+    "readiness": "number",
+    "sponsorStrength": "number",
+    "complexity": "number",
+    "totalScore": "number",
+    "tier": "Tier1 | Tier2 | Tier3 | Tier4",
+
+    "reasonCodes": ["string"]
+  },
+
+  "matching": {
+    "recommendedCDEs": ["string"],
+    "recommendedInvestors": ["string"],
+    "matchStrength": "number"
+  },
+
+  "compliance": {
+    "substantiallyAllTest": "number",
+    "qliciQualifiedUses": "boolean",
+    "excludedBusiness": "boolean",
+    "debarmentCheck": "boolean",
+    "annualReportingRequired": "boolean"
+  },
+
+  "status": "Intake | Scoring | Market | TermSheet | Closing | Compliance | Year7 Unwind"
+}

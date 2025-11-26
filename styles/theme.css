@@ -1,0 +1,51 @@
+:root {
+  /* BRAND COLORS */
+  --tc-primary: #00E7FF;         /* Electric Cyan */
+  --tc-slate: #203344;           /* tCredex Slate */
+  --tc-deepnavy: #071B2C;        /* Deep Navy Background */
+  
+  /* AIV SUPPORT TONES */
+  --aiv-teal: #45C4AA;
+  --aiv-green: #6BCB77;
+  --aiv-sand: #E4DAD0;
+
+  /* NEUTRAL SYSTEM */
+  --neutral-900: #0B121A;
+  --neutral-800: #15202B;
+  --neutral-700: #1E2A36;
+  --neutral-600: #2C3A47;
+  --neutral-500: #3C4D5C;
+  --neutral-400: #526475;
+  --neutral-300: #7A8995;
+  --neutral-200: #A9B4BD;
+  --neutral-100: #D9E0E4;
+
+  /* TYPOGRAPHY */
+  --font-main: 'Inter', 'IBM Plex Sans', Arial, sans-serif;
+
+  /* SPACING */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* BORDERS */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* SHADOWS */
+  --shadow-soft: 0 4px 12px rgba(0,0,0,0.2);
+  --shadow-strong: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+/* GLOBAL RESET + THEME */
+body {
+  background: var(--neutral-900);
+  color: var(--neutral-100);
+  font-family: var(--font-main);
+  margin: 0;
+  padding: 0;
+}
+

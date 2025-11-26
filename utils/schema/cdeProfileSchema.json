@@ -1,0 +1,23 @@
+{
+  "cdeId": "string",
+  "name": "string",
+  "states": ["string"],
+  "serviceArea": ["string"],
+  "minDistress": "number",
+  "minImpact": "number",
+  "minProjectSize": "number",
+  "programs": {
+    "nmtc": "boolean",
+    "stateNMTC": "boolean",
+    "htc": "boolean",
+    "lihtc": "boolean",
+    "oz": "boolean"
+  },
+  "allocation": {
+    "available": "number",
+    "committed": "number",
+    "pipeline": "number"
+  },
+  "prioritySectors": ["string"],
+  "complexityTolerance": "Low | Medium | High"
+}

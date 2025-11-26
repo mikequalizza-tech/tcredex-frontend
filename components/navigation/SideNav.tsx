@@ -1,0 +1,1 @@
+export const SideNav=()=><nav>SideNav</nav>;

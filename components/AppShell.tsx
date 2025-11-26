@@ -1,0 +1,1 @@
+export const AppShell=({children})=>(<div className='shell'>{children}</div>);

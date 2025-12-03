@@ -1,1 +1,0 @@
-export const MapContainer=()=><canvas width={800} height={500}/>;

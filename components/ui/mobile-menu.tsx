@@ -26,8 +26,8 @@ export default function MobileMenu() {
 
   // close if the esc key is pressed
   useEffect(() => {
-    const keyHandler = ({ keyCode }: { keyCode: number }): void => {
-      if (!mobileNavOpen || keyCode !== 27) return;
+    const keyHandler = ({ key }: { key: string }): void => {
+      if (!mobileNavOpen || key !== "Escape") return;
       setMobileNavOpen(false);
     };
     document.addEventListener("keydown", keyHandler);

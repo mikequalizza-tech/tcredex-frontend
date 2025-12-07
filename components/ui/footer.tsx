@@ -15,7 +15,7 @@ export default function Footer() {
                 Connecting Sponsors/Developers, CDEs, and Investors with intelligent automation.
               </p>
               <Link
-                href="#"
+                href="/signup"
                 className="btn-sm bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] py-2 px-4 text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] inline-block"
               >
                 Sign up FREE

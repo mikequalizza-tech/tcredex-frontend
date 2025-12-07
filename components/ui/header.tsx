@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Logo from "./logo";
+import MobileMenu from "./mobile-menu";
 
 export default function Header() {
   return (
@@ -13,7 +14,43 @@ export default function Header() {
             <Logo />
           </div>
 
-          {/* Desktop navigation - removed per requirement to keep only Login and Register */}
+          {/* Desktop navigation */}
+          <nav className="hidden md:flex md:grow">
+            <ul className="flex grow flex-wrap items-center justify-center gap-4 text-sm">
+              <li>
+                <Link
+                  href="/"
+                  className="flex items-center text-gray-300 transition hover:text-white"
+                >
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/how-it-works"
+                  className="flex items-center text-gray-300 transition hover:text-white"
+                >
+                  How It Works
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/blog"
+                  className="flex items-center text-gray-300 transition hover:text-white"
+                >
+                  Blog
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/dashboard"
+                  className="flex items-center text-gray-300 transition hover:text-white"
+                >
+                  Dashboard
+                </Link>
+              </li>
+            </ul>
+          </nav>
 
           {/* Desktop sign in links */}
           <ul className="flex flex-1 items-center justify-end gap-3">
@@ -32,6 +69,9 @@ export default function Header() {
               >
                 Register
               </Link>
+            </li>
+            <li>
+              <MobileMenu />
             </li>
           </ul>
         </div>

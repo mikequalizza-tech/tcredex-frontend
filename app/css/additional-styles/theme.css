@@ -1,0 +1,92 @@
+/* Hamburger button */
+.hamburger svg > *:nth-child(1),
+.hamburger svg > *:nth-child(2),
+.hamburger svg > *:nth-child(3) {
+  transform-origin: center;
+  transform: rotate(0deg);
+}
+
+.hamburger svg > *:nth-child(1) {
+  transition:
+    y 0.1s 0.25s ease-in,
+    transform 0.22s cubic-bezier(0.55, 0.055, 0.675, 0.19),
+    opacity 0.1s ease-in;
+}
+
+.hamburger svg > *:nth-child(2) {
+  transition:
+    transform 0.22s cubic-bezier(0.55, 0.055, 0.675, 0.19),
+    opacity 0.1s ease-in;
+}
+
+.hamburger svg > *:nth-child(3) {
+  transition:
+    y 0.1s 0.25s ease-in,
+    transform 0.22s cubic-bezier(0.215, 0.61, 0.355, 1),
+    opacity 0.1s ease-in;
+}
+
+.hamburger[aria-expanded='true'] svg > *:nth-child(1) {
+  y: 45;
+  transform: rotate(45deg);
+  transition:
+    y 0.1s ease-out,
+    transform 0.22s 0.12s cubic-bezier(0.215, 0.61, 0.355, 1),
+    opacity 0.1s ease-out;
+}
+
+.hamburger[aria-expanded='true'] svg > *:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger[aria-expanded='true'] svg > *:nth-child(3) {
+  y: 45;
+  transform: rotate(-45deg);
+  transition:
+    y 0.1s ease-out,
+    transform 0.22s 0.12s cubic-bezier(0.215, 0.61, 0.355, 1),
+    opacity 0.1s ease-out;
+}
+
+/* Theme-specific stuff for the fintech template (slightly trimmed) */
+
+.hero-gradient {
+  background: radial-gradient(circle at top left, #1f2937 0, #020617 45%, #020617 100%);
+}
+
+.card-glass {
+  background: linear-gradient(
+    145deg,
+    rgba(15, 23, 42, 0.9),
+    rgba(30, 64, 175, 0.35),
+    rgba(15, 23, 42, 0.9)
+  );
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.badge-pill {
+  border-radius: 9999px;
+  padding-inline: 0.75rem;
+  padding-block: 0.25rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Simple fade-in */
+
+.fade-in {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}

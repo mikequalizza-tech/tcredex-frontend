@@ -1,17 +1,5 @@
 import Image from "next/image";
 
-import WorldMapImg from "@/public/images/worldmap.png";
-import BlurredShape02Img from "@/public/images/blurred-shape-02.svg";
-import WorldUserImg01 from "@/public/images/world-user-01.jpg";
-import WorldUserImg02 from "@/public/images/world-user-02.jpg";
-import WorldUserImg03 from "@/public/images/world-user-03.jpg";
-import WorldUserImg04 from "@/public/images/world-user-04.jpg";
-import WorldUserImg05 from "@/public/images/world-user-05.jpg";
-import WorldUserImg06 from "@/public/images/world-user-06.jpg";
-import WorldUserImg07 from "@/public/images/world-user-07.jpg";
-import WorldUserImg08 from "@/public/images/world-user-08.jpg";
-import LargeTestimonialImg02 from "@/public/images/large-testimonial-02.jpg";
-
 export default function Benefits() {
   return (
     <section>
@@ -19,7 +7,7 @@ export default function Benefits() {
         <div className="border-t py-12 [border-image:linear-gradient(to_right,transparent,--theme(--color-slate-400/.25),transparent)1] md:py-20">
           {/* Section header */}
           <div className="mx-auto max-w-3xl pb-12 text-center">
-            <h2 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-4 font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
+            <h2 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-indigo-200))] bg-clip-text text-3xl font-extrabold text-transparent sm:text-4xl">
               Seeking ambitious problem solvers
             </h2>
             <p className="text-lg text-indigo-200/65">
@@ -103,7 +91,7 @@ export default function Benefits() {
                   aria-hidden="true"
                 >
                   <Image
-                    src={BlurredShape02Img}
+                    src="/images/blurred-shape-02.svg"
                     width={760}
                     height={668}
                     alt="Section illustration"
@@ -111,7 +99,7 @@ export default function Benefits() {
                 </div>
                 {/* Map */}
                 <Image
-                  src={WorldMapImg}
+                  src="/images/worldmap.png"
                   width={672}
                   height={330}
                   alt="World map"
@@ -120,7 +108,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "22%", left: "52%" }}
-                  src={WorldUserImg01}
+                  src="/images/world-user-01.jpg"
                   width={32}
                   height={32}
                   alt="User 01"
@@ -129,7 +117,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "50%", left: "58%" }}
-                  src={WorldUserImg02}
+                  src="/images/world-user-02.jpg"
                   width={48}
                   height={48}
                   alt="User 02"
@@ -139,17 +127,17 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "8.5%", left: "70.5%" }}
-                  src={WorldUserImg03}
+                  src="/images/world-user-03.jpg"
                   width={56}
                   height={56}
-                  alt="User 02"
+                  alt="User 03"
                   data-aos="fade-up"
                   data-aos-delay={100}
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "34%", left: "76.5%" }}
-                  src={WorldUserImg04}
+                  style={{ top: "34%, left: "76.5%" }}
+                  src="/images/world-user-04.jpg"
                   width={72}
                   height={72}
                   alt="User 04"
@@ -158,8 +146,8 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "29.5%", left: "8.5%" }}
-                  src={WorldUserImg05}
+                  style={{ top: "29.5%, left: "8.5%" }}
+                  src="/images/world-user-05.jpg"
                   width={48}
                   height={48}
                   alt="User 05"
@@ -168,8 +156,8 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "56%", left: "19%" }}
-                  src={WorldUserImg06}
+                  style={{ top: "56%, left: "19%" }}
+                  src="/images/world-user-06.jpg"
                   width={56}
                   height={56}
                   alt="User 06"
@@ -178,8 +166,8 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "20%", left: "24.5%" }}
-                  src={WorldUserImg07}
+                  style={{ top: "20%, left: "24.5%" }}
+                  src="/images/world-user-07.jpg"
                   width={64}
                   height={64}
                   alt="User 07"
@@ -188,8 +176,8 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "39%", left: "43%" }}
-                  src={WorldUserImg08}
+                  style={{ top: "39%, left: "43%" }}
+                  src="/images/world-user-08.jpg"
                   width={40}
                   height={40}
                   alt="User 08"
@@ -205,12 +193,12 @@ export default function Benefits() {
               <div className="text-center">
                 <Image
                   className="mb-3 inline-flex rounded-full"
-                  src={LargeTestimonialImg02}
+                  src="/images/large-testimonial-02.jpg"
                   width={40}
                   height={40}
                   alt="Large testimonial"
                 />
-                <p className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-3 font-nacelle text-xl font-semibold text-transparent">
+                <p className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-indigo-200))] bg-clip-text text-lg font-medium text-transparent">
                   "I am grateful to Open PRO for encouraging me to expand my
                   horizons and strive for greater achievements, both in my
                   career and in my education."

@@ -6,25 +6,10 @@ export default function Footer() {
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <div className="py-8 md:py-12">
           {/* Footer content */}
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-            {/* About section */}
-            <div className="lg:col-span-2">
-              <div className="mb-4 text-lg font-semibold text-gray-200">tCredex</div>
-              <p className="mb-4 text-sm text-indigo-200/65">
-                The AI-powered tax credit marketplace for Federal & State NMTC, LIHTC, and HTC. 
-                Connecting Sponsors/Developers, CDEs, and Investors with intelligent automation.
-              </p>
-              <Link
-                href="/signup"
-                className="btn-sm bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] py-2 px-4 text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] inline-block"
-              >
-                Sign up FREE
-              </Link>
-            </div>
-
-            {/* Quick Links */}
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {/* Navigation Links - Left side */}
             <div>
-              <div className="mb-3 text-sm font-semibold text-gray-200">Quick Links</div>
+              <div className="mb-3 text-sm font-semibold text-gray-200">Navigation</div>
               <ul className="space-y-2 text-sm text-indigo-200/65">
                 <li>
                   <Link href="/" className="transition hover:text-gray-200">
@@ -49,15 +34,48 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Copyright */}
-            <div className="lg:col-span-1">
-              <div className="text-sm text-indigo-200/65">
-                © {new Date().getFullYear()} tCredex
+            {/* Support Links */}
+            <div>
+              <div className="mb-3 text-sm font-semibold text-gray-200">Support</div>
+              <ul className="space-y-2 text-sm text-indigo-200/65">
+                <li>
+                  <Link href="/contact" className="transition hover:text-gray-200">
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/support" className="transition hover:text-gray-200">
+                    Support
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="transition hover:text-gray-200">
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/privacy" className="transition hover:text-gray-200">
+                    Privacy Policy
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Copyright and Affiliate Disclaimer */}
+            <div>
+              <div className="text-sm text-indigo-200/65 space-y-3">
+                <p>© {new Date().getFullYear()} tCredex</p>
+                <p className="text-xs">
+                  Tcredex.com is an affiliate of American Impact Ventures LLC.
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
+      
+      {/* AI Chat Bot will appear in lower right-hand corner */}
+      {/* Chat bot implementation to be added separately */}
     </footer>
   );
 }

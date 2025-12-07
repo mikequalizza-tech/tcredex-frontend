@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "About us - Open PRO",
-  description: "Page description",
+  title: "About us - tCredex",
+  description: "Learn about tCredex's mission to streamline tax credit financing for community development",
 };
 
 import PageIllustration from "@/components/page-illustration";

@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Home - Open PRO",
-  description: "Page description",
+  title: "Home - tCredex",
+  description: "tCredex.com - The AI-Powered Tax Credit Marketplace for Federal & State NMTC, LIHTC, and HTC",
 };
 
 import PageIllustration from "@/components/page-illustration";

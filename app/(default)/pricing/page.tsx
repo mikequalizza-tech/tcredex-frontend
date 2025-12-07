@@ -1,6 +1,6 @@
 export const metadata = {
-  title: "Pricing - Open PRO",
-  description: "Page description",
+  title: "Pricing - tCredex",
+  description: "Transparent pricing for tCredex tax credit marketplace platform",
 };
 
 import PageIllustration from "@/components/page-illustration";

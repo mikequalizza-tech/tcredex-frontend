@@ -21,7 +21,7 @@ export default function HeroHome() {
                 data-aos="fade-up"
                 data-aos-delay={200}
               >
-                Federal &amp; State NMTC, LIHTC, and HTC all in one platform. 
+                Federal & State NMTC, LIHTC, and HTC all in one platform. 
                 Sponsors/Developers, CDEs, and Investors each have tailored workflows 
                 to streamline deal flow, compliance, and closing.
               </p>

@@ -9,7 +9,7 @@ export default function Footer() {
           <div className="text-center">
             {/* tCredex blurb */}
             <p className="text-sm text-indigo-200/65 mb-6 max-w-2xl mx-auto">
-              tCredex is the AI-powered tax credit marketplace for Federal &amp; State NMTC, LIHTC, and HTC. 
+              tCredex is the AI-powered tax credit marketplace for Federal & State NMTC, LIHTC, and HTC. 
               Streamline your deal flow from intake to closing.
             </p>
             

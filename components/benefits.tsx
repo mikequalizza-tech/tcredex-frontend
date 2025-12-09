@@ -136,7 +136,7 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "34%, left: "76.5%" }}
+                  style={{ top: "34%", left: "76.5%" }}
                   src="/images/world-user-04.jpg"
                   width={72}
                   height={72}
@@ -146,7 +146,7 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "29.5%, left: "8.5%" }}
+                  style={{ top: "29.5%", left: "8.5%" }}
                   src="/images/world-user-05.jpg"
                   width={48}
                   height={48}
@@ -156,7 +156,7 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "56%, left: "19%" }}
+                  style={{ top: "56%", left: "19%" }}
                   src="/images/world-user-06.jpg"
                   width={56}
                   height={56}
@@ -166,7 +166,7 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "20%, left: "24.5%" }}
+                  style={{ top: "20%", left: "24.5%" }}
                   src="/images/world-user-07.jpg"
                   width={64}
                   height={64}
@@ -176,7 +176,7 @@ export default function Benefits() {
                 />
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
-                  style={{ top: "39%, left: "43%" }}
+                  style={{ top: "39%", left: "43%" }}
                   src="/images/world-user-08.jpg"
                   width={40}
                   height={40}

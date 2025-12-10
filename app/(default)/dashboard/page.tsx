@@ -24,7 +24,7 @@ export default function DashboardPlaceholder() {
                 This area will surface pipeline visibility, underwriting checklists, servicing alerts, and data room access for every deal you manage. The sitemap link is live so stakeholders can see where this experience will live as we build it out.
               </p>
               <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-gray-800/80 bg-gray-800/60 px-4 py-3 text-left text-sm text-indigo-100/70">
-                <span className="inline-flex h-2 w-2 rounded-full bg-amber-400" aria-hidden />
+                <span className="inline-flex h-2 w-2 rounded-full bg-amber-400" aria-hidden={true} />
                 <span>
                   We're finalizing the productized flows here. For now, navigation remains so partners know a dashboard is part of the roadmap.
                 </span>

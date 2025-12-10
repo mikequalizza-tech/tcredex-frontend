@@ -1,10 +1,12 @@
-export const metadata = {
+import type { Metadata } from "next";
+
+import PageIllustration from "@/components/page-illustration";
+
+export const metadata: Metadata = {
   title: "How it works - tCredex",
   description:
     "See how tCredex pairs AI-driven diligence with a transparent marketplace to streamline tax credit investments.",
 };
-
-import PageIllustration from "@/components/page-illustration";
 
 const steps = [
   {

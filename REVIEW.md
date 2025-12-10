@@ -17,7 +17,3 @@ High-level review of the tCredex frontend codebase, focusing on discoverability,
 3. **Placeholder API route is deployed.**
    - The `app/api/hello/route.ts` endpoint still returns the scaffolded "Hello, Next.js!" response. Remove or replace it with production-ready functionality to avoid exposing unnecessary surface area.
 
-## Suggested Next Steps
-- Update global metadata to reflect the brand and marketing copy.
-- Align navigation with available routes, or create thin placeholder pages with clear messaging until the full experiences are built.
-- Remove unused scaffolded endpoints and double-check that only intended API surface is exposed.

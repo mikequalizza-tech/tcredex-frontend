@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import useMousePosition from "@/utils/useMousePosition";
 
 type SpotlightProps = {
@@ -18,36 +18,14 @@ export default function Spotlight({
   const containerSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const [boxes, setBoxes] = useState<Array<HTMLElement>>([]);
 
-  useEffect(() => {
-    containerRef.current &&
-      setBoxes(
-        Array.from(containerRef.current.children).map(
-          (el) => el as HTMLElement,
-        ),
-      );
-  }, []);
-
-  useEffect(() => {
-    initContainer();
-    window.addEventListener("resize", initContainer);
-
-    return () => {
-      window.removeEventListener("resize", initContainer);
-    };
-  }, [boxes]);
-
-  useEffect(() => {
-    onMouseMove();
-  }, [mousePosition]);
-
-  const initContainer = () => {
+  const initContainer = useCallback(() => {
     if (containerRef.current) {
       containerSize.current.w = containerRef.current.offsetWidth;
       containerSize.current.h = containerRef.current.offsetHeight;
     }
-  };
+  }, []);
 
-  const onMouseMove = () => {
+  const onMouseMove = useCallback(() => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const { w, h } = containerSize.current;
@@ -67,7 +45,26 @@ export default function Spotlight({
         });
       }
     }
-  };
+  }, [boxes, mousePosition]);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setBoxes(Array.from(containerRef.current.children) as HTMLElement[]);
+    }
+  }, []);
+
+  useEffect(() => {
+    initContainer();
+    window.addEventListener("resize", initContainer);
+
+    return () => {
+      window.removeEventListener("resize", initContainer);
+    };
+  }, [initContainer]);
+
+  useEffect(() => {
+    onMouseMove();
+  }, [onMouseMove]);
 
   return (
     <div className={className} ref={containerRef}>

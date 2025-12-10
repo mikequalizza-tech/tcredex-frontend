@@ -64,7 +64,7 @@ export default function Spotlight({
 
   useEffect(() => {
     onMouseMove();
-  }, [onMouseMove, mousePosition]);
+  }, [onMouseMove]);
 
   return (
     <div className={className} ref={containerRef}>

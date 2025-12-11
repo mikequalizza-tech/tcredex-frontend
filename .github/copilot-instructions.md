@@ -18,10 +18,11 @@
 
 ### ✅ Tailwind Usage
 
-- Detect any use of unsupported or purged utility classes (e.g., `rounded-lg`, `bg-*`, etc.)
+- Detect any use of utility classes that may have been purged or are not included in the configuration
 - Confirm Tailwind classes match expected HTML/JSX structure
-- Ensure `tailwind.config.js` content paths cover all file types used
-- Validate that only Tailwind v4-compatible utilities are used
+- Ensure `tailwind.config.js` content paths cover all file types used (JS, TS, JSX, TSX)
+- Validate that only Tailwind v4-compatible utilities and syntax are used
+- Flag usage of deprecated v3 features or configuration patterns
 
 ### ✅ App Router Structure
 
@@ -42,7 +43,7 @@ If Mapbox is imported:
 
 - Confirm access token is **not hardcoded** in components
 - Validate layers and event handlers are performant
-- Tract overlays must load via GeoJSON or API route
+- Track overlays must load via GeoJSON or API route
 - Check for proper error handling on map load failures
 - Ensure map interactions (click/hover) include proper event handling
 

@@ -5,10 +5,11 @@ export const metadata = {
 
 import PageIllustration from "@/components/page-illustration";
 import Hero from "@/components/hero-home";
-import Workflows from "@/components/workflows";
+import FeaturedDeals from "@/components/featured-deals";
 import Features from "@/components/features";
-import Pricing from "@/components/pricing-home";
+import MapSection from "@/components/map-section";
 import SplitCarousel from "@/components/split-carousel";
+import Pricing from "@/components/pricing-home";
 import Cta from "@/components/cta";
 
 export default function Home() {
@@ -16,8 +17,9 @@ export default function Home() {
     <>
       <PageIllustration />
       <Hero />
-      <Workflows />
+      <FeaturedDeals />
       <Features />
+      <MapSection />
       <SplitCarousel />
       <Pricing />
       <Cta />

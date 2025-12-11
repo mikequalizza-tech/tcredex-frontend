@@ -7,29 +7,28 @@ import { Transition } from "@headlessui/react";
 import CarouselImg01 from "@/public/images/carousel-01.png";
 import CarouselImg02 from "@/public/images/carousel-02.png";
 import CarouselImg03 from "@/public/images/carousel-03.png";
-import SmallTestimonialImg from "@/public/images/small-testimonial.jpg";
 
 const tabs = [
   {
-    title: "Strategic Sync",
+    title: "Automatch AI™",
     description:
-      "Remove corners from the avatars and transform the way your team work.",
+      "Instantly match projects to eligible CDEs, investors, and census tracts based on program requirements.",
     img: CarouselImg01,
-    imgAlt: "Carousel image 01",
+    imgAlt: "Automatch AI matching dashboard",
   },
   {
-    title: "Feedback Loop",
+    title: "Deal Room",
     description:
-      "Best-in-class design practices to keep your work safe and secure.",
+      "Secure virtual closing room with document management, milestone tracking, and stakeholder collaboration.",
     img: CarouselImg02,
-    imgAlt: "Carousel image 02",
+    imgAlt: "Deal room interface",
   },
   {
-    title: "Enterprise-Ready",
+    title: "Compliance Engine",
     description:
-      "Built for teams of all sizes. From early-stage startups to global enterprises.",
+      "Automated compliance monitoring for NMTC 7-year, LIHTC 15-year, and HTC 5-year requirements.",
     img: CarouselImg03,
-    imgAlt: "Carousel image 03",
+    imgAlt: "Compliance tracking dashboard",
   },
 ];
 
@@ -46,18 +45,18 @@ export default function SplitCarousel() {
               <div className="shrink-0 md:w-[500px] *:pl-7">
                 <div className="inline-flex items-center gap-3 pb-3 before:h-px before:w-8 before:bg-linear-to-r before:from-transparent before:to-indigo-200/50 after:h-px after:w-8 after:bg-linear-to-l after:from-transparent after:to-indigo-200/50">
                   <span className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text text-transparent">
-                    Software Standard
+                    Platform Capabilities
                   </span>
                 </div>
                 <div className="relative mb-6 border-l [border-image:linear-gradient(to_bottom,transparent,--theme(--color-slate-400/.25),transparent)1] after:absolute after:left-0 after:top-0 after:h-4 after:w-px after:origin-bottom after:-translate-y-full after:animate-shine after:bg-[linear-gradient(180deg,transparent,--theme(--color-indigo-500/.5)_25%,--theme(--color-indigo-500)_50%,--theme(--color-indigo-500/.5)_75%,transparent)] after:opacity-0">
                   <div className="mb-4">
                     <h2 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-4 font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
-                      Improve efficiency & global coverage
+                      End-to-End Tax Credit Automation
                     </h2>
                     <p className="text-indigo-200/65">
-                      Open is so simple to use, it's easy to overlook the wealth
-                      of complex technologies packed under the hood that keep
-                      Open robust, safe, and blazing fast.
+                      From project intake to closing, tCredex streamlines every step 
+                      of the tax credit financing process. Our AI-powered platform 
+                      connects sponsors, CDEs, and investors in one unified marketplace.
                     </p>
                   </div>
 
@@ -92,27 +91,20 @@ export default function SplitCarousel() {
                 </div>
                 <div>
                   <p className="mb-4 font-nacelle text-gray-200">
-                    “I was blown away by how easy it was to create my content
-                    using this tool! Within a few hours, I had a
-                    professional-looking flow up and running.”
+                    "tCredex cut our deal cycle time in half. The automated census 
+                    tract eligibility checks and CDE matching saved us weeks of work 
+                    on every transaction."
                   </p>
                   <div className="flex items-center gap-3">
-                    <Image
-                      className="inline-flex shrink-0 rounded-full"
-                      src={SmallTestimonialImg}
-                      width={24}
-                      height={24}
-                      alt="Small testimonial"
-                    />
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
+                      JM
+                    </div>
                     <div className="text-sm font-medium text-gray-200">
-                      <span>Chris Pick</span>
+                      <span>James Mitchell</span>
                       <span className="text-gray-700"> - </span>
-                      <a
-                        className="text-indigo-200/65 transition-colors hover:text-indigo-500"
-                        href="#0"
-                      >
-                        Notion Circle
-                      </a>
+                      <span className="text-indigo-200/65">
+                        Director, Community Development Finance
+                      </span>
                     </div>
                   </div>
                 </div>

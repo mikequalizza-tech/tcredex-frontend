@@ -4,7 +4,7 @@ import AvatarImg01 from "@/public/images/avatar-01.jpg";
 import AvatarImg02 from "@/public/images/avatar-02.jpg";
 import AvatarImg03 from "@/public/images/avatar-03.jpg";
 import AvatarImg04 from "@/public/images/avatar-04.jpg";
-import PricingTable from "@/components/pricing-table";
+import PricingTable from "@/components/pricingtable";
 
 export default function HeroPricing() {
   return (

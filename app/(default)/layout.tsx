@@ -1,5 +1,5 @@
-import Header from "@/components/ui/Header";
-import Footer from "@/components/ui/Footer";
+import Header from "@/components/ui/header";
+import Footer from "@/components/ui/footer";
 
 export default function DefaultLayout({
   children,

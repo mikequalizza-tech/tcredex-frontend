@@ -1,7 +1,7 @@
 import Image from "next/image";
 import BlurredShape from "@/public/images/blurred-shape.svg";
 import TestimonialImage from "@/public/images/large-testimonial-01.jpg";
-import PricingTable from "@/components/pricing-table";
+import PricingTable from "@/components/pricingtable";
 
 export default function PricingHome() {
   return (

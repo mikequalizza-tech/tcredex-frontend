@@ -5,7 +5,7 @@ export const metadata = {
 
 import PageIllustration from "@/components/PageIllustration";
 import FooterSeparator from "@/components/FooterSeparator";
-import Hero from "@/components/HeroPricing";
+import Hero from "@/components/heropricing";
 import Faqs from "@/components/faqs";
 import Testimonials from "@/components/testimonials";
 import Cta from "@/components/cta";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function PricingTable() {
+export default function pricingtable() {
   const [annual, setAnnual] = useState<boolean>(true);
 
   return (

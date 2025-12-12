@@ -1,6 +1,5 @@
-import Header from "@/components/ui/header";
-import Footer from "@/components/ui/footer";
-import AOSProvider from "@/components/aosprovider";
+import Header from "@/components/ui/Header";
+import Footer from "@/components/ui/Footer";
 
 export default function DefaultLayout({
   children,
@@ -8,10 +7,12 @@ export default function DefaultLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AOSProvider>
+    <>
       <Header />
-      <main className="relative flex grow flex-col">{children}</main>
+      <main className="min-h-screen">
+        {children}
+      </main>
       <Footer />
-    </AOSProvider>
+    </>
   );
 }

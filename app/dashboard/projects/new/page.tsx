@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 
 export default function IntakeFormV4() {
@@ -16,7 +15,7 @@ export default function IntakeFormV4() {
     email: "",
   });
 
-  function handleChange(e) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -24,7 +23,7 @@ export default function IntakeFormV4() {
     }));
   }
 
-  function handleSubmit(e) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     fetch("/api/intake/route", {
       method: "POST",

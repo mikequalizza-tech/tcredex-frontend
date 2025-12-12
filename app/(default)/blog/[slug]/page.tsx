@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getBlogPosts } from "@/components/mdx/utils";
 import { notFound } from "next/navigation";
-import PageIllustration from "@/components/page-illustration";
+import PageIllustration from "@/components/PageIllustration";
 import Image from "next/image";
 import { CustomMDX } from "@/components/mdx/mdx";
 import RelatedPosts from "./related-posts";

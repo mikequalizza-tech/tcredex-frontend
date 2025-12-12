@@ -1,6 +1,6 @@
 import { getBlogPosts } from "@/components/mdx/utils";
 import CategoryProvider from "./category-provider";
-import PageIllustration from "@/components/page-illustration";
+import PageIllustration from "@/components/PageIllustration";
 import BlogFilters from "./filters";
 import PostItem from "@/app/(default)/blog/post-item";
 

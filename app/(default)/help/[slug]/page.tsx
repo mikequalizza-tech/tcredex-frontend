@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { getHelpPages } from "@/components/mdx/utils";
 import { notFound } from "next/navigation";
-import PageIllustration from "@/components/page-illustration";
+import PageIllustration from "@/components/PageIllustration";
 import Sidebar from "./help-sidebar";
-import FooterSeparator from "@/components/footer-separator";
+import FooterSeparator from "@/components/FooterSeparator";
 import { CustomMDX } from "@/components/mdx/mdx";
 
 export async function generateStaticParams() {

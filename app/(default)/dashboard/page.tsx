@@ -6,7 +6,7 @@ export const metadata: Metadata = {
     "A secure dashboard for monitoring tax credit deals, counterparties, and servicing tasks across the tCredex marketplace.",
 };
 
-import PageIllustration from "@/components/page-illustration";
+import PageIllustration from "@/components/PageIllustration";
 
 export default function DashboardPlaceholder() {
   return (

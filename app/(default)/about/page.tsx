@@ -3,8 +3,8 @@ export const metadata = {
   description: "Learn about tCredex's mission to streamline tax credit financing for community development",
 };
 
-import PageIllustration from "@/components/page-illustration";
-import Hero from "@/components/hero-about";
+import PageIllustration from "@/components/PageIllustration";
+import Hero from "@/components/heroabout";
 import Timeline from "@/components/timeline";
 import Team from "@/components/team";
 import Benefits from "@/components/benefits";

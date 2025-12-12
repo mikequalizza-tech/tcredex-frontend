@@ -3,8 +3,9 @@ export const metadata = {
   description: "Transparent pricing for tCredex tax credit marketplace platform",
 };
 
-import PageIllustration from "@/components/page-illustration";
-import Hero from "@/components/hero-pricing";
+import PageIllustration from "@/components/PageIllustration";
+import FooterSeparator from "@/components/FooterSeparator";
+import Hero from "@/components/HeroPricing";
 import Faqs from "@/components/faqs";
 import Testimonials from "@/components/testimonials";
 import Cta from "@/components/cta";

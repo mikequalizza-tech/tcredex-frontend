@@ -1,6 +1,6 @@
 import Header from "@/components/ui/header";
 import Footer from "@/components/ui/footer";
-import AOSProvider from "@/components/aos-provider";
+import AOSProvider from "@/components/aosprovider";
 
 export default function DefaultLayout({
   children,

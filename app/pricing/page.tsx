@@ -3,8 +3,8 @@
   description: "Transparent pricing for tCredex tax credit marketplace platform",
 };
 
-import PageIllustration from "@/components/pageillustration";
-import FooterSeparator from "@/components/footerseparator";
+import PageIllustration from "@/components/PageIllustration";
+import FooterSeparator from "@/components/FooterSeparator";
 import Hero from "@/components/heropricing";
 import Faqs from "@/components/faqs";
 import Testimonials from "@/components/testimonials";

@@ -3,13 +3,13 @@
   description: "Page description",
 };
 
-import PageIllustration from "@/components/pageillustration";
+import PageIllustration from "@/components/PageIllustration";
 import Image from "next/image";
 import AvatarImg01 from "@/public/images/avatar-group-01.jpg";
 import AvatarImg02 from "@/public/images/avatar-group-02.jpg";
 import AvatarImg03 from "@/public/images/avatar-group-03.jpg";
 import AvatarImg04 from "@/public/images/avatar-group-04.jpg";
-import FooterSeparator from "@/components/footerseparator";
+import FooterSeparator from "@/components/FooterSeparator";
 
 export default function Newsletter() {
   return (

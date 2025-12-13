@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
-import DealCard, { Deal } from '@/components/DealCard';
+import DealCard, { Deal } from '@/components/dealcard';
 
 // Sample deals
 const allDeals: Deal[] = [

@@ -1,9 +1,9 @@
-export const metadata = {
+﻿export const metadata = {
   title: "About us - tCredex",
   description: "Learn about tCredex's mission to streamline tax credit financing for community development",
 };
 
-import PageIllustration from "@/components/PageIllustration";
+import PageIllustration from "@/components/pageillustration";
 import Hero from "@/components/heroabout";
 import Timeline from "@/components/timeline";
 import Team from "@/components/team";

@@ -1,4 +1,4 @@
-export const metadata = {
+﻿export const metadata = {
   title: "Sign Up - Open PRO",
   description: "Page description",
 };

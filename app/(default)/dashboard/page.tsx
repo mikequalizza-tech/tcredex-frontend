@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Dashboard - tCredex",
@@ -6,7 +6,7 @@ export const metadata: Metadata = {
     "A secure dashboard for monitoring tax credit deals, counterparties, and servicing tasks across the tCredex marketplace.",
 };
 
-import PageIllustration from "@/components/PageIllustration";
+import PageIllustration from "@/components/pageillustration";
 
 export default function DashboardPlaceholder() {
   return (

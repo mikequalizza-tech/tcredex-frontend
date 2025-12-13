@@ -1,10 +1,10 @@
-export const metadata = {
+﻿export const metadata = {
   title: "Pricing - tCredex",
   description: "Transparent pricing for tCredex tax credit marketplace platform",
 };
 
-import PageIllustration from "@/components/PageIllustration";
-import FooterSeparator from "@/components/FooterSeparator";
+import PageIllustration from "@/components/pageillustration";
+import FooterSeparator from "@/components/footerseparator";
 import Hero from "@/components/heropricing";
 import Faqs from "@/components/faqs";
 import Testimonials from "@/components/testimonials";

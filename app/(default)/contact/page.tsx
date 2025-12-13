@@ -1,10 +1,10 @@
-export const metadata = {
+﻿export const metadata = {
   title: "Contact us - Open PRO",
   description: "Page description",
 };
 
-import PageIllustration from "@/components/PageIllustration";
-import FooterSeparator from "@/components/FooterSeparator";
+import PageIllustration from "@/components/pageillustration";
+import FooterSeparator from "@/components/footerseparator";
 
 export default function Contact() {
   return (

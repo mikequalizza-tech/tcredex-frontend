@@ -1,8 +1,8 @@
-﻿import HeroHome from "@/components/herohome";
+﻿import HeroHome from "@/components/HeroHome";
 import Features from "@/components/features";
 import Workflows from "@/components/workflows";
 import Cta from "@/components/cta";
-import FooterSeparator from "@/components/footerseparator";
+import FooterSeparator from "@/components/FooterSeparator";
 
 export const metadata = {
   title: "Home - tCredex",

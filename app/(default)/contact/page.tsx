@@ -3,8 +3,8 @@
   description: "Page description",
 };
 
-import PageIllustration from "@/components/pageillustration";
-import FooterSeparator from "@/components/footerseparator";
+import PageIllustration from "@/components/PageIllustration";
+import FooterSeparator from "@/components/FooterSeparator";
 
 export default function Contact() {
   return (

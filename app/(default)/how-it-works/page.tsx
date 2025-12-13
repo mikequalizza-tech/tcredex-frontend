@@ -6,8 +6,8 @@ export const metadata: Metadata = {
     "See how tCredex pairs AI-driven diligence with a transparent marketplace to streamline tax credit investments.",
 };
 
-import PageIllustration from "@/components/pageillustration";
-import FooterSeparator from "@/components/footerseparator";
+import PageIllustration from "@/components/PageIllustration";
+import FooterSeparator from "@/components/FooterSeparator";
 
 const steps = [
   {

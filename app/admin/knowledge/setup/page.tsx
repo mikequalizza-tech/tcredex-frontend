@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SETUP_SQL } from '@/lib/knowledge';
+import { SETUP_SQL } from '@/lib/knowledge/setup-sql';
 
 export default function KnowledgeSetupPage() {
   const [copied, setCopied] = useState(false);

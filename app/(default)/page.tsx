@@ -2,22 +2,21 @@ import HeroHome from "@/components/HeroHome";
 import Features from "@/components/features";
 import Workflows from "@/components/workflows";
 import Cta from "@/components/cta";
-import FooterSeparator from "@/components/FooterSeparator";
-
-export const metadata = {
-  title: "Home - tCredex",
-  description:
-    "AI-Powered 5-Tax Credit Community Marketplace including State and Federal-Tax Credits for NMTC, LIHTC, HTC, OZ, Brownfield.",
-};
+import MapSection from "@/components/MapSection";
 
 export default function HomePage() {
   return (
     <>
       <HeroHome />
       <Features />
+      <MapSection 
+        title="Free Census Tract Check" 
+        description="Search any U.S. address to determine NMTC, LIHTC, and HTC eligibility instantly. No login required." 
+        showLegend 
+        showSearch 
+      />
       <Workflows />
       <Cta />
-      <FooterSeparator />
     </>
   );
 }

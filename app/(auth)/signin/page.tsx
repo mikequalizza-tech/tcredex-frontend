@@ -1,11 +1,53 @@
-﻿export const metadata = {
-  title: "Sign In - Open PRO",
-  description: "Page description",
-};
+'use client';
 
-import Link from "next/link";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useCurrentUser } from '@/lib/auth';
 
 export default function SignIn() {
+  const router = useRouter();
+  const { login, isAuthenticated, isLoading } = useCurrentUser();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect if already logged in
+  if (!isLoading && isAuthenticated) {
+    router.push('/dashboard');
+    return null;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+
+    const result = await login(email, password);
+    
+    if (result.success) {
+      router.push('/dashboard');
+    } else {
+      setError(result.error || 'Login failed');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDemoLogin = async (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword('demo123');
+    setIsSubmitting(true);
+    
+    const result = await login(demoEmail, 'demo123');
+    if (result.success) {
+      router.push('/dashboard');
+    } else {
+      setError(result.error || 'Demo login failed');
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <section>
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -13,39 +55,43 @@ export default function SignIn() {
           {/* Section header */}
           <div className="pb-12 text-center">
             <h1 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
-              Welcome back
+              Welcome back to tCredex
             </h1>
+            <p className="mt-4 text-indigo-200/65">
+              Sign in to access your deals, matches, and closing rooms.
+            </p>
           </div>
-          {/* Contact form */}
-          <form className="mx-auto max-w-[400px]">
+
+          {/* Sign in form */}
+          <form className="mx-auto max-w-[400px]" onSubmit={handleSubmit}>
+            {error && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-500 rounded-lg text-red-300 text-sm">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-5">
               <div>
-                <label
-                  className="mb-1 block text-sm font-medium text-indigo-200/65"
-                  htmlFor="email"
-                >
+                <label className="mb-1 block text-sm font-medium text-indigo-200/65" htmlFor="email">
                   Email
                 </label>
                 <input
                   id="email"
                   type="email"
                   className="form-input w-full"
-                  placeholder="Your email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
               </div>
               <div>
                 <div className="mb-1 flex items-center justify-between gap-3">
-                  <label
-                    className="block text-sm font-medium text-indigo-200/65"
-                    htmlFor="password"
-                  >
+                  <label className="block text-sm font-medium text-indigo-200/65" htmlFor="password">
                     Password
                   </label>
-                  <Link
-                    className="text-sm text-gray-600 hover:underline"
-                    href="/reset-password"
-                  >
-                    Forgot?
+                  <Link className="text-sm text-gray-600 hover:underline" href="/reset-password">
+                    Forgot password?
                   </Link>
                 </div>
                 <input
@@ -53,26 +99,71 @@ export default function SignIn() {
                   type="password"
                   className="form-input w-full"
                   placeholder="Your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
               </div>
             </div>
+
             <div className="mt-6 space-y-5">
-              <button className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]">
-                Sign in
-              </button>
-              <div className="flex items-center gap-3 text-center text-sm italic text-gray-600 before:h-px before:flex-1 before:bg-linear-to-r before:from-transparent before:via-gray-400/25 after:h-px after:flex-1 after:bg-linear-to-r after:from-transparent after:via-gray-400/25">
-                or
-              </div>
-              <button className="btn relative w-full bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]">
-                Sign In with Google
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] disabled:opacity-50"
+              >
+                {isSubmitting ? 'Signing In...' : 'Sign In'}
               </button>
             </div>
           </form>
+
+          {/* Demo accounts */}
+          <div className="mx-auto max-w-[400px] mt-8 pt-8 border-t border-gray-800">
+            <p className="text-center text-sm text-gray-400 mb-4">Quick Demo Login</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleDemoLogin('sarah@midwestcde.com')}
+                disabled={isSubmitting}
+                className="p-3 bg-purple-900/30 border border-purple-700 rounded-lg text-sm text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50"
+              >
+                <div className="font-medium">CDE User</div>
+                <div className="text-xs text-purple-400/70">Sarah Chen</div>
+              </button>
+              <button
+                onClick={() => handleDemoLogin('john@eastsidefood.org')}
+                disabled={isSubmitting}
+                className="p-3 bg-green-900/30 border border-green-700 rounded-lg text-sm text-green-300 hover:bg-green-900/50 transition-colors disabled:opacity-50"
+              >
+                <div className="font-medium">Sponsor</div>
+                <div className="text-xs text-green-400/70">John Martinez</div>
+              </button>
+              <button
+                onClick={() => handleDemoLogin('michael@greatlakes.bank')}
+                disabled={isSubmitting}
+                className="p-3 bg-blue-900/30 border border-blue-700 rounded-lg text-sm text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50"
+              >
+                <div className="font-medium">Investor</div>
+                <div className="text-xs text-blue-400/70">Michael Thompson</div>
+              </button>
+              <button
+                onClick={() => handleDemoLogin('admin@tcredex.com')}
+                disabled={isSubmitting}
+                className="p-3 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300 hover:bg-red-900/50 transition-colors disabled:opacity-50"
+              >
+                <div className="font-medium">Admin</div>
+                <div className="text-xs text-red-400/70">Platform Admin</div>
+              </button>
+            </div>
+            <p className="text-center text-xs text-gray-500 mt-3">
+              Demo password: <code className="bg-gray-800 px-1.5 py-0.5 rounded">demo123</code>
+            </p>
+          </div>
+
           {/* Bottom link */}
           <div className="mt-6 text-center text-sm text-indigo-200/65">
-            Don't you have an account?{" "}
-            <Link className="font-medium text-indigo-500" href="/signup">
-              Sign Up
+            Don&apos;t have an account?{" "}
+            <Link className="font-medium text-indigo-500 hover:text-indigo-400" href="/signup">
+              Create Account
             </Link>
           </div>
         </div>

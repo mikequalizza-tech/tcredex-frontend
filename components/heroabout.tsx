@@ -1,10 +1,3 @@
-import Image from "next/image";
-
-import TeamImg01 from "@/public/images/team-mosaic-01.jpg";
-import TeamImg02 from "@/public/images/team-mosaic-02.jpg";
-import TeamImg03 from "@/public/images/team-mosaic-03.jpg";
-import TeamImg04 from "@/public/images/team-mosaic-04.jpg";
-
 export default function HeroAbout() {
   return (
     <section>
@@ -14,90 +7,52 @@ export default function HeroAbout() {
           {/* Section header */}
           <div className="pb-12 text-center md:pb-20">
             <h1 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-5 font-nacelle text-4xl font-semibold text-transparent md:text-5xl">
-              The story behind the project
+              About tCredex
             </h1>
             <div className="mx-auto max-w-3xl">
-              <p className="text-xl text-indigo-200/65">
-                Developers are trusted to create an engaging experience for
-                their companies, so we build tools to help them.
+              <p className="text-xl text-indigo-200/65 mb-6">
+                The AI-powered marketplace connecting tax credit projects with the capital they need.
+              </p>
+              <p className="text-base text-indigo-200/50">
+                tCredex was born from a simple observation: the tax credit financing ecosystem is fragmented, opaque, and inefficient. Project sponsors struggle to find CDEs with allocation authority. CDEs waste time reviewing unqualified deals. Investors lack visibility into the pipeline.
               </p>
             </div>
           </div>
-          <div className="mx-auto max-w-3xl">
-            <div className="relative aspect-4/3 w-full">
-              <figure
-                className="absolute h-auto"
-                style={{ top: "45%", width: "41.67%", maxWidth: 320 }}
-                data-aos="fade-right"
-              >
-                <div className="relative -rotate-2 overflow-hidden rounded-2xl before:absolute before:inset-0 before:bg-linear-to-br before:from-gray-900 before:via-indigo-500 before:to-gray-900">
-                  <Image
-                    className="opacity-80 grayscale"
-                    src={TeamImg02}
-                    width={320}
-                    height={240}
-                    alt="Team mosaic 02"
-                  />
-                </div>
-              </figure>
-              <figure
-                className="relative mx-auto"
-                style={{ width: "78.13%", maxWidth: 600 }}
-                data-aos="fade-down"
-                data-aos-delay={100}
-              >
-                <div className="relative -rotate-2 overflow-hidden rounded-2xl before:absolute before:inset-0 before:bg-linear-to-br before:from-gray-900 before:via-indigo-500 before:to-gray-900">
-                  <Image
-                    className="opacity-90 grayscale"
-                    src={TeamImg01}
-                    width={600}
-                    height={338}
-                    alt="Team mosaic 01"
-                  />
-                </div>
-              </figure>
-              <figure
-                className="absolute h-auto"
-                style={{
-                  top: "8.5%",
-                  right: 0,
-                  width: "32.56%",
-                  maxWidth: 250,
-                }}
-                data-aos="fade-left"
-                data-aos-delay={200}
-              >
-                <div className="relative rotate-2 overflow-hidden rounded-2xl before:absolute before:inset-0 before:bg-linear-to-br before:from-gray-900 before:via-indigo-500 before:to-gray-900">
-                  <Image
-                    className="opacity-90 grayscale"
-                    src={TeamImg03}
-                    width={250}
-                    height={188}
-                    alt="Team mosaic 03"
-                  />
-                </div>
-              </figure>
-              <figure
-                className="absolute h-auto"
-                style={{
-                  bottom: 0,
-                  right: "20%",
-                  width: "25.53%",
-                  maxWidth: 196,
-                }}
-                data-aos="fade-up"
-                data-aos-delay={300}
-              >
-                <div className="relative rotate-2 overflow-hidden rounded-2xl before:absolute before:inset-0 before:bg-linear-to-br before:from-gray-900 before:via-indigo-500 before:to-gray-900 before:opacity-10">
-                  <Image
-                    className="opacity-20 grayscale"
-                    src={TeamImg04}
-                    width={196}
-                    height={196}
-                    alt="Team mosaic 04"
-                  />
-                </div>
-              </figure>
+
+          {/* Mission & Vision */}
+          <div className="mx-auto max-w-4xl">
+            <div className="grid gap-8 md:grid-cols-2">
+              <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-100 mb-3">Our Mission</h2>
+                <p className="text-indigo-200/65">
+                  To democratize access to tax credit financing by creating the most efficient marketplace for connecting community development projects with the capital they need to succeed.
+                </p>
+              </div>
+              <div className="bg-gray-900/50 rounded-2xl p-6 border border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-100 mb-3">Our Vision</h2>
+                <p className="text-indigo-200/65">
+                  A world where every qualified project in low-income and distressed communities can access tax credit financing quickly, transparently, and at fair terms.
+                </p>
+              </div>
+            </div>
+
+            {/* 5 Programs */}
+            <div className="mt-12 text-center">
+              <h2 className="text-xl font-semibold text-gray-100 mb-6">5 Tax Credit Programs. One Platform.</h2>
+              <div className="flex flex-wrap justify-center gap-3">
+                <span className="px-4 py-2 bg-indigo-900/50 text-indigo-300 rounded-full text-sm font-medium">NMTC</span>
+                <span className="px-4 py-2 bg-green-900/50 text-green-300 rounded-full text-sm font-medium">LIHTC</span>
+                <span className="px-4 py-2 bg-amber-900/50 text-amber-300 rounded-full text-sm font-medium">HTC</span>
+                <span className="px-4 py-2 bg-purple-900/50 text-purple-300 rounded-full text-sm font-medium">Opportunity Zones</span>
+                <span className="px-4 py-2 bg-teal-900/50 text-teal-300 rounded-full text-sm font-medium">Brownfield</span>
+              </div>
+            </div>
+
+            {/* Affiliate Note */}
+            <div className="mt-12 text-center">
+              <p className="text-sm text-gray-500">
+                tCredex.com is an affiliate of American Impact Ventures LLC
+              </p>
             </div>
           </div>
         </div>

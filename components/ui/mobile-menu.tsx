@@ -8,7 +8,6 @@ export default function MobileMenu() {
   const trigger = useRef<HTMLButtonElement>(null);
   const mobileNav = useRef<HTMLDivElement>(null);
 
-  // close on click outside
   useEffect(() => {
     const clickHandler = ({ target }: { target: EventTarget | null }): void => {
       if (!mobileNav.current || !trigger.current) return;
@@ -24,7 +23,6 @@ export default function MobileMenu() {
     return () => document.removeEventListener("click", clickHandler);
   });
 
-  // close if the esc key is pressed
   useEffect(() => {
     const keyHandler = ({ key }: { key: string }): void => {
       if (!mobileNavOpen || key !== "Escape") return;
@@ -34,9 +32,10 @@ export default function MobileMenu() {
     return () => document.removeEventListener("keydown", keyHandler);
   });
 
+  const closeMenu = () => setMobileNavOpen(false);
+
   return (
     <div className="md:hidden">
-      {/* Hamburger button */}
       <button
         ref={trigger}
         className={`hamburger ${mobileNavOpen && "active"}`}
@@ -56,52 +55,85 @@ export default function MobileMenu() {
         </svg>
       </button>
 
-      {/* Mobile navigation */}
       <nav
         id="mobile-nav"
         ref={mobileNav}
         className={`absolute left-0 top-full z-20 w-full overflow-hidden transition-all duration-300 ease-in-out ${
-          mobileNavOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
+          mobileNavOpen ? "max-h-[80vh] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <ul className="rounded-2xl bg-gray-900/90 px-4 py-2 backdrop-blur-sm">
-          <li>
-            <Link
-              href="/"
-              className="flex py-2 text-gray-300 transition hover:text-white"
-              onClick={() => setMobileNavOpen(false)}
-            >
-              Home
+        <div className="rounded-2xl bg-gray-900/95 px-4 py-4 backdrop-blur-sm mt-2 mx-4 border border-gray-800 max-h-[70vh] overflow-y-auto">
+          {/* Home */}
+          <Link href="/" className="block py-2 text-gray-300 hover:text-white font-medium" onClick={closeMenu}>
+            Home
+          </Link>
+
+          {/* Platform Section */}
+          <div className="mt-4 pt-4 border-t border-gray-800">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Platform</p>
+            <Link href="/map" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              Map
             </Link>
-          </li>
-          <li>
-            <Link
-              href="/how-it-works"
-              className="flex py-2 text-gray-300 transition hover:text-white"
-              onClick={() => setMobileNavOpen(false)}
-            >
+            <Link href="/deals" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              Marketplace
+            </Link>
+            <Link href="/automatch" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              AutoMatch AI
+            </Link>
+            <Link href="/pricing" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              Pricing Coach
+            </Link>
+          </div>
+
+          {/* Portals Section */}
+          <div className="mt-4 pt-4 border-t border-gray-800">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Portals</p>
+            <Link href="/dashboard" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              Sponsor Portal
+            </Link>
+            <Link href="/cde" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              CDE Portal
+            </Link>
+            <Link href="/investor" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              Investor Portal
+            </Link>
+          </div>
+
+          {/* Resources Section */}
+          <div className="mt-4 pt-4 border-t border-gray-800">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Resources</p>
+            <Link href="/features" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              Features
+            </Link>
+            <Link href="/how-it-works" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
               How It Works
             </Link>
-          </li>
-          <li>
-            <Link
-              href="/blog"
-              className="flex py-2 text-gray-300 transition hover:text-white"
-              onClick={() => setMobileNavOpen(false)}
-            >
-              Blog
+            <Link href="/who-we-serve" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              Who We Serve
             </Link>
-          </li>
-          <li>
-            <Link
-              href="/dashboard"
-              className="flex py-2 text-gray-300 transition hover:text-white"
-              onClick={() => setMobileNavOpen(false)}
-            >
-              Dashboard
+            <Link href="/about" className="block py-2 text-gray-300 hover:text-white" onClick={closeMenu}>
+              About
             </Link>
-          </li>
-        </ul>
+          </div>
+
+          {/* Auth */}
+          <div className="mt-4 pt-4 border-t border-gray-800 flex gap-3">
+            <Link 
+              href="/signin" 
+              className="flex-1 py-2 text-center text-gray-300 hover:text-white border border-gray-700 rounded-lg" 
+              onClick={closeMenu}
+            >
+              Login
+            </Link>
+            <Link 
+              href="/signup" 
+              className="flex-1 py-2 text-center text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium" 
+              onClick={closeMenu}
+            >
+              Register
+            </Link>
+          </div>
+        </div>
       </nav>
     </div>
   );

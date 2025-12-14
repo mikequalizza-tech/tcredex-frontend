@@ -1,5 +1,6 @@
-﻿import Header from "@/components/ui/header";
+import Header from "@/components/ui/header";
 import Footer from "@/components/ui/footer";
+import { ChatTC } from "@/components/chat";
 
 export default function DefaultLayout({
   children,
@@ -13,6 +14,7 @@ export default function DefaultLayout({
         {children}
       </main>
       <Footer />
+      <ChatTC />
     </>
   );
 }

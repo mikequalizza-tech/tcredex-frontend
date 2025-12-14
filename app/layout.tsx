@@ -17,9 +17,8 @@ export default function RootLayout({
         <div className="flex min-h-screen flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
           <AOSProvider>{children}</AOSProvider>
         </div>
+        {/* ChatTC is added by individual layouts that need it */}
       </body>
     </html>
   );
 }
-
-

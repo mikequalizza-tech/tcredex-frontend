@@ -1,102 +1,286 @@
-﻿export const metadata = {
-  title: "Sign Up - Open PRO",
-  description: "Page description",
-};
+'use client';
 
-import Link from "next/link";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+type OrgType = 'sponsor' | 'cde' | 'investor';
 
 export default function SignUp() {
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  // Form data
+  const [orgType, setOrgType] = useState<OrgType | ''>('');
+  const [orgName, setOrgName] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // Demo: Store registration locally and auto-login
+    // In production, this would call an API
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+
+      // Create demo session
+      const session = {
+        role: orgType,
+        email: email.toLowerCase(),
+        name,
+        orgName,
+        registeredAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem('tcredex_session', JSON.stringify(session));
+      localStorage.setItem('tcredex_registered_user', JSON.stringify({
+        ...session,
+        password, // In production, never store passwords client-side
+      }));
+
+      // Redirect to dashboard
+      router.push('/dashboard');
+    } catch (err) {
+      setError('Registration failed. Please try again.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const orgTypes = [
+    {
+      id: 'sponsor' as OrgType,
+      name: 'Project Sponsor / Developer',
+      description: 'I have projects seeking tax credit financing',
+      icon: '🏗️',
+      color: 'green',
+    },
+    {
+      id: 'cde' as OrgType,
+      name: 'Community Development Entity',
+      description: 'I allocate NMTC or manage tax credit transactions',
+      icon: '🏛️',
+      color: 'purple',
+    },
+    {
+      id: 'investor' as OrgType,
+      name: 'Tax Credit Investor',
+      description: 'I invest in tax credit transactions for CRA or tax benefits',
+      icon: '💰',
+      color: 'blue',
+    },
+  ];
+
   return (
     <section>
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="py-12 md:py-20">
-          {/* Section header */}
+          {/* Header */}
           <div className="pb-12 text-center">
             <h1 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
-              Create an account
+              Create your tCredex account
             </h1>
+            <p className="mt-4 text-indigo-200/65">
+              Join the tax credit marketplace connecting sponsors, CDEs, and investors.
+            </p>
           </div>
-          {/* Contact form */}
-          <form className="mx-auto max-w-[400px]">
-            <div className="space-y-5">
-              <div>
-                <label
-                  className="mb-1 block text-sm font-medium text-indigo-200/65"
-                  htmlFor="name"
-                >
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  className="form-input w-full"
-                  placeholder="Your full name"
-                  required
-                />
+
+          {/* Progress steps */}
+          <div className="mx-auto max-w-[500px] mb-8">
+            <div className="flex items-center justify-center gap-4">
+              <div className={`flex items-center gap-2 ${step >= 1 ? 'text-indigo-400' : 'text-gray-500'}`}>
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 1 ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-500'}`}>1</span>
+                <span className="text-sm hidden sm:inline">Account Type</span>
               </div>
-              <div>
-                <label
-                  className="mb-1 block text-sm font-medium text-indigo-200/65"
-                  htmlFor="company"
-                >
-                  Company Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="company"
-                  type="text"
-                  className="form-input w-full"
-                  placeholder="Your company name"
-                  required
-                />
-              </div>
-              <div>
-                <label
-                  className="mb-1 block text-sm font-medium text-indigo-200/65"
-                  htmlFor="email"
-                >
-                  Work Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  className="form-input w-full"
-                  placeholder="Your work email"
-                />
-              </div>
-              <div>
-                <label
-                  className="block text-sm font-medium text-indigo-200/65"
-                  htmlFor="password"
-                >
-                  Password <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  className="form-input w-full"
-                  placeholder="Password (at least 10 characters)"
-                />
+              <div className={`w-12 h-px ${step >= 2 ? 'bg-indigo-500' : 'bg-gray-700'}`} />
+              <div className={`flex items-center gap-2 ${step >= 2 ? 'text-indigo-400' : 'text-gray-500'}`}>
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 2 ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-500'}`}>2</span>
+                <span className="text-sm hidden sm:inline">Your Details</span>
               </div>
             </div>
-            <div className="mt-6 space-y-5">
-              <button className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]">
-                Register
-              </button>
-              <div className="flex items-center gap-3 text-center text-sm italic text-gray-600 before:h-px before:flex-1 before:bg-linear-to-r before:from-transparent before:via-gray-400/25 after:h-px after:flex-1 after:bg-linear-to-r after:from-transparent after:via-gray-400/25">
-                or
-              </div>
-              <button className="btn relative w-full bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]">
-                Sign In with Google
-              </button>
-            </div>
-          </form>
-          {/* Bottom link */}
-          <div className="mt-6 text-center text-sm text-indigo-200/65">
-            Already have an account?{" "}
-            <Link className="font-medium text-indigo-500" href="/signin">
-              Sign in
-            </Link>
           </div>
+
+          {error && (
+            <div className="mx-auto max-w-[500px] mb-6 p-3 bg-red-900/30 border border-red-500 rounded-lg text-red-300 text-sm text-center">
+              {error}
+            </div>
+          )}
+
+          {/* Step 1: Select Organization Type */}
+          {step === 1 && (
+            <div className="mx-auto max-w-[500px]">
+              <h2 className="text-lg font-semibold text-gray-200 mb-4 text-center">What best describes you?</h2>
+              <div className="space-y-3">
+                {orgTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => {
+                      setOrgType(type.id);
+                      setStep(2);
+                    }}
+                    className={`w-full p-4 rounded-xl border-2 text-left transition-all hover:bg-gray-800/50 ${
+                      orgType === type.id
+                        ? type.color === 'green' ? 'border-green-500 bg-green-900/20' :
+                          type.color === 'purple' ? 'border-purple-500 bg-purple-900/20' :
+                          'border-blue-500 bg-blue-900/20'
+                        : 'border-gray-700 hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <span className="text-3xl">{type.icon}</span>
+                      <div>
+                        <p className="font-semibold text-gray-200">{type.name}</p>
+                        <p className="text-sm text-gray-400 mt-1">{type.description}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-8 text-center text-sm text-indigo-200/65">
+                Already have an account?{" "}
+                <Link className="font-medium text-indigo-500 hover:text-indigo-400" href="/signin">
+                  Sign in
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Account Details */}
+          {step === 2 && (
+            <form className="mx-auto max-w-[500px]" onSubmit={handleSubmit}>
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex items-center gap-2 text-sm text-gray-400 hover:text-white mb-6"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to account type
+              </button>
+
+              <div className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg mb-6">
+                <p className="text-sm text-gray-400">Registering as:</p>
+                <p className="font-medium text-gray-200">
+                  {orgTypes.find(t => t.id === orgType)?.name}
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-indigo-200/65" htmlFor="orgName">
+                    Organization Name
+                  </label>
+                  <input
+                    id="orgName"
+                    type="text"
+                    className="form-input w-full"
+                    placeholder="Acme Development Corp"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-indigo-200/65" htmlFor="name">
+                    Your Full Name
+                  </label>
+                  <input
+                    id="name"
+                    type="text"
+                    className="form-input w-full"
+                    placeholder="John Smith"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-indigo-200/65" htmlFor="email">
+                    Work Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    className="form-input w-full"
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-indigo-200/65" htmlFor="password">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    className="form-input w-full"
+                    placeholder="Min. 6 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-indigo-200/65" htmlFor="confirmPassword">
+                    Confirm Password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    className="form-input w-full"
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Creating Account...' : 'Create Account'}
+                </button>
+              </div>
+
+              <p className="mt-4 text-xs text-gray-500 text-center">
+                By creating an account, you agree to our{' '}
+                <Link href="/terms" className="text-indigo-400 hover:underline">Terms of Service</Link>
+                {' '}and{' '}
+                <Link href="/privacy" className="text-indigo-400 hover:underline">Privacy Policy</Link>.
+              </p>
+            </form>
+          )}
         </div>
       </div>
     </section>

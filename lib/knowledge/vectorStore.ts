@@ -229,6 +229,40 @@ export async function searchKnowledge(
 // ============================================================
 
 /**
+ * Get knowledge base statistics
+ */
+export async function getKnowledgeStats(): Promise<{
+  totalSources: number;
+  totalChunks: number;
+  byCategory: Record<string, number>;
+}> {
+  try {
+    const docs = await listDocuments();
+    const byCategory: Record<string, number> = {};
+    
+    for (const doc of docs) {
+      byCategory[doc.category] = (byCategory[doc.category] || 0) + 1;
+    }
+    
+    // Get total chunks count
+    const chunks = await supabaseQuery('knowledge_chunks', 'GET', null, 'select=id');
+    
+    return {
+      totalSources: docs.length,
+      totalChunks: Array.isArray(chunks) ? chunks.length : 0,
+      byCategory,
+    };
+  } catch (error) {
+    console.error('Failed to get knowledge stats:', error);
+    return {
+      totalSources: 0,
+      totalChunks: 0,
+      byCategory: {},
+    };
+  }
+}
+
+/**
  * SQL to set up the knowledge base tables in Supabase
  * Run this in Supabase SQL Editor
  */

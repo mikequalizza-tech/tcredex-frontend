@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getKnowledgeStats } from '@/lib/knowledge';
+import { getKnowledgeStats } from '@/lib/knowledge/vectorStore';
 
 export async function GET() {
   try {

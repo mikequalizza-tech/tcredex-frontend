@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listDocuments } from '@/lib/knowledge';
+import { listDocuments } from '@/lib/knowledge/vectorStore';
 
 export async function GET(req: NextRequest) {
   try {

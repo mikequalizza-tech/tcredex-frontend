@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { searchKnowledge, KnowledgeCategory } from '@/lib/knowledge';
+import { searchKnowledge } from '@/lib/knowledge/vectorStore';
+import { KnowledgeCategory } from '@/lib/knowledge/types';
 
 export async function POST(req: NextRequest) {
   try {

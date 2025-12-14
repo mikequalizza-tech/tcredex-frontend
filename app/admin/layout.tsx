@@ -29,11 +29,11 @@ export default function AdminLayout({
         <div className="p-4 border-b border-gray-800">
           <Link href="/" className="flex items-center gap-2">
             <Image 
-              src="/images/Cropped_tCredex_logo.png" 
+              src="/brand/tcredex_transparent_512x128.png" 
               alt="tCredex" 
-              width={32} 
-              height={32}
-              className="h-8 w-auto"
+              width={120} 
+              height={30}
+              className="h-7 w-auto"
             />
             <span className="font-bold text-gray-100">tCredex Admin</span>
           </Link>

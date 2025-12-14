@@ -20,6 +20,10 @@ export interface Deal {
   shovelReady: boolean;
   completionDate: string;
   financingGap: number;
+  coordinates?: [number, number]; // [lng, lat]
+  description?: string;
+  impactStatement?: string;
+  hasProfile?: boolean;
 }
 
 interface DealCardProps {
@@ -44,11 +48,11 @@ export default function DealCard({ deal, onRequestMemo }: DealCardProps) {
           <p className="text-sm text-gray-400">{deal.location}</p>
         </div>
         <Image 
-          src="/brand/logo-tcredex-cropped.png" 
+          src="/brand/tcredex_transparent_256x64.png" 
           alt="tCredex Logo" 
-          width={32} 
-          height={32}
-          className="h-8 w-auto"
+          width={80} 
+          height={20}
+          className="h-5 w-auto opacity-60"
         />
       </div>
 

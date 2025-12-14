@@ -209,21 +209,21 @@ export default function AppLayout({
           {sidebarOpen ? (
             <Link href="/" className="flex items-center gap-2">
               <Image 
-                src="/brand/logo-tcredex-cropped.png" 
+                src="/brand/tcredex_transparent_512x128.png" 
                 alt="tCredex" 
-                width={32} 
-                height={32}
+                width={120} 
+                height={30}
                 className="h-8 w-auto"
               />
               <span className="text-lg font-semibold text-indigo-300">tCredex</span>
             </Link>
           ) : (
             <Image 
-              src="/brand/logo-tcredex-cropped.png" 
+              src="/brand/tcredex_transparent_256x64.png" 
               alt="tCredex" 
-              width={32} 
-              height={32}
-              className="h-8 w-auto mx-auto"
+              width={60} 
+              height={15}
+              className="h-6 w-auto mx-auto"
             />
           )}
           <button 

@@ -1,6 +1,5 @@
 'use client';
 
-import AppLayout from '@/components/layout/AppLayout';
 import { AuthProvider } from '@/lib/auth';
 import ChatTC from '@/components/chat/ChatTC';
 
@@ -11,9 +10,10 @@ export default function MapLayout({
 }) {
   return (
     <AuthProvider>
-      <AppLayout>
+      {/* Map page is full-screen, no AppLayout wrapper */}
+      <div className="h-screen w-screen overflow-hidden">
         {children}
-      </AppLayout>
+      </div>
       <ChatTC />
     </AuthProvider>
   );

@@ -1,10 +1,30 @@
 import Link from "next/link";
+import Image from "next/image";
+import Logo from "./logo";
 
 export default function Footer() {
   return (
     <footer>
       <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <div className="py-8 md:py-12">
+          {/* Logo and tagline */}
+          <div className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <Logo size="md" />
+              <div className="h-8 w-px bg-gray-700" />
+              <Image
+                src="/brand/aiv-tree.png"
+                alt="American Impact Ventures"
+                width={40}
+                height={40}
+                className="opacity-70"
+              />
+            </div>
+            <p className="text-sm text-gray-400 max-w-xs">
+              No risk. You don't close, we don't get paid.
+            </p>
+          </div>
+
           {/* Footer content */}
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             {/* Platform Links */}

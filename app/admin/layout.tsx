@@ -29,7 +29,7 @@ export default function AdminLayout({
         <div className="p-4 border-b border-gray-800">
           <Link href="/" className="flex items-center gap-2">
             <Image 
-              src="/brand/logo-tcredex-cropped.png" 
+              src="/images/Cropped_tCredex_logo.png" 
               alt="tCredex" 
               width={32} 
               height={32}

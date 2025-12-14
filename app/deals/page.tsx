@@ -3,114 +3,22 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import MarketplaceFooter from '@/components/layout/MarketplaceFooter';
+import { 
+  DEMO_DEALS, 
+  PROGRAM_COLORS, 
+  LEVEL_COLORS, 
+  STATUS_CONFIG,
+  TRACT_LABELS,
+  US_STATES,
+  getProgramStats,
+  type ProgramType,
+  type ProgramLevel,
+  type DealStatus,
+  type TractType,
+  type Deal
+} from '@/lib/data/deals';
 
-// Types
-type ProgramType = 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
-type ProgramLevel = 'federal' | 'state';
-type DealStatus = 'available' | 'under_review' | 'matched' | 'closing' | 'closed';
-type TractType = 'QCT' | 'SD' | 'LIC' | 'DDA';
 type EntityView = 'investors' | 'cdes' | 'deals' | 'sponsors';
-
-interface MarketplaceDeal {
-  id: string;
-  projectName: string;
-  sponsorName: string;
-  sponsorLogo?: string;
-  website?: string;
-  programType: ProgramType;
-  programLevel: ProgramLevel;
-  stateProgram?: string;
-  allocation: number;
-  creditPrice: number;
-  state: string;
-  city: string;
-  tractType: TractType[];
-  status: DealStatus;
-  foundedYear?: number;
-  submittedDate: string;
-  povertyRate?: number;
-  medianIncome?: number;
-  visible: boolean;
-}
-
-// Demo data - 25 sample deals
-const DEMO_DEALS: MarketplaceDeal[] = [
-  { id: 'deal-001', projectName: 'Downtown Community Center', sponsorName: 'Metro Development Corp', website: 'www.metrodev.com', programType: 'NMTC', programLevel: 'federal', allocation: 15000000, creditPrice: 0.76, state: 'Illinois', city: 'Chicago', tractType: ['QCT', 'SD'], status: 'available', foundedYear: 2018, submittedDate: '2024-12-01', povertyRate: 28.4, visible: true },
-  { id: 'deal-002', projectName: 'Heritage Theater Restoration', sponsorName: 'Historic Holdings LLC', website: 'www.historicholdings.com', programType: 'HTC', programLevel: 'federal', allocation: 8500000, creditPrice: 0.92, state: 'Ohio', city: 'Cleveland', tractType: ['QCT'], status: 'under_review', foundedYear: 2015, submittedDate: '2024-11-15', visible: true },
-  { id: 'deal-003', projectName: 'Riverside Affordable Housing', sponsorName: 'Community Builders Inc', website: 'www.communitybuilders.org', programType: 'LIHTC', programLevel: 'federal', allocation: 22000000, creditPrice: 0.88, state: 'Michigan', city: 'Detroit', tractType: ['QCT', 'DDA'], status: 'available', foundedYear: 2010, submittedDate: '2024-12-05', povertyRate: 32.1, visible: true },
-  { id: 'deal-004', projectName: 'Bay Area Workforce Housing', sponsorName: 'Golden State Developers', website: 'www.goldenstatedev.com', programType: 'LIHTC', programLevel: 'state', stateProgram: 'CA State LIHTC', allocation: 18000000, creditPrice: 0.91, state: 'California', city: 'Oakland', tractType: ['QCT'], status: 'available', foundedYear: 2019, submittedDate: '2024-12-08', povertyRate: 26.5, visible: true },
-  { id: 'deal-005', projectName: 'Tech Manufacturing Hub', sponsorName: 'Industrial Partners', website: 'www.industrialpartners.com', programType: 'NMTC', programLevel: 'federal', allocation: 18000000, creditPrice: 0.75, state: 'Indiana', city: 'Indianapolis', tractType: ['LIC', 'SD'], status: 'matched', foundedYear: 2020, submittedDate: '2024-10-20', povertyRate: 24.5, visible: true },
-  { id: 'deal-006', projectName: 'Empire State Historic Lofts', sponsorName: 'NY Heritage Partners', website: 'www.nyheritage.com', programType: 'HTC', programLevel: 'state', stateProgram: 'NY State HTC', allocation: 12000000, creditPrice: 0.88, state: 'New York', city: 'Buffalo', tractType: ['QCT'], status: 'available', foundedYear: 2017, submittedDate: '2024-12-03', visible: true },
-  { id: 'deal-007', projectName: 'Main Street Revitalization', sponsorName: 'Downtown Partners LLC', website: 'www.downtownpartners.com', programType: 'OZ', programLevel: 'federal', allocation: 10000000, creditPrice: 0.85, state: 'Wisconsin', city: 'Milwaukee', tractType: ['QCT'], status: 'closing', foundedYear: 2019, submittedDate: '2024-09-15', visible: true },
-  { id: 'deal-008', projectName: 'Rural Health Clinic Network', sponsorName: 'HealthFirst Foundation', website: 'www.healthfirst.org', programType: 'NMTC', programLevel: 'federal', allocation: 12000000, creditPrice: 0.74, state: 'Iowa', city: 'Des Moines', tractType: ['LIC'], status: 'available', foundedYear: 2012, submittedDate: '2024-12-08', povertyRate: 22.3, visible: true },
-  { id: 'deal-009', projectName: 'Missouri Affordable Homes', sponsorName: 'Gateway Housing', website: 'www.gatewayhousing.org', programType: 'LIHTC', programLevel: 'state', stateProgram: 'MO State LIHTC', allocation: 9500000, creditPrice: 0.84, state: 'Missouri', city: 'Kansas City', tractType: ['QCT', 'DDA'], status: 'available', foundedYear: 2016, submittedDate: '2024-12-06', povertyRate: 29.8, visible: true },
-  { id: 'deal-010', projectName: 'Eastside Grocery Co-Op', sponsorName: 'Food Access Initiative', website: 'www.foodaccess.org', programType: 'NMTC', programLevel: 'federal', allocation: 4500000, creditPrice: 0.77, state: 'Minnesota', city: 'Minneapolis', tractType: ['QCT', 'SD'], status: 'available', foundedYear: 2021, submittedDate: '2024-12-10', povertyRate: 35.2, visible: true },
-  { id: 'deal-011', projectName: 'Virginia Historic Mill', sponsorName: 'Commonwealth Restoration', website: 'www.commonwealthrest.com', programType: 'HTC', programLevel: 'state', stateProgram: 'VA State HTC', allocation: 7500000, creditPrice: 0.90, state: 'Virginia', city: 'Richmond', tractType: ['QCT'], status: 'under_review', foundedYear: 2014, submittedDate: '2024-11-28', visible: true },
-  { id: 'deal-012', projectName: 'Workforce Training Center', sponsorName: 'Skills Development Corp', website: 'www.skillsdev.com', programType: 'NMTC', programLevel: 'federal', allocation: 9000000, creditPrice: 0.76, state: 'Missouri', city: 'St. Louis', tractType: ['QCT'], status: 'under_review', foundedYear: 2017, submittedDate: '2024-11-25', povertyRate: 26.8, visible: true },
-  { id: 'deal-013', projectName: 'Arts District Lofts', sponsorName: 'Creative Spaces LLC', website: 'www.creativespaces.com', programType: 'HTC', programLevel: 'federal', allocation: 14000000, creditPrice: 0.91, state: 'Pennsylvania', city: 'Pittsburgh', tractType: ['QCT'], status: 'available', foundedYear: 2016, submittedDate: '2024-12-02', visible: true },
-  { id: 'deal-014', projectName: 'Green Energy Campus', sponsorName: 'Sustainable Ventures', website: 'www.sustainableventures.com', programType: 'OZ', programLevel: 'federal', allocation: 25000000, creditPrice: 0.82, state: 'Colorado', city: 'Denver', tractType: ['QCT', 'SD'], status: 'matched', foundedYear: 2022, submittedDate: '2024-10-30', visible: true },
-  { id: 'deal-015', projectName: 'Georgia Workforce Housing', sponsorName: 'Peach State Housing', website: 'www.peachstatehousing.com', programType: 'LIHTC', programLevel: 'state', stateProgram: 'GA State LIHTC', allocation: 14000000, creditPrice: 0.86, state: 'Georgia', city: 'Atlanta', tractType: ['QCT', 'DDA'], status: 'available', foundedYear: 2018, submittedDate: '2024-12-04', povertyRate: 31.2, visible: true },
-  { id: 'deal-016', projectName: 'Senior Living Community', sponsorName: 'Elder Care Partners', website: 'www.eldercarepartners.com', programType: 'LIHTC', programLevel: 'federal', allocation: 18500000, creditPrice: 0.87, state: 'Florida', city: 'Tampa', tractType: ['DDA'], status: 'available', foundedYear: 2014, submittedDate: '2024-12-06', visible: true },
-  { id: 'deal-017', projectName: 'Mixed-Use Transit Hub', sponsorName: 'Urban Transit Development', website: 'www.urbantransit.com', programType: 'NMTC', programLevel: 'federal', allocation: 32000000, creditPrice: 0.78, state: 'California', city: 'Los Angeles', tractType: ['QCT', 'LIC'], status: 'under_review', foundedYear: 2019, submittedDate: '2024-11-18', povertyRate: 29.1, visible: true },
-  { id: 'deal-018', projectName: 'Community Hospital Expansion', sponsorName: 'Regional Health Systems', website: 'www.regionalhealthsys.org', programType: 'NMTC', programLevel: 'federal', allocation: 28000000, creditPrice: 0.75, state: 'Texas', city: 'Houston', tractType: ['QCT', 'SD'], status: 'available', foundedYear: 2008, submittedDate: '2024-12-09', povertyRate: 31.4, visible: true },
-  { id: 'deal-019', projectName: 'Historic Hotel Renovation', sponsorName: 'Landmark Properties', website: 'www.landmarkprops.com', programType: 'HTC', programLevel: 'federal', allocation: 11000000, creditPrice: 0.93, state: 'Louisiana', city: 'New Orleans', tractType: ['QCT'], status: 'closing', foundedYear: 2011, submittedDate: '2024-09-28', visible: true },
-  { id: 'deal-020', projectName: 'Maryland Historic Theater', sponsorName: 'Chesapeake Restoration', website: 'www.chesapeakerest.com', programType: 'HTC', programLevel: 'state', stateProgram: 'MD State HTC', allocation: 6500000, creditPrice: 0.85, state: 'Maryland', city: 'Baltimore', tractType: ['QCT'], status: 'available', foundedYear: 2019, submittedDate: '2024-12-07', visible: true },
-  { id: 'deal-021', projectName: 'Youth Education Center', sponsorName: 'Future Leaders Foundation', website: 'www.futureleaders.org', programType: 'NMTC', programLevel: 'federal', allocation: 7500000, creditPrice: 0.76, state: 'Georgia', city: 'Savannah', tractType: ['QCT', 'SD'], status: 'available', foundedYear: 2020, submittedDate: '2024-12-11', povertyRate: 33.8, visible: true },
-  { id: 'deal-022', projectName: 'Industrial Park Phase II', sponsorName: 'Commerce Development Group', website: 'www.commercedev.com', programType: 'OZ', programLevel: 'federal', allocation: 45000000, creditPrice: 0.80, state: 'Arizona', city: 'Phoenix', tractType: ['QCT'], status: 'matched', foundedYear: 2018, submittedDate: '2024-10-15', visible: true },
-  { id: 'deal-023', projectName: 'Connecticut Affordable Housing', sponsorName: 'Nutmeg Housing Partners', website: 'www.nutmeghousing.com', programType: 'LIHTC', programLevel: 'state', stateProgram: 'CT State LIHTC', allocation: 11000000, creditPrice: 0.89, state: 'Connecticut', city: 'Hartford', tractType: ['QCT', 'DDA'], status: 'available', foundedYear: 2015, submittedDate: '2024-12-02', povertyRate: 27.4, visible: true },
-  { id: 'deal-024', projectName: 'Veterans Housing Complex', sponsorName: 'Heroes Home Foundation', website: 'www.heroeshome.org', programType: 'LIHTC', programLevel: 'federal', allocation: 16000000, creditPrice: 0.89, state: 'Virginia', city: 'Norfolk', tractType: ['QCT', 'DDA'], status: 'under_review', foundedYear: 2015, submittedDate: '2024-11-22', visible: true },
-  { id: 'deal-025', projectName: 'Waterfront Redevelopment', sponsorName: 'Coastal Development LLC', website: 'www.coastaldev.com', programType: 'OZ', programLevel: 'federal', allocation: 38000000, creditPrice: 0.83, state: 'Maryland', city: 'Annapolis', tractType: ['QCT', 'SD'], status: 'available', foundedYear: 2017, submittedDate: '2024-12-03', povertyRate: 30.2, visible: true },
-];
-
-// Constants - Dark Theme Colors
-const PROGRAM_COLORS: Record<ProgramType, string> = {
-  NMTC: 'bg-emerald-900/50 text-emerald-400 border-emerald-700',
-  HTC: 'bg-blue-900/50 text-blue-400 border-blue-700',
-  LIHTC: 'bg-purple-900/50 text-purple-400 border-purple-700',
-  OZ: 'bg-amber-900/50 text-amber-400 border-amber-700',
-};
-
-const LEVEL_COLORS: Record<ProgramLevel, string> = {
-  federal: 'bg-gray-800 text-gray-300',
-  state: 'bg-sky-900/50 text-sky-400',
-};
-
-const STATUS_COLORS: Record<DealStatus, string> = {
-  available: 'bg-green-900/50 text-green-400',
-  under_review: 'bg-amber-900/50 text-amber-400',
-  matched: 'bg-purple-900/50 text-purple-400',
-  closing: 'bg-blue-900/50 text-blue-400',
-  closed: 'bg-gray-800 text-gray-400',
-};
-
-const STATUS_LABELS: Record<DealStatus, string> = {
-  available: 'Available',
-  under_review: 'Under Review',
-  matched: 'Matched',
-  closing: 'Closing',
-  closed: 'Closed',
-};
-
-const TRACT_LABELS: Record<TractType, string> = {
-  QCT: 'Qualified Census Tract',
-  SD: 'Severely Distressed',
-  LIC: 'Low-Income Community',
-  DDA: 'Difficult Development Area',
-};
-
-const US_STATES: Record<string, string> = {
-  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
-  'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
-  'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
-  'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
-  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
-  'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
-  'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
-  'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
-  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
-  'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
-};
-
 type SortField = 'projectName' | 'sponsorName' | 'programType' | 'allocation' | 'creditPrice' | 'state' | 'status' | 'submittedDate';
 type SortDirection = 'asc' | 'desc';
 
@@ -129,6 +37,7 @@ export default function MarketplacePage() {
   const itemsPerPage = 50;
 
   const uniqueStates = useMemo(() => [...new Set(DEMO_DEALS.map(d => d.state))].sort(), []);
+  const programStats = getProgramStats();
 
   const filteredDeals = useMemo(() => {
     let result = DEMO_DEALS.filter(d => d.visible);
@@ -151,18 +60,6 @@ export default function MarketplacePage() {
     });
     return result;
   }, [searchQuery, programFilter, levelFilter, statusFilter, stateFilter, sortField, sortDirection]);
-
-  const programStats = useMemo(() => {
-    const visible = DEMO_DEALS.filter(d => d.visible);
-    return {
-      nmtc: visible.filter(d => d.programType === 'NMTC').length,
-      htc: visible.filter(d => d.programType === 'HTC').length,
-      lihtc: visible.filter(d => d.programType === 'LIHTC').length,
-      oz: visible.filter(d => d.programType === 'OZ').length,
-      federal: visible.filter(d => d.programLevel === 'federal').length,
-      state: visible.filter(d => d.programLevel === 'state').length,
-    };
-  }, []);
 
   const totalPages = Math.ceil(filteredDeals.length / itemsPerPage);
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -194,7 +91,7 @@ export default function MarketplacePage() {
   const activeFilters = [
     programFilter !== 'all' && { type: 'program', label: programFilter, value: programFilter },
     levelFilter !== 'all' && { type: 'level', label: levelFilter === 'federal' ? 'Federal' : 'State', value: levelFilter },
-    statusFilter !== 'all' && { type: 'status', label: STATUS_LABELS[statusFilter], value: statusFilter },
+    statusFilter !== 'all' && { type: 'status', label: STATUS_CONFIG[statusFilter].label, value: statusFilter },
     stateFilter !== 'all' && { type: 'state', label: stateFilter, value: stateFilter },
   ].filter(Boolean) as { type: string; label: string; value: string }[];
 
@@ -213,11 +110,17 @@ export default function MarketplacePage() {
   const sidebarItems = [
     { id: 'investors', label: 'Investors', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', count: 156 },
     { id: 'cdes', label: 'CDEs', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', count: 42 },
-    { id: 'deals', label: 'Projects', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', count: DEMO_DEALS.filter(d => d.visible).length },
+    { id: 'deals', label: 'Projects', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', count: programStats.total },
     { id: 'sponsors', label: 'Sponsors', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', count: 89 },
   ];
 
   const viewTitles: Record<EntityView, string> = { investors: 'Investors', cdes: 'CDEs', deals: 'Marketplace Projects', sponsors: 'Sponsors' };
+
+  // Helper to get program color string for table
+  const getProgramColorClass = (program: ProgramType) => {
+    const c = PROGRAM_COLORS[program];
+    return `${c.bg} ${c.text} ${c.border}`;
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 flex">
@@ -398,7 +301,7 @@ export default function MarketplacePage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${PROGRAM_COLORS[deal.programType]}`}>{deal.programType}</span>
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${getProgramColorClass(deal.programType)}`}>{deal.programType}</span>
                           <span className={`inline-flex px-2 py-0.5 rounded text-xs ${LEVEL_COLORS[deal.programLevel]}`}>{deal.programLevel === 'federal' ? 'Federal' : deal.stateProgram || 'State'}</span>
                         </div>
                       </td>
@@ -417,7 +320,7 @@ export default function MarketplacePage() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3"><span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[deal.status]}`}>{STATUS_LABELS[deal.status]}</span></td>
+                      <td className="px-4 py-3"><span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[deal.status].color}`}>{STATUS_CONFIG[deal.status].label}</span></td>
                       <td className="px-4 py-3"><Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm font-medium">View →</Link></td>
                     </tr>
                   ))}

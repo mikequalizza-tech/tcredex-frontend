@@ -131,8 +131,8 @@ export default function MatchingPage() {
       return (
         deal.projectName.toLowerCase().includes(query) ||
         deal.location.toLowerCase().includes(query) ||
-        deal.parent.toLowerCase().includes(query) ||
-        deal.censusTract.includes(query)
+        (deal.parent?.toLowerCase().includes(query) ?? false) ||
+        (deal.censusTract?.includes(query) ?? false)
       );
     }
     

@@ -2,10 +2,53 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
+// Type declarations for Google Maps
 declare global {
   interface Window {
-    google: typeof google;
-    initGooglePlaces: () => void;
+    google?: {
+      maps: {
+        places: {
+          Autocomplete: new (
+            input: HTMLInputElement,
+            options?: google.maps.places.AutocompleteOptions
+          ) => google.maps.places.Autocomplete;
+        };
+        event: {
+          clearInstanceListeners: (instance: unknown) => void;
+        };
+      };
+    };
+    initGooglePlaces?: () => void;
+  }
+}
+
+// Use namespace for Google Maps types
+declare namespace google.maps {
+  namespace places {
+    interface AutocompleteOptions {
+      componentRestrictions?: { country: string | string[] };
+      fields?: string[];
+      types?: string[];
+    }
+    interface Autocomplete {
+      addListener(event: string, handler: () => void): void;
+      getPlace(): PlaceResult;
+    }
+    interface PlaceResult {
+      address_components?: AddressComponent[];
+      formatted_address?: string;
+      geometry?: {
+        location?: {
+          lat(): number;
+          lng(): number;
+        };
+      };
+    }
+    interface AddressComponent {
+      long_name: string;
+      short_name: string;
+      types: string[];
+    }
   }
 }
 
@@ -60,7 +103,7 @@ export function AddressAutocomplete({
     // Load the script
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
-      console.error('Google Places API key not found');
+      console.warn('Google Places API key not found - address autocomplete disabled');
       return;
     }
 
@@ -76,6 +119,7 @@ export function AddressAutocomplete({
   // Initialize autocomplete
   useEffect(() => {
     if (!isLoaded || !inputRef.current || autocompleteRef.current) return;
+    if (!window.google?.maps?.places) return;
 
     try {
       autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
@@ -90,10 +134,11 @@ export function AddressAutocomplete({
     }
 
     return () => {
-      if (autocompleteRef.current) {
-        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+      if (autocompleteRef.current && window.google?.maps?.event) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded]);
 
   const handlePlaceSelect = useCallback(() => {

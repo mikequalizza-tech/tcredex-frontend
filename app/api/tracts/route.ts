@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getTractStats, getTractsByState, searchTracts, STATE_ABBR_TO_NAME } from '@/lib/tracts/tractData';
 
-// Census tract eligibility data summary by state
-// Source: NMTC 2016-2020 ACS Low-Income Community Data
+// State summary data (pre-computed from full dataset)
 const STATE_SUMMARY: Record<string, {
   name: string;
   totalTracts: number;
@@ -63,48 +63,113 @@ const STATE_SUMMARY: Record<string, {
   "PR": { "name": "Puerto Rico", "totalTracts": 981, "eligibleTracts": 857, "avgPoverty": 44.6, "avgUnemployment": 15.2 }
 };
 
-// Totals
+// National totals
 const NATIONAL_TOTALS = {
   totalTracts: 85395,
   eligibleTracts: 35167,
+  eligibilityRate: 41.2,
   avgPoverty: 14.2,
   avgUnemployment: 5.6
 };
 
+/**
+ * GET /api/tracts
+ * 
+ * Query parameters:
+ * - summary=true: Return national summary with all states
+ * - state=XX: Return data for specific state (abbreviation or FIPS)
+ * - stats=true: Return computed statistics from loaded data
+ * - search=true: Search tracts with criteria (minPoverty, maxPoverty, minIncome, maxIncome, severelyDistressed, classification, limit)
+ */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const state = searchParams.get('state');
   const summary = searchParams.get('summary');
+  const stats = searchParams.get('stats');
+  const search = searchParams.get('search');
 
-  // Return national summary
-  if (summary === 'true' || summary === '1') {
-    return NextResponse.json({
-      national: NATIONAL_TOTALS,
-      states: STATE_SUMMARY
-    });
-  }
-
-  // Return specific state data
-  if (state) {
-    const stateUpper = state.toUpperCase();
-    const stateData = STATE_SUMMARY[stateUpper];
-    
-    if (!stateData) {
-      return NextResponse.json(
-        { error: `State ${state} not found` },
-        { status: 404 }
-      );
+  try {
+    // Return computed stats from loaded data
+    if (stats === 'true' || stats === '1') {
+      const computedStats = await getTractStats();
+      return NextResponse.json({
+        source: 'loaded_data',
+        ...computedStats
+      });
     }
 
-    return NextResponse.json({
-      state: stateUpper,
-      ...stateData
-    });
-  }
+    // Search tracts with criteria
+    if (search === 'true' || search === '1') {
+      const criteria = {
+        minPoverty: searchParams.get('minPoverty') ? parseFloat(searchParams.get('minPoverty')!) : undefined,
+        maxPoverty: searchParams.get('maxPoverty') ? parseFloat(searchParams.get('maxPoverty')!) : undefined,
+        minIncome: searchParams.get('minIncome') ? parseFloat(searchParams.get('minIncome')!) : undefined,
+        maxIncome: searchParams.get('maxIncome') ? parseFloat(searchParams.get('maxIncome')!) : undefined,
+        severelyDistressed: searchParams.get('severelyDistressed') === 'true' ? true : 
+                            searchParams.get('severelyDistressed') === 'false' ? false : undefined,
+        classification: searchParams.get('classification') || undefined,
+        limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100
+      };
+      
+      const results = await searchTracts(criteria);
+      return NextResponse.json({
+        criteria,
+        count: results.length,
+        tracts: results
+      });
+    }
 
-  // Return all states
-  return NextResponse.json({
-    national: NATIONAL_TOTALS,
-    states: STATE_SUMMARY
-  });
+    // Return national summary
+    if (summary === 'true' || summary === '1') {
+      return NextResponse.json({
+        national: NATIONAL_TOTALS,
+        states: STATE_SUMMARY
+      });
+    }
+
+    // Return specific state data with tracts
+    if (state) {
+      const stateUpper = state.toUpperCase();
+      const stateSummary = STATE_SUMMARY[stateUpper];
+      
+      if (!stateSummary) {
+        return NextResponse.json(
+          { error: `State ${state} not found` },
+          { status: 404 }
+        );
+      }
+
+      // Get all tracts for this state
+      const tracts = await getTractsByState(stateUpper);
+
+      return NextResponse.json({
+        state: stateUpper,
+        name: stateSummary.name,
+        summary: stateSummary,
+        tractCount: tracts.length,
+        tracts: tracts.slice(0, 100), // Limit to first 100 for performance
+        _note: tracts.length > 100 ? `Showing first 100 of ${tracts.length} tracts` : undefined
+      });
+    }
+
+    // Default: return national summary with all states
+    return NextResponse.json({
+      national: NATIONAL_TOTALS,
+      states: STATE_SUMMARY,
+      endpoints: {
+        summary: '/api/tracts?summary=true',
+        state: '/api/tracts?state=IL',
+        stats: '/api/tracts?stats=true',
+        search: '/api/tracts?search=true&minPoverty=30&limit=50',
+        lookup: '/api/tracts/lookup?geoid=17031010100'
+      }
+    });
+
+  } catch (error) {
+    console.error('[TractAPI] Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }

@@ -9,15 +9,19 @@ export interface MapDeal {
   id: string;
   projectName: string;
   location: string;
+  parent?: string;
   address?: string;
   censusTract?: string;
   projectCost: number;
   financingGap: number;
   fedNmtcReq?: number;
+  stateNmtcReq?: number;
+  htc?: number;
   povertyRate?: number;
   medianIncome?: number;
   unemployment?: number;
   shovelReady?: boolean;
+  completionDate?: string;
   coordinates?: [number, number]; // [lng, lat]
 }
 

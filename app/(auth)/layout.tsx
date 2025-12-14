@@ -1,4 +1,7 @@
-﻿import PageIllustration from "@/components/PageIllustration";
+'use client';
+
+import PageIllustration from "@/components/PageIllustration";
+import { AuthProvider } from "@/lib/auth";
 
 export default function AuthLayout({
   children,
@@ -6,10 +9,11 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="relative flex grow flex-col">
-      <PageIllustration multiple />
-
-      {children}
-    </main>
+    <AuthProvider>
+      <main className="relative flex grow flex-col">
+        <PageIllustration multiple />
+        {children}
+      </main>
+    </AuthProvider>
   );
 }

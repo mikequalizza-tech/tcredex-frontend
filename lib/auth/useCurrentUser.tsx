@@ -53,6 +53,7 @@ export interface ExtendedAuthContext extends AuthContext {
   currentDemoRole: 'sponsor' | 'cde' | 'investor' | 'admin' | null;
   orgType: 'cde' | 'sponsor' | 'investor' | undefined;
   orgName: string;
+  orgLogo?: string;
   userName: string;
   userEmail: string;
 }
@@ -237,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     currentDemoRole,
     orgType: user?.organization.type,
     orgName: user?.organization.name || '',
+    orgLogo: user?.organization.logo,
     userName: user?.name || '',
     userEmail: user?.email || '',
   };

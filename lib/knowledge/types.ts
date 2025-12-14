@@ -12,15 +12,15 @@ export type KnowledgeCategory =
   | 'compliance'    // General compliance guidance
   | 'general';      // General tax credit info
 
-export const CATEGORY_INFO: Record<KnowledgeCategory, { label: string; color: string }> = {
-  platform: { label: 'Platform Docs', color: 'bg-purple-100 text-purple-700' },
-  nmtc: { label: 'NMTC', color: 'bg-emerald-100 text-emerald-700' },
-  htc: { label: 'HTC', color: 'bg-blue-100 text-blue-700' },
-  lihtc: { label: 'LIHTC', color: 'bg-violet-100 text-violet-700' },
-  oz: { label: 'Opportunity Zone', color: 'bg-amber-100 text-amber-700' },
-  state: { label: 'State Credits', color: 'bg-cyan-100 text-cyan-700' },
-  compliance: { label: 'Compliance', color: 'bg-red-100 text-red-700' },
-  general: { label: 'General', color: 'bg-gray-100 text-gray-700' },
+export const CATEGORY_INFO: Record<KnowledgeCategory, { label: string; color: string; description: string }> = {
+  platform: { label: 'Platform Docs', color: 'bg-purple-100 text-purple-700', description: 'tCredex platform documentation and specifications' },
+  nmtc: { label: 'NMTC', color: 'bg-emerald-100 text-emerald-700', description: 'New Markets Tax Credit resources and guides' },
+  htc: { label: 'HTC', color: 'bg-blue-100 text-blue-700', description: 'Historic Tax Credit documentation' },
+  lihtc: { label: 'LIHTC', color: 'bg-violet-100 text-violet-700', description: 'Low-Income Housing Tax Credit materials' },
+  oz: { label: 'Opportunity Zone', color: 'bg-amber-100 text-amber-700', description: 'Opportunity Zone program information' },
+  state: { label: 'State Credits', color: 'bg-cyan-100 text-cyan-700', description: 'State-specific credit documentation' },
+  compliance: { label: 'Compliance', color: 'bg-red-100 text-red-700', description: 'Compliance and regulatory guidance' },
+  general: { label: 'General', color: 'bg-gray-100 text-gray-700', description: 'General tax credit information' },
 };
 
 export interface DocumentMetadata {

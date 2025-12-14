@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteSource } from '@/lib/knowledge';
+import { deleteDocument } from '@/lib/knowledge';
 
 export async function DELETE(
   req: NextRequest,
@@ -8,7 +8,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     
-    await deleteSource(id);
+    await deleteDocument(id);
     
     return NextResponse.json({ success: true });
   } catch (error) {

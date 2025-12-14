@@ -9,20 +9,9 @@ export default function MatchingLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // TODO: Get user role from auth session
-  const userRole = 'cde' as const;
-  const userName = 'Demo User';
-  const userEmail = 'demo@tcredex.com';
-  const orgName = 'Demo Organization';
-
   return (
     <AuthProvider>
-      <AppLayout
-        userRole={userRole}
-        userName={userName}
-        userEmail={userEmail}
-        orgName={orgName}
-      >
+      <AppLayout>
         {children}
       </AppLayout>
       <ChatTC />

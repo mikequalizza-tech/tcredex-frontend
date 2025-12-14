@@ -97,6 +97,6 @@ export function canPerform(
   resource: keyof typeof PERMISSIONS, 
   action: string
 ): boolean {
-  const allowedRoles = (PERMISSIONS[resource] as Record<string, Role[]>)[action];
+  const allowedRoles = (PERMISSIONS[resource] as Record<string, readonly Role[]>)[action];
   return allowedRoles?.includes(userRole) ?? false;
 }

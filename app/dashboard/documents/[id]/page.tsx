@@ -31,6 +31,7 @@ const demoDocument: Document = {
   },
   versionCount: 3,
   owner: { id: 'u1', name: 'John Smith', email: 'john@example.com' },
+  organizationId: 'org1',
   shares: [
     {
       id: 's1',
@@ -50,7 +51,7 @@ const demoDocument: Document = {
     },
   ],
   isPublic: false,
-  tags: ['environmental', 'due-diligence', 'required', 'phase-1'],
+  tags: ['Environmental', 'Compliance', 'Closing', 'Impact'],
   status: 'approved',
   requiredForClosing: true,
   createdAt: '2024-11-15T09:00:00Z',

@@ -104,8 +104,15 @@ const AdminIcon = () => (
 );
 
 // Navigation items with organization type-based access
+const SubmitDealIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+  </svg>
+);
+
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: <HomeIcon /> },
+  { name: 'Submit Deal', href: '/deals/new', icon: <SubmitDealIcon />, orgTypes: ['sponsor', 'cde'] },
   { name: 'Map', href: '/map', icon: <MapIcon /> },
   { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, orgTypes: ['sponsor'] },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: <PipelineIcon />, orgTypes: ['cde'] },

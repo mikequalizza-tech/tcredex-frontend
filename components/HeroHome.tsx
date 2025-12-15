@@ -76,22 +76,26 @@ export default function HeroHome() {
             data-aos-delay={600}
           >
             <div className="relative rounded-2xl border border-gray-700/50 bg-gray-900/50 px-6 py-5">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                 <div>
-                  <p className="text-2xl font-bold text-indigo-400">$127B+</p>
-                  <p className="text-xs text-gray-500">Historic Tax Credit Investment</p>
+                  <p className="text-2xl font-bold text-indigo-400">$450M</p>
+                  <p className="text-xs text-gray-500">Historic Tax Credit Investments</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-green-400">7,100+</p>
-                  <p className="text-xs text-gray-500">NMTC Projects Financed</p>
+                  <p className="text-2xl font-bold text-green-400">85</p>
+                  <p className="text-xs text-gray-500">NMTC Projects Closed</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-purple-400">3.7M</p>
-                  <p className="text-xs text-gray-500">LIHTC Affordable Units</p>
+                  <p className="text-2xl font-bold text-purple-400">$3B</p>
+                  <p className="text-xs text-gray-500">LIHTC Syndication</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-amber-400">8,764</p>
-                  <p className="text-xs text-gray-500">Opportunity Zones</p>
+                  <p className="text-2xl font-bold text-amber-400">$350M</p>
+                  <p className="text-xs text-gray-500">State Tax Credits</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-emerald-400">$650M</p>
+                  <p className="text-xs text-gray-500">NMTC Allocation Closed</p>
                 </div>
               </div>
             </div>

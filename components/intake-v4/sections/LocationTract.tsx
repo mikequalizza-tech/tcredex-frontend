@@ -91,9 +91,9 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
         censusTract: fullTract,
         tractType: tractTypes,
         // Store raw metrics for deal card generation
-        tractPovertyRate: eligibility.povertyRate,
-        tractMedianIncome: eligibility.medianIncomePct,
-        tractUnemployment: eligibility.unemployment,
+        tractPovertyRate: eligibility.povertyRate ?? undefined,
+        tractMedianIncome: eligibility.medianIncomePct ?? undefined,
+        tractUnemployment: eligibility.unemployment ?? undefined,
         tractEligible: eligibility.eligible,
         tractSeverelyDistressed: eligibility.programs?.includes('Severely Distressed') || false,
         tractClassification: eligibility.details?.classification,

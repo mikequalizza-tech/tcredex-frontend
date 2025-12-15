@@ -19,8 +19,19 @@ export interface IntakeData {
   city?: string;
   state?: string;
   zipCode?: string;
+  county?: string;
   censusTract?: string;
   tractType?: ('QCT' | 'SD' | 'LIC' | 'DDA')[];
+  tractPovertyRate?: number;
+  tractMedianIncome?: number;
+  tractUnemployment?: number;
+  tractEligible?: boolean;
+  tractSeverelyDistressed?: boolean;
+  tractClassification?: string;
+  tractCounty?: string;
+  tractState?: string;
+  latitude?: number;
+  longitude?: number;
   programs?: ProgramType[];
   programLevel?: 'federal' | 'state';
   stateProgram?: string;
@@ -52,17 +63,25 @@ export interface IntakeData {
   qalicbEmployeeServices?: number;
   isProhibitedBusiness?: boolean;
   leverageStructure?: 'standard' | 'self-leverage' | 'hybrid';
+  // HTC fields
+  htcTypes?: ('federal' | 'state')[];
   historicStatus?: 'listed' | 'contributing' | 'pending' | 'none';
   part1Status?: 'approved' | 'submitted' | 'not_started';
   part2Status?: 'approved' | 'submitted' | 'not_started';
   qreAmount?: number;
+  hasStateHTC?: boolean;
+  stateHTCState?: string;
+  stateHTCRate?: number;
+  // LIHTC fields
   totalUnits?: number;
   affordableUnits?: number;
   amiTargets?: number[];
   lihtcType?: '9%' | '4%';
+  // OZ fields
   ozInvestmentDate?: string;
   substantialImprovement?: boolean;
   holdingPeriod?: number;
+  // Impact fields
   jobsCreated?: number;
   jobsRetained?: number;
   sqFootage?: number;

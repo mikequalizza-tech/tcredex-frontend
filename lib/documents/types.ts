@@ -154,8 +154,8 @@ export interface Document {
   shares: DocumentShare[];
   isPublic: boolean;
   
-  // Document control (checkout/check-in)
-  lock: DocumentLock;
+  // Document control (checkout/check-in) - nullable when not locked
+  lock: DocumentLock | null;
   collaborators: DocumentCollaborator[];
   
   // Metadata

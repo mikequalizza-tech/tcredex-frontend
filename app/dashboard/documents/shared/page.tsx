@@ -15,6 +15,8 @@ const sharedDocuments: Document[] = [
     entityType: 'organization',
     entityId: 'o1',
     entityName: 'Midwest CDE',
+    lock: null,
+    collaborators: [],
     currentVersion: {
       id: 'v1',
       versionNumber: 2,
@@ -56,6 +58,8 @@ const sharedDocuments: Document[] = [
     entityName: 'Eastside Grocery Co-Op',
     projectId: 'P001',
     projectName: 'Eastside Grocery Co-Op',
+    lock: null,
+    collaborators: [],
     currentVersion: {
       id: 'v2',
       versionNumber: 1,
@@ -97,6 +101,8 @@ const sharedDocuments: Document[] = [
     entityName: 'Eastside Grocery Deal',
     dealId: 'D001',
     dealName: 'Eastside Grocery Deal',
+    lock: null,
+    collaborators: [],
     currentVersion: {
       id: 'v3',
       versionNumber: 3,

@@ -17,6 +17,8 @@ const demoDocument: Document = {
   entityType: 'project',
   entityId: 'P001',
   entityName: 'Eastside Grocery Co-Op',
+  lock: null,
+  collaborators: [],
   currentVersion: {
     id: 'v1-3',
     versionNumber: 3,

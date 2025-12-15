@@ -16,16 +16,20 @@ const PUBLIC_ROUTES = [
   '/how-it-works',
   '/privacy',
   '/terms',
+  '/deals',  // Marketplace browsing is public
 ];
 
 // Routes that start with these prefixes are public
 const PUBLIC_PREFIXES = [
   '/api/auth',      // Auth API endpoints
+  '/api/geo',       // Geo lookup endpoints
+  '/api/eligibility', // Eligibility checks
   '/_next',         // Next.js internals
   '/favicon',
   '/images',
   '/fonts',
   '/icons',
+  '/deals/',        // Individual deal pages are public
 ];
 
 // Role-based route protection

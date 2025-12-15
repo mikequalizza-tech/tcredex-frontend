@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCurrentUser } from '@/lib/auth';
@@ -12,12 +12,16 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasRedirected = useRef(false);
 
-  // Redirect if already logged in
-  if (!isLoading && isAuthenticated) {
-    router.push('/dashboard');
-    return null;
-  }
+  // Redirect if already logged in - use ref to prevent multiple redirects
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !hasRedirected.current) {
+      hasRedirected.current = true;
+      // Use window.location for cleaner redirect without React state issues
+      window.location.href = '/dashboard';
+    }
+  }, [isLoading, isAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,26 +31,48 @@ export default function SignIn() {
     const result = await login(email, password);
     
     if (result.success) {
-      router.push('/dashboard');
+      // Use window.location to avoid React Router state issues
+      window.location.href = '/dashboard';
     } else {
       setError(result.error || 'Login failed');
       setIsSubmitting(false);
     }
   };
 
-  const handleDemoLogin = async (demoEmail: string) => {
+  const handleDemoLogin = async (demoEmail: string, demoPassword: string = 'demo123') => {
     setEmail(demoEmail);
-    setPassword('demo123');
+    setPassword(demoPassword);
     setIsSubmitting(true);
     
-    const result = await login(demoEmail, 'demo123');
+    const result = await login(demoEmail, demoPassword);
     if (result.success) {
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     } else {
       setError(result.error || 'Demo login failed');
       setIsSubmitting(false);
     }
   };
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Show redirect message if authenticated
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <p className="text-gray-400">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section>
@@ -122,6 +148,7 @@ export default function SignIn() {
             <p className="text-center text-sm text-gray-400 mb-4">Quick Demo Login</p>
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => handleDemoLogin('sarah@midwestcde.com')}
                 disabled={isSubmitting}
                 className="p-3 bg-purple-900/30 border border-purple-700 rounded-lg text-sm text-purple-300 hover:bg-purple-900/50 transition-colors disabled:opacity-50"
@@ -130,6 +157,7 @@ export default function SignIn() {
                 <div className="text-xs text-purple-400/70">Sarah Chen</div>
               </button>
               <button
+                type="button"
                 onClick={() => handleDemoLogin('john@eastsidefood.org')}
                 disabled={isSubmitting}
                 className="p-3 bg-green-900/30 border border-green-700 rounded-lg text-sm text-green-300 hover:bg-green-900/50 transition-colors disabled:opacity-50"
@@ -138,6 +166,7 @@ export default function SignIn() {
                 <div className="text-xs text-green-400/70">John Martinez</div>
               </button>
               <button
+                type="button"
                 onClick={() => handleDemoLogin('michael@greatlakes.bank')}
                 disabled={isSubmitting}
                 className="p-3 bg-blue-900/30 border border-blue-700 rounded-lg text-sm text-blue-300 hover:bg-blue-900/50 transition-colors disabled:opacity-50"
@@ -146,7 +175,8 @@ export default function SignIn() {
                 <div className="text-xs text-blue-400/70">Michael Thompson</div>
               </button>
               <button
-                onClick={() => handleDemoLogin('admin@tcredex.com')}
+                type="button"
+                onClick={() => handleDemoLogin('admin@tcredex.com', 'admin123')}
                 disabled={isSubmitting}
                 className="p-3 bg-red-900/30 border border-red-700 rounded-lg text-sm text-red-300 hover:bg-red-900/50 transition-colors disabled:opacity-50"
               >

@@ -22,8 +22,8 @@ interface SponsorDashboardProps {
 const DEMO_DEALS: DealSummary[] = [
   { id: 'deal-001', projectName: 'Downtown Community Center', program: 'NMTC', status: 'closing', allocation: 15000000, creditPrice: 0.76, submittedDate: '2024-10-15', matchedDate: '2024-11-01' },
   { id: 'deal-002', projectName: 'Heritage Theater Restoration', program: 'HTC', status: 'matched', allocation: 8500000, creditPrice: 0.92, submittedDate: '2024-11-20', matchedDate: '2024-12-05' },
-  { id: 'deal-003', projectName: 'Affordable Housing Complex', program: 'LIHTC', status: 'submitted', allocation: 22000000, creditPrice: 0.88, submittedDate: '2024-12-01' },
-  { id: 'deal-004', projectName: 'Mixed-Use Development Phase II', program: 'NMTC', status: 'draft', allocation: 12000000, creditPrice: 0.74 },
+  { id: 'deal-003', projectName: 'Riverside Affordable Housing', program: 'LIHTC', status: 'submitted', allocation: 22000000, creditPrice: 0.88, submittedDate: '2024-12-01' },
+  { id: 'deal-007', projectName: 'Main Street Revitalization', program: 'OZ', status: 'draft', allocation: 10000000, creditPrice: 0.85 },
 ];
 
 const STATUS_COLORS = {

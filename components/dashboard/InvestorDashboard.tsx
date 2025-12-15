@@ -9,15 +9,15 @@ interface InvestorDashboardProps {
 }
 
 const INVESTMENTS = [
-  { id: 'inv-001', projectName: 'Downtown Community Center', cde: 'Enterprise Community', program: 'NMTC', invested: 5000000, creditPrice: 0.76, status: 'active', craEligible: true },
-  { id: 'inv-002', projectName: 'Heritage Theater', cde: 'US Bancorp CDC', program: 'HTC', invested: 3200000, creditPrice: 0.92, status: 'active', craEligible: true },
-  { id: 'inv-003', projectName: 'Riverside Apartments', cde: 'N/A', program: 'LIHTC', invested: 8500000, creditPrice: 0.88, status: 'active', craEligible: true },
+  { id: 'deal-001', projectName: 'Downtown Community Center', cde: 'Enterprise Community', program: 'NMTC', invested: 5000000, creditPrice: 0.76, status: 'active', craEligible: true },
+  { id: 'deal-002', projectName: 'Heritage Theater Restoration', cde: 'US Bancorp CDC', program: 'HTC', invested: 3200000, creditPrice: 0.92, status: 'active', craEligible: true },
+  { id: 'deal-003', projectName: 'Riverside Affordable Housing', cde: 'N/A', program: 'LIHTC', invested: 8500000, creditPrice: 0.88, status: 'active', craEligible: true },
 ];
 
 const MATCHES = [
-  { id: 'm-001', projectName: 'Rural Health Clinic Network', program: 'NMTC', allocation: 12000000, matchScore: 94, state: 'Iowa' },
-  { id: 'm-002', projectName: 'Workforce Training Center', program: 'NMTC', allocation: 9000000, matchScore: 89, state: 'Missouri' },
-  { id: 'm-003', projectName: 'Arts District Lofts', program: 'HTC', allocation: 14000000, matchScore: 87, state: 'Pennsylvania' },
+  { id: 'deal-008', projectName: 'Rural Health Clinic Network', program: 'NMTC', allocation: 12000000, matchScore: 94, state: 'Iowa' },
+  { id: 'deal-012', projectName: 'Workforce Training Center', program: 'NMTC', allocation: 9000000, matchScore: 89, state: 'Missouri' },
+  { id: 'deal-013', projectName: 'Arts District Lofts', program: 'HTC', allocation: 14000000, matchScore: 87, state: 'Pennsylvania' },
 ];
 
 const PROGRAM_COLORS: Record<string, string> = {

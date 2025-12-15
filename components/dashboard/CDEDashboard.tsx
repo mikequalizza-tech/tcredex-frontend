@@ -9,10 +9,10 @@ interface CDEDashboardProps {
 }
 
 const PIPELINE_DEALS = [
-  { id: 'p-001', projectName: 'Downtown Community Center', sponsor: 'Metro Development', program: 'NMTC', allocation: 15000000, stage: 'closing', daysInStage: 12 },
-  { id: 'p-002', projectName: 'Rural Health Clinic', sponsor: 'HealthFirst Foundation', program: 'NMTC', allocation: 8000000, stage: 'underwriting', daysInStage: 5 },
-  { id: 'p-003', projectName: 'Workforce Training Center', sponsor: 'Skills Development Corp', program: 'NMTC', allocation: 12000000, stage: 'review', daysInStage: 3 },
-  { id: 'p-004', projectName: 'Community Grocery Store', sponsor: 'Food Access Initiative', program: 'NMTC', allocation: 4500000, stage: 'new', daysInStage: 1 },
+  { id: 'deal-001', projectName: 'Downtown Community Center', sponsor: 'Metro Development Corp', program: 'NMTC', allocation: 15000000, stage: 'closing', daysInStage: 12 },
+  { id: 'deal-008', projectName: 'Rural Health Clinic Network', sponsor: 'HealthFirst Foundation', program: 'NMTC', allocation: 12000000, stage: 'underwriting', daysInStage: 5 },
+  { id: 'deal-012', projectName: 'Workforce Training Center', sponsor: 'Skills Development Corp', program: 'NMTC', allocation: 9000000, stage: 'review', daysInStage: 3 },
+  { id: 'deal-010', projectName: 'Eastside Grocery Co-Op', sponsor: 'Food Access Initiative', program: 'NMTC', allocation: 4500000, stage: 'new', daysInStage: 1 },
 ];
 
 const STAGE_COLORS: Record<string, string> = {

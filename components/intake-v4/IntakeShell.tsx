@@ -14,6 +14,8 @@ export interface IntakeData {
   sponsorEmail?: string;
   sponsorPhone?: string;
   projectDescription?: string;
+  communityImpact?: string;  // NEW: Community impact statement
+  projectImages?: { name: string; url: string; size: number }[];  // NEW: Project images for profile
   projectType?: string;
   address?: string;
   city?: string;

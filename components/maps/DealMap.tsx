@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Map, { Marker, NavigationControl } from 'react-map-gl/mapbox';
+import React, { useState, useEffect, useRef } from 'react';
+import Map, { Marker, NavigationControl, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface DealLocation {
@@ -16,29 +16,25 @@ interface DealMapProps {
   markers?: DealLocation[];
   height?: string;
   className?: string;
-  showOverlay?: boolean;
-  showLegend?: boolean;
 }
 
-const DealMap: React.FC<DealMapProps> = ({
+export default function DealMap({
   center = { latitude: 39.8283, longitude: -98.5795 },
   zoom = 4,
   markers = [],
   height = '100%',
   className = '',
-  showOverlay = false,
-  showLegend = false,
-}) => {
+}: DealMapProps) {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const [selectedMarker, setSelectedMarker] = useState<DealLocation | null>(null);
   
-  // Controlled view state that responds to prop changes
   const [viewState, setViewState] = useState({
     latitude: center.latitude,
     longitude: center.longitude,
     zoom: zoom
   });
 
-  // Update view state when center/zoom props change
+  // Update view when props change
   useEffect(() => {
     setViewState({
       latitude: center.latitude,
@@ -50,7 +46,7 @@ const DealMap: React.FC<DealMapProps> = ({
   if (!mapboxToken) {
     return (
       <div 
-        className={`rounded-xl overflow-hidden shadow-md bg-gray-800 flex items-center justify-center ${className}`} 
+        className={`rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center ${className}`} 
         style={{ height }}
       >
         <div className="text-center p-8">
@@ -71,16 +67,15 @@ const DealMap: React.FC<DealMapProps> = ({
       >
         <NavigationControl position="top-right" />
         
-        {/* Searched location marker */}
+        {/* Center marker (searched location) */}
         {center.name && (
           <Marker
             longitude={center.longitude}
             latitude={center.latitude}
             anchor="bottom"
           >
-            <div className="relative">
+            <div className="relative cursor-pointer" onClick={() => setSelectedMarker(center)}>
               <div className="w-6 h-6 bg-indigo-500 rounded-full border-2 border-white shadow-lg animate-pulse" />
-              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-indigo-500" />
             </div>
           </Marker>
         )}
@@ -93,38 +88,28 @@ const DealMap: React.FC<DealMapProps> = ({
             latitude={loc.latitude}
             anchor="bottom"
           >
-            <div className="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-lg" />
+            <div 
+              className="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-125 transition-transform"
+              onClick={() => setSelectedMarker(loc)}
+            />
           </Marker>
         ))}
-      </Map>
 
-      {/* Deal counter */}
-      {showOverlay && (
-        <div className="absolute bottom-4 left-4 bg-gray-900/90 rounded-lg px-3 py-2 text-sm z-10">
-          <span className="text-green-400 mr-2">●</span>
-          <span className="text-gray-300">Total Deals: <strong>127</strong></span>
-        </div>
-      )}
-
-      {/* Legend */}
-      {showLegend && (
-        <div className="absolute bottom-4 right-4 bg-gray-900/90 rounded-lg p-3 text-xs z-10">
-          <p className="font-semibold text-gray-300 mb-2">Deal Density</p>
-          <div className="flex items-center gap-1">
-            <span className="text-gray-500">Low</span>
-            <div className="flex gap-0.5">
-              <div className="w-3 h-3 bg-blue-900" />
-              <div className="w-3 h-3 bg-blue-700" />
-              <div className="w-3 h-3 bg-blue-500" />
-              <div className="w-3 h-3 bg-blue-400" />
-              <div className="w-3 h-3 bg-blue-300" />
+        {/* Popup */}
+        {selectedMarker && (
+          <Popup
+            longitude={selectedMarker.longitude}
+            latitude={selectedMarker.latitude}
+            anchor="bottom"
+            onClose={() => setSelectedMarker(null)}
+            closeOnClick={false}
+          >
+            <div className="text-gray-900 text-sm font-medium">
+              {selectedMarker.name || 'Location'}
             </div>
-            <span className="text-gray-500">High</span>
-          </div>
-        </div>
-      )}
+          </Popup>
+        )}
+      </Map>
     </div>
   );
-};
-
-export default DealMap;
+}

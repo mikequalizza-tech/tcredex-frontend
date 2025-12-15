@@ -18,6 +18,8 @@ interface Document {
   size: string;
   version: number;
   aiFlags?: string[];
+  // Add mock URL for demo
+  fileUrl?: string;
 }
 
 const DEMO_DOCUMENTS: Document[] = [
@@ -32,6 +34,7 @@ const DEMO_DOCUMENTS: Document[] = [
     uploadedDate: '2024-11-15',
     size: '1.2 MB',
     version: 1,
+    fileUrl: '/documents/sample.pdf',
   },
   {
     id: 'doc-002',
@@ -44,6 +47,7 @@ const DEMO_DOCUMENTS: Document[] = [
     uploadedDate: '2024-11-15',
     size: '3.4 MB',
     version: 2,
+    fileUrl: '/documents/sample.pdf',
   },
   {
     id: 'doc-003',
@@ -57,6 +61,7 @@ const DEMO_DOCUMENTS: Document[] = [
     size: '8.7 MB',
     version: 1,
     aiFlags: ['Report date is more than 6 months old'],
+    fileUrl: '/documents/sample.pdf',
   },
   {
     id: 'doc-004',
@@ -69,6 +74,7 @@ const DEMO_DOCUMENTS: Document[] = [
     uploadedDate: '2024-11-20',
     size: '5.2 MB',
     version: 1,
+    fileUrl: '/documents/sample.pdf',
   },
   {
     id: 'doc-005',
@@ -82,6 +88,7 @@ const DEMO_DOCUMENTS: Document[] = [
     size: '2.1 MB',
     version: 3,
     aiFlags: ['Interest rate assumptions may be outdated'],
+    fileUrl: '/documents/sample.xlsx',
   },
   {
     id: 'doc-006',
@@ -106,6 +113,7 @@ const DEMO_DOCUMENTS: Document[] = [
     uploadedDate: '2024-12-08',
     size: '4.3 MB',
     version: 1,
+    fileUrl: '/documents/sample.pdf',
   },
   {
     id: 'doc-008',
@@ -118,6 +126,7 @@ const DEMO_DOCUMENTS: Document[] = [
     uploadedDate: '2024-11-25',
     size: '1.8 MB',
     version: 1,
+    fileUrl: '/documents/sample.pdf',
   },
   {
     id: 'doc-009',
@@ -131,6 +140,7 @@ const DEMO_DOCUMENTS: Document[] = [
     size: '0.9 MB',
     version: 1,
     aiFlags: ['Policy expired - renewal required'],
+    fileUrl: '/documents/sample.pdf',
   },
   {
     id: 'doc-010',
@@ -143,6 +153,7 @@ const DEMO_DOCUMENTS: Document[] = [
     uploadedDate: '2024-11-10',
     size: '0.5 MB',
     version: 2,
+    fileUrl: '/documents/sample.pdf',
   },
 ];
 
@@ -183,6 +194,7 @@ export default function DocumentsPage() {
   const [statusFilter, setStatusFilter] = useState<DocumentStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
 
   // Filter documents
   const filteredDocs = DEMO_DOCUMENTS.filter((doc) => {
@@ -200,6 +212,28 @@ export default function DocumentsPage() {
     underReview: DEMO_DOCUMENTS.filter(d => d.status === 'under_review').length,
     approved: DEMO_DOCUMENTS.filter(d => d.status === 'approved').length,
     aiFlags: DEMO_DOCUMENTS.filter(d => d.aiFlags && d.aiFlags.length > 0).length,
+  };
+
+  // Handle preview
+  const handlePreview = (doc: Document) => {
+    setPreviewDoc(doc);
+  };
+
+  // Handle download
+  const handleDownload = (doc: Document) => {
+    // For demo, we'll create a simple text file to download
+    // In production, this would fetch the actual file
+    const content = `Document: ${doc.name}\nProject: ${doc.projectName}\nCategory: ${doc.category}\nStatus: ${doc.status}\nUploaded: ${doc.uploadedDate}\nUploaded By: ${doc.uploadedBy}\nSize: ${doc.size}\nVersion: ${doc.version}`;
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = doc.name.replace('.pdf', '.txt').replace('.xlsx', '.txt');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -305,7 +339,7 @@ export default function DocumentsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -373,13 +407,23 @@ export default function DocumentsPage() {
                       </button>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <button className="text-gray-600 hover:text-gray-700 p-1">
+                        {/* Preview Button */}
+                        <button 
+                          onClick={() => handlePreview(doc)}
+                          className="text-gray-600 hover:text-blue-600 p-1 rounded hover:bg-blue-50 transition-colors"
+                          title="Preview document"
+                        >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                           </svg>
                         </button>
-                        <button className="text-gray-600 hover:text-gray-700 p-1">
+                        {/* Download Button */}
+                        <button 
+                          onClick={() => handleDownload(doc)}
+                          className="text-gray-600 hover:text-green-600 p-1 rounded hover:bg-green-50 transition-colors"
+                          title="Download document"
+                        >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
@@ -402,6 +446,103 @@ export default function DocumentsPage() {
           </div>
         )}
       </div>
+
+      {/* Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setPreviewDoc(null)} />
+          <div className="relative bg-white rounded-xl w-full max-w-4xl mx-4 shadow-xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  {previewDoc.name.endsWith('.pdf') ? (
+                    <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{previewDoc.name}</h3>
+                  <p className="text-sm text-gray-500">{previewDoc.projectName}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownload(previewDoc)}
+                  className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
+                </button>
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Document Preview */}
+            <div className="flex-1 overflow-auto p-6 bg-gray-100">
+              <div className="bg-white rounded-lg shadow-sm p-8 min-h-[500px] flex flex-col items-center justify-center">
+                {/* Demo preview content */}
+                <div className="text-center max-w-md">
+                  <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-6">
+                    {previewDoc.name.endsWith('.pdf') ? (
+                      <svg className="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-12 h-12 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                      </svg>
+                    )}
+                  </div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-2">{previewDoc.name}</h4>
+                  <div className="space-y-2 text-sm text-gray-600 mb-6">
+                    <p><span className="text-gray-500">Project:</span> {previewDoc.projectName}</p>
+                    <p><span className="text-gray-500">Category:</span> {previewDoc.category.replace('_', ' ')}</p>
+                    <p><span className="text-gray-500">Status:</span> <span className={`px-2 py-0.5 rounded-full text-xs ${STATUS_COLORS[previewDoc.status]}`}>{STATUS_LABELS[previewDoc.status]}</span></p>
+                    <p><span className="text-gray-500">Size:</span> {previewDoc.size}</p>
+                    <p><span className="text-gray-500">Version:</span> {previewDoc.version}</p>
+                    <p><span className="text-gray-500">Uploaded:</span> {previewDoc.uploadedDate} by {previewDoc.uploadedBy}</p>
+                  </div>
+                  
+                  {previewDoc.aiFlags && previewDoc.aiFlags.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                      <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        AI Flags
+                      </div>
+                      <ul className="text-sm text-amber-600">
+                        {previewDoc.aiFlags.map((flag, i) => (
+                          <li key={i}>• {flag}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-gray-400">
+                    Document preview will display here when connected to file storage.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Modal */}
       {showUploadModal && (

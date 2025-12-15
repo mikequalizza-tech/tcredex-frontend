@@ -209,7 +209,7 @@ export default function AppLayout({
           {sidebarOpen ? (
             <Link href="/" className="flex items-center gap-2">
               <Image 
-                src="/brand/tcredex_transparent_512x128.png" 
+                src="/brand/tcredex_512x128.png" 
                 alt="tCredex" 
                 width={120} 
                 height={30}
@@ -219,7 +219,7 @@ export default function AppLayout({
             </Link>
           ) : (
             <Image 
-              src="/brand/tcredex_transparent_256x64.png" 
+              src="/brand/tcredex_256x64.png" 
               alt="tCredex" 
               width={60} 
               height={15}

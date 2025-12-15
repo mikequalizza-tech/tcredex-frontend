@@ -5,13 +5,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import DocumentCard from '@/components/documents/DocumentCard';
 import ShareModal from '@/components/documents/ShareModal';
+import DocumentPreviewModal from '@/components/documents/DocumentPreviewModal';
 import { 
   Document, 
   DocumentCategory, 
   DOCUMENT_CATEGORIES, 
-  DOCUMENT_TAGS, 
   DocumentTag, 
-  TAG_COLORS,
   DocumentShare,
 } from '@/lib/documents/types';
 
@@ -22,7 +21,7 @@ const demoProjects: Record<string, { name: string; status: string }> = {
   'P003': { name: 'Youth Training Center', status: 'draft' },
 };
 
-// Demo documents for this project
+// Demo documents for this project - with lock and collaborator data
 const getProjectDocuments = (projectId: string): Document[] => {
   if (projectId === 'P001') {
     return [
@@ -56,6 +55,8 @@ const getProjectDocuments = (projectId: string): Document[] => {
         tags: ['Environmental', 'Intake'],
         status: 'approved',
         requiredForClosing: true,
+        lock: { isLocked: false },
+        collaborators: [],
         createdAt: '2024-11-15T09:00:00Z',
         updatedAt: '2024-12-10T14:30:00Z',
       },
@@ -88,6 +89,16 @@ const getProjectDocuments = (projectId: string): Document[] => {
         tags: ['QALICB', 'Compliance'],
         status: 'pending_review',
         requiredForClosing: true,
+        // This document is checked out by another user
+        lock: {
+          isLocked: true,
+          lockedBy: { id: 'u2', name: 'Sarah Johnson', email: 'sarah@example.com' },
+          lockedAt: '2024-12-14T09:00:00Z',
+          lockReason: 'Reviewing certification requirements',
+        },
+        collaborators: [
+          { id: 'u2', name: 'Sarah Johnson', email: 'sarah@example.com', activity: 'editing', lastActiveAt: '2024-12-14T10:30:00Z' },
+        ],
         createdAt: '2024-12-08T11:15:00Z',
         updatedAt: '2024-12-08T11:15:00Z',
       },
@@ -121,6 +132,13 @@ const getProjectDocuments = (projectId: string): Document[] => {
         tags: ['Financial Projections'],
         status: 'approved',
         requiredForClosing: false,
+        // This document is checked out by current user
+        lock: {
+          isLocked: true,
+          lockedBy: { id: 'u1', name: 'John Smith', email: 'john@example.com' },
+          lockedAt: '2024-12-14T08:00:00Z',
+        },
+        collaborators: [],
         createdAt: '2024-10-20T14:00:00Z',
         updatedAt: '2024-12-11T16:20:00Z',
       },
@@ -149,11 +167,24 @@ const getProjectDocuments = (projectId: string): Document[] => {
         versionCount: 2,
         owner: { id: 'u1', name: 'John Smith', email: 'john@example.com' },
         organizationId: 'org1',
-        shares: [],
+        shares: [
+          {
+            id: 's1',
+            sharedWith: { type: 'user', id: 'u3', name: 'Mike Chen' },
+            accessLevel: 'viewer',
+            sharedBy: { id: 'u1', name: 'John Smith' },
+            sharedAt: '2024-12-01T10:00:00Z',
+            canReshare: false,
+          },
+        ],
         isPublic: false,
         tags: ['Intake'],
         status: 'approved',
         requiredForClosing: true,
+        lock: { isLocked: false },
+        collaborators: [
+          { id: 'u3', name: 'Mike Chen', email: 'mike@example.com', activity: 'viewing', lastActiveAt: '2024-12-14T10:00:00Z' },
+        ],
         createdAt: '2024-11-15T08:00:00Z',
         updatedAt: '2024-11-20T10:00:00Z',
       },
@@ -185,6 +216,10 @@ export default function ProjectDocumentsPage() {
   const [filterCategory, setFilterCategory] = useState<DocumentCategory | 'all'>('all');
   const [filterTag, setFilterTag] = useState<DocumentTag | 'all'>('all');
   const [shareDocument, setShareDocument] = useState<Document | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
+
+  // Demo current user ID
+  const currentUserId = 'u1';
 
   if (!project) {
     return (
@@ -221,6 +256,30 @@ export default function ProjectDocumentsPage() {
 
   const completedCount = checklistStatus.filter(c => c.status === 'complete').length;
   const totalRequired = closingChecklist.length;
+
+  // Document control handlers
+  const handleCheckout = (doc: Document) => {
+    setDocuments(documents.map(d => 
+      d.id === doc.id 
+        ? { 
+            ...d, 
+            lock: {
+              isLocked: true,
+              lockedBy: { id: currentUserId, name: 'John Smith', email: 'john@example.com' },
+              lockedAt: new Date().toISOString(),
+            }
+          }
+        : d
+    ));
+  };
+
+  const handleCheckin = (doc: Document) => {
+    setDocuments(documents.map(d => 
+      d.id === doc.id 
+        ? { ...d, lock: { isLocked: false } }
+        : d
+    ));
+  };
 
   const handleShare = (share: Omit<DocumentShare, 'id' | 'sharedAt' | 'sharedBy'>) => {
     if (!shareDocument) return;
@@ -289,6 +348,42 @@ export default function ProjectDocumentsPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2">
+          {/* Legend */}
+          <div className="bg-gray-900/50 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+            <span className="font-medium text-gray-400">Legend:</span>
+            <span className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Preview
+            </span>
+            <span className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download
+            </span>
+            <span className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Check Out
+            </span>
+            <span className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+              </svg>
+              Check In
+            </span>
+            <span className="flex items-center gap-1">
+              <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              </svg>
+              Locked by Other
+            </span>
+          </div>
+
           {/* Filters */}
           <div className="flex gap-4 mb-6">
             <select
@@ -323,7 +418,11 @@ export default function ProjectDocumentsPage() {
                   document={doc}
                   onShare={setShareDocument}
                   onDelete={handleDelete}
+                  onPreview={setPreviewDocument}
+                  onCheckout={handleCheckout}
+                  onCheckin={handleCheckin}
                   showEntity={false}
+                  currentUserId={currentUserId}
                 />
               ))
             ) : (
@@ -393,15 +492,49 @@ export default function ProjectDocumentsPage() {
                     </Link>
                   )}
                   {item.documentId && (
-                    <Link
-                      href={`/dashboard/documents/${item.documentId}`}
+                    <button
+                      onClick={() => {
+                        const doc = documents.find(d => d.id === item.documentId);
+                        if (doc) setPreviewDocument(doc);
+                      }}
                       className="text-xs text-gray-500 hover:text-gray-300"
                     >
                       View
-                    </Link>
+                    </button>
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Active Users */}
+          <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+            <h3 className="font-semibold text-gray-200 mb-3">Active Collaborators</h3>
+            <div className="space-y-2">
+              {documents
+                .filter(d => d.collaborators && d.collaborators.length > 0)
+                .flatMap(d => d.collaborators.map(c => ({ ...c, docName: d.name, docId: d.id })))
+                .map((collab, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      collab.activity === 'editing' ? 'bg-green-600' : 'bg-blue-600'
+                    }`}>
+                      {collab.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-300 truncate">{collab.name}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {collab.activity === 'editing' ? 'Editing' : 'Viewing'}: {collab.docName}
+                      </p>
+                    </div>
+                    <span className={`w-2 h-2 rounded-full ${
+                      collab.activity === 'editing' ? 'bg-green-500' : 'bg-blue-500'
+                    }`} />
+                  </div>
+                ))}
+              {documents.filter(d => d.collaborators && d.collaborators.length > 0).length === 0 && (
+                <p className="text-sm text-gray-500">No active collaborators</p>
+              )}
             </div>
           </div>
         </div>
@@ -414,6 +547,15 @@ export default function ProjectDocumentsPage() {
           onClose={() => setShareDocument(null)}
           onShare={handleShare}
           onRemoveShare={handleRemoveShare}
+        />
+      )}
+
+      {/* Preview Modal */}
+      {previewDocument && (
+        <DocumentPreviewModal
+          document={previewDocument}
+          onClose={() => setPreviewDocument(null)}
+          onCheckout={handleCheckout}
         />
       )}
     </div>

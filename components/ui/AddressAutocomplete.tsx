@@ -2,54 +2,27 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-// Type declarations for Google Maps
-declare global {
-  interface Window {
-    google?: {
-      maps: {
-        places: {
-          Autocomplete: new (
-            input: HTMLInputElement,
-            options?: google.maps.places.AutocompleteOptions
-          ) => google.maps.places.Autocomplete;
-        };
-        event: {
-          clearInstanceListeners: (instance: unknown) => void;
-        };
-      };
+// Simple inline type definitions (no namespace needed)
+interface PlaceResult {
+  address_components?: AddressComponent[];
+  formatted_address?: string;
+  geometry?: {
+    location?: {
+      lat(): number;
+      lng(): number;
     };
-    initGooglePlaces?: () => void;
-  }
+  };
 }
 
-// Use namespace for Google Maps types
-declare namespace google.maps {
-  namespace places {
-    interface AutocompleteOptions {
-      componentRestrictions?: { country: string | string[] };
-      fields?: string[];
-      types?: string[];
-    }
-    interface Autocomplete {
-      addListener(event: string, handler: () => void): void;
-      getPlace(): PlaceResult;
-    }
-    interface PlaceResult {
-      address_components?: AddressComponent[];
-      formatted_address?: string;
-      geometry?: {
-        location?: {
-          lat(): number;
-          lng(): number;
-        };
-      };
-    }
-    interface AddressComponent {
-      long_name: string;
-      short_name: string;
-      types: string[];
-    }
-  }
+interface AddressComponent {
+  long_name: string;
+  short_name: string;
+  types: string[];
+}
+
+interface AutocompleteInstance {
+  addListener(event: string, handler: () => void): void;
+  getPlace(): PlaceResult;
 }
 
 export interface AddressData {
@@ -79,7 +52,7 @@ export function AddressAutocomplete({
   disabled = false,
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const autocompleteRef = useRef<AutocompleteInstance | null>(null);
   const [inputValue, setInputValue] = useState(value);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -88,7 +61,8 @@ export function AddressAutocomplete({
     if (typeof window === 'undefined') return;
     
     // Check if already loaded
-    if (window.google?.maps?.places) {
+    const win = window as unknown as { google?: { maps?: { places?: unknown; event?: unknown } } };
+    if (win.google?.maps?.places) {
       setIsLoaded(true);
       return;
     }
@@ -119,14 +93,18 @@ export function AddressAutocomplete({
   // Initialize autocomplete
   useEffect(() => {
     if (!isLoaded || !inputRef.current || autocompleteRef.current) return;
-    if (!window.google?.maps?.places) return;
+    
+    const win = window as unknown as { google?: { maps?: { places?: { Autocomplete: unknown }; event?: { clearInstanceListeners: (i: unknown) => void } } } };
+    if (!win.google?.maps?.places) return;
 
     try {
-      autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const AutocompleteClass = (win.google.maps.places as any).Autocomplete;
+      autocompleteRef.current = new AutocompleteClass(inputRef.current, {
         componentRestrictions: { country: 'us' },
         fields: ['address_components', 'formatted_address', 'geometry'],
         types: ['address'],
-      });
+      }) as AutocompleteInstance;
 
       autocompleteRef.current.addListener('place_changed', handlePlaceSelect);
     } catch (error) {
@@ -134,8 +112,8 @@ export function AddressAutocomplete({
     }
 
     return () => {
-      if (autocompleteRef.current && window.google?.maps?.event) {
-        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      if (autocompleteRef.current && win.google?.maps?.event) {
+        win.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

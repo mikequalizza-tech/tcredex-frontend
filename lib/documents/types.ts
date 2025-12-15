@@ -61,6 +61,31 @@ export type AccessLevel = 'owner' | 'admin' | 'editor' | 'viewer';
 
 export type EntityType = 'organization' | 'project' | 'deal' | 'user';
 
+// Document lock status for checkout/check-in
+export interface DocumentLock {
+  isLocked: boolean;
+  lockedBy?: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl?: string;
+  };
+  lockedAt?: string;
+  lockExpiresAt?: string;
+  lockReason?: string;
+}
+
+// Active collaborators currently viewing/editing
+export interface DocumentCollaborator {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  activity: 'viewing' | 'editing';
+  lastActiveAt: string;
+  cursor?: { page: number; position: number };
+}
+
 export interface DocumentVersion {
   id: string;
   versionNumber: number;
@@ -76,6 +101,9 @@ export interface DocumentVersion {
   changeNotes?: string;
   checksum: string;
   storageUrl: string;
+  // Preview URLs for different formats
+  previewUrl?: string;
+  thumbnailUrl?: string;
 }
 
 export interface DocumentShare {
@@ -126,6 +154,10 @@ export interface Document {
   shares: DocumentShare[];
   isPublic: boolean;
   
+  // Document control (checkout/check-in)
+  lock: DocumentLock;
+  collaborators: DocumentCollaborator[];
+  
   // Metadata
   tags: DocumentTag[];
   status: 'draft' | 'pending_review' | 'approved' | 'archived';
@@ -174,7 +206,17 @@ export interface DocumentPermissions {
   canUploadVersion: boolean;
   canChangeStatus: boolean;
   canManageAccess: boolean;
+  canCheckout: boolean;
+  canCheckin: boolean;
 }
+
+// Document action types for the API
+export type DocumentAction = 
+  | 'checkout'    // Lock document for editing
+  | 'checkin'     // Unlock document, optionally with new version
+  | 'force_unlock'// Admin override to unlock
+  | 'join_session'// Join collaborative editing
+  | 'leave_session';
 
 // Category metadata for UI
 export const DOCUMENT_CATEGORIES: Record<DocumentCategory, { label: string; color: string; icon: string }> = {
@@ -237,4 +279,24 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function isPreviewable(mimeType: string): boolean {
+  return [
+    'application/pdf',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'text/plain',
+    'text/csv',
+  ].includes(mimeType);
+}
+
+export function getFileTypeIcon(mimeType: string): string {
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'spreadsheet';
+  if (mimeType.includes('document') || mimeType.includes('word')) return 'document';
+  return 'file';
 }

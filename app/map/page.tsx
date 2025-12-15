@@ -105,7 +105,7 @@ export default function MapPlatformPage() {
           {/* Left: Logo + Title */}
           <div className="flex items-center gap-4">
             <a href="/" className="flex items-center gap-2">
-              <img src="/brand/tcredex_transparent_256x64.png" alt="tCredex" className="h-8 w-auto" />
+              <img src="/brand/tcredex_256x64.png" alt="tCredex" className="h-8 w-auto" />
             </a>
             <div className="h-6 w-px bg-gray-700" />
             <span className="text-sm text-gray-400">Map Platform</span>
@@ -156,9 +156,6 @@ export default function MapPlatformPage() {
             deals={filteredDeals}
             selectedDealId={selectedDealId}
             onSelectDeal={handleSelectDeal}
-            showTractLayers={true}
-            showDealPins={true}
-            showLegend={true}
           />
         </div>
 

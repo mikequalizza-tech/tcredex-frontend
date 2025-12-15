@@ -3,12 +3,7 @@
  * 
  * Data source: CDFI Fund 2016-2020 ACS Low-Income Community Data
  * Total eligible tracts: 35,167 out of 85,395 nationwide
- * 
- * Compact format per tract: [state, county, poverty, income, unemployment, povertyQualifies, incomeQualifies, classification]
  */
-
-import { promises as fs } from 'fs';
-import path from 'path';
 
 // State FIPS to name mapping
 export const STATE_FIPS: Record<string, string> = {
@@ -76,7 +71,28 @@ let tractDataCache: Map<string, RawTractData> | null = null;
 let loadPromise: Promise<void> | null = null;
 
 /**
- * Load tract data from JSON file (cached in memory)
+ * Get the base URL for fetching static files
+ */
+function getBaseUrl(): string {
+  // In server-side rendering, use the VERCEL_URL or default to localhost
+  if (typeof window === 'undefined') {
+    const vercelUrl = process.env.VERCEL_URL;
+    if (vercelUrl) {
+      return `https://${vercelUrl}`;
+    }
+    // Check for custom domain
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (siteUrl) {
+      return siteUrl;
+    }
+    return 'http://localhost:3000';
+  }
+  // In browser, use relative URL
+  return '';
+}
+
+/**
+ * Load tract data from JSON file via HTTP (cached in memory)
  */
 async function loadTractData(): Promise<Map<string, RawTractData>> {
   if (tractDataCache) {
@@ -90,32 +106,16 @@ async function loadTractData(): Promise<Map<string, RawTractData>> {
 
   loadPromise = (async () => {
     try {
-      // Try multiple paths for the data file
-      const possiblePaths = [
-        path.join(process.cwd(), 'public', 'data', 'tract_eligible.json'),
-        path.join(process.cwd(), 'data', 'tract_eligible.json'),
-        path.join(process.cwd(), 'lib', 'tracts', 'tract_eligible.json'),
-      ];
-
-      let rawData: string | null = null;
+      const baseUrl = getBaseUrl();
+      const response = await fetch(`${baseUrl}/data/tract_eligible.json`);
       
-      for (const filePath of possiblePaths) {
-        try {
-          rawData = await fs.readFile(filePath, 'utf-8');
-          console.log(`[TractData] Loaded from ${filePath}`);
-          break;
-        } catch {
-          // Try next path
-        }
-      }
-
-      if (!rawData) {
-        console.warn('[TractData] Could not load tract_eligible.json from any path');
+      if (!response.ok) {
+        console.warn(`[TractData] Failed to load tract data: ${response.status}`);
         tractDataCache = new Map();
         return;
       }
 
-      const parsed = JSON.parse(rawData) as Record<string, RawTractData>;
+      const parsed = await response.json() as Record<string, RawTractData>;
       tractDataCache = new Map(Object.entries(parsed));
       
       console.log(`[TractData] Loaded ${tractDataCache.size} eligible tracts`);
@@ -283,7 +283,7 @@ export async function getTractStats(): Promise<{
   const byClassification: Record<string, number> = {};
   let severelyDistressed = 0;
   
-  for (const [geoid, raw] of data) {
+  for (const [, raw] of data) {
     const [stateAbbr, , poverty, , , povertyQ, incomeQ, classLetter] = raw;
     
     byState[stateAbbr] = (byState[stateAbbr] || 0) + 1;

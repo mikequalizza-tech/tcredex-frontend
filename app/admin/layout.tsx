@@ -1,8 +1,11 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
+import { AuthProvider } from '@/lib/auth';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { Role } from '@/lib/auth/types';
 
 const navItems = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
@@ -14,11 +17,7 @@ const navItems = [
   { name: 'Settings', href: '/admin/settings', icon: '⚙️' },
 ];
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AdminContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
@@ -35,7 +34,7 @@ export default function AdminLayout({
               height={30}
               className="h-7 w-auto"
             />
-            <span className="font-bold text-gray-100">tCredex Admin</span>
+            <span className="font-bold text-gray-100">Admin</span>
           </Link>
         </div>
 
@@ -67,11 +66,11 @@ export default function AdminLayout({
         <div className="p-4 border-t border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">
-              MQ
+              A
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-200 truncate">Mike Qualizza</p>
-              <p className="text-xs text-gray-500 truncate">Admin</p>
+              <p className="text-sm font-medium text-gray-200 truncate">Platform Admin</p>
+              <p className="text-xs text-gray-500 truncate">admin@tcredex.com</p>
             </div>
           </div>
         </div>
@@ -82,5 +81,19 @@ export default function AdminLayout({
         {children}
       </main>
     </div>
+  );
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthProvider>
+      <ProtectedRoute requiredRole={Role.ORG_ADMIN}>
+        <AdminContent>{children}</AdminContent>
+      </ProtectedRoute>
+    </AuthProvider>
   );
 }

@@ -1,43 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import AppLayout from '@/components/layout/AppLayout';
-import { AuthProvider, useCurrentUser } from '@/lib/auth';
+import { AuthProvider } from '@/lib/auth';
 import { ChatTC } from '@/components/chat';
-
-function ProtectedContent({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const { isAuthenticated, isLoading } = useCurrentUser();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/signin');
-    }
-  }, [isAuthenticated, isLoading, router]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) return null;
-
-  return (
-    <>
-      <AppLayout>{children}</AppLayout>
-      <ChatTC />
-    </>
-  );
-}
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function DealsLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <ProtectedContent>{children}</ProtectedContent>
+      <ProtectedRoute>
+        <AppLayout>{children}</AppLayout>
+        <ChatTC />
+      </ProtectedRoute>
     </AuthProvider>
   );
 }

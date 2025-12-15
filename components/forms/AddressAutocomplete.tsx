@@ -87,20 +87,16 @@ export default function AddressAutocomplete({
     return () => clearTimeout(timer);
   }, [value, mapboxToken]);
 
-  // Lookup census tract from coordinates
+  // Lookup census tract from coordinates via our API (avoids CORS issues)
   const lookupCensusTract = async (lng: number, lat: number): Promise<string | null> => {
     try {
-      // FCC Census Block API - free, no key required
       const response = await fetch(
-        `https://geo.fcc.gov/api/census/block/find?latitude=${lat}&longitude=${lng}&format=json`
+        `/api/geo/tract-lookup?lat=${lat}&lng=${lng}`
       );
       const data = await response.json();
       
-      if (data.Block?.FIPS) {
-        // FIPS is 15 digits: State(2) + County(3) + Tract(6) + Block(4)
-        // Census tract is first 11 digits
-        const tract = data.Block.FIPS.substring(0, 11);
-        return tract;
+      if (data.tract_id) {
+        return data.tract_id;
       }
       return null;
     } catch (error) {

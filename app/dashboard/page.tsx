@@ -2,8 +2,17 @@
 
 import { useCurrentUser } from '@/lib/auth';
 import { SponsorDashboard, CDEDashboard, InvestorDashboard } from '@/components/dashboard';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
+  );
+}
+
+function DashboardContent() {
   const { orgType, userName, orgName, currentDemoRole } = useCurrentUser();
   
   // Determine which dashboard to show based on role

@@ -3,6 +3,16 @@
 import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { User, Role, AuthContext, hasMinimumRole } from './types';
 
+// Cookie helper functions for middleware auth
+function setCookie(name: string, value: string, days: number = 7) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+}
+
 // Demo users for different roles
 const DEMO_USERS: Record<string, User> = {
   cde: {
@@ -104,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const role = session.role as 'sponsor' | 'cde' | 'investor' | 'admin';
             setCurrentDemoRole(role);
             setUser(createUserFromSession(session));
+            // Ensure cookie is synced for middleware
+            setCookie('tcredex_session', savedSession);
           }
         }
       } catch (error) {
@@ -122,11 +134,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const demoCred = DEMO_CREDENTIALS[normalizedEmail];
     if (demoCred && demoCred.password === password) {
       const role = demoCred.role as 'sponsor' | 'cde' | 'investor' | 'admin';
+      const demoUser = DEMO_USERS[role];
       setCurrentDemoRole(role);
-      setUser(DEMO_USERS[role]);
+      setUser(demoUser);
       
       if (typeof window !== 'undefined') {
-        localStorage.setItem('tcredex_session', JSON.stringify({ role, email: normalizedEmail }));
+        const sessionData = { 
+          role, 
+          email: normalizedEmail,
+          orgRole: demoUser.role // ORG_ADMIN, PROJECT_ADMIN, etc.
+        };
+        localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
+        // Set cookie for middleware
+        setCookie('tcredex_session', JSON.stringify(sessionData));
       }
       return { success: true };
     }
@@ -139,7 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (userData.email === normalizedEmail && userData.password === password) {
           setCurrentDemoRole(userData.role);
           setUser(createUserFromSession(userData));
-          localStorage.setItem('tcredex_session', JSON.stringify(userData));
+          const sessionData = { ...userData, orgRole: Role.ORG_ADMIN };
+          localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
+          // Set cookie for middleware
+          setCookie('tcredex_session', JSON.stringify(sessionData));
           return { success: true };
         }
       }
@@ -158,16 +181,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentDemoRole(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('tcredex_session');
+      // Delete cookie for middleware
+      deleteCookie('tcredex_session');
       window.location.href = '/';
     }
   }, []);
 
   const switchRole = useCallback((role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
     if (!user) return;
+    const demoUser = DEMO_USERS[role];
     setCurrentDemoRole(role);
-    setUser(DEMO_USERS[role]);
+    setUser(demoUser);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('tcredex_session', JSON.stringify({ role, email: DEMO_USERS[role].email }));
+      const sessionData = { 
+        role, 
+        email: demoUser.email,
+        orgRole: demoUser.role 
+      };
+      localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
+      setCookie('tcredex_session', JSON.stringify(sessionData));
     }
   }, [user]);
 

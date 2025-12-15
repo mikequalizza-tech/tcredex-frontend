@@ -3,6 +3,7 @@
 import AppLayout from '@/components/layout/AppLayout';
 import { AuthProvider } from '@/lib/auth';
 import { ChatTC } from '@/components/chat';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function InvestorLayout({
   children,
@@ -11,10 +12,10 @@ export default function InvestorLayout({
 }) {
   return (
     <AuthProvider>
-      <AppLayout>
-        {children}
-      </AppLayout>
-      <ChatTC />
+      <ProtectedRoute allowedOrgTypes={['investor']}>
+        <AppLayout>{children}</AppLayout>
+        <ChatTC />
+      </ProtectedRoute>
     </AuthProvider>
   );
 }

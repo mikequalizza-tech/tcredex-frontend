@@ -3,6 +3,7 @@
 import { AppLayout } from '@/components/layout';
 import { AuthProvider } from '@/lib/auth';
 import ChatTC from '@/components/chat/ChatTC';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function AutomatchLayout({
   children,
@@ -11,10 +12,10 @@ export default function AutomatchLayout({
 }) {
   return (
     <AuthProvider>
-      <AppLayout>
-        {children}
-      </AppLayout>
-      <ChatTC />
+      <ProtectedRoute>
+        <AppLayout>{children}</AppLayout>
+        <ChatTC />
+      </ProtectedRoute>
     </AuthProvider>
   );
 }

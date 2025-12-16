@@ -4,7 +4,21 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-type OrgType = 'sponsor' | 'cde' | 'investor';
+type OrgType = 'sponsor' | 'cde' | 'investor' | 'consultant';
+
+const scheduleAnchors: Record<OrgType, string> = {
+  sponsor: '#schedule-sponsor',
+  cde: '#schedule-cde',
+  investor: '#schedule-investor',
+  consultant: '#schedule-consultant',
+};
+
+const scheduleNames: Record<OrgType, string> = {
+  sponsor: 'Schedule A (Sponsors)',
+  cde: 'Schedule B (CDEs)',
+  investor: 'Schedule C (Investors)',
+  consultant: 'Schedule D (Consultants)',
+};
 
 export default function SignUp() {
   const router = useRouter();
@@ -19,10 +33,16 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!termsAccepted) {
+      setError('You must accept the Platform Terms to continue');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -48,6 +68,8 @@ export default function SignUp() {
         name,
         orgName,
         registeredAt: new Date().toISOString(),
+        termsAcceptedAt: new Date().toISOString(),
+        showWelcomeModal: true, // Flag for first login modal
       };
 
       localStorage.setItem('tcredex_session', JSON.stringify(session));
@@ -58,7 +80,7 @@ export default function SignUp() {
 
       // Redirect to dashboard
       router.push('/dashboard');
-    } catch (err) {
+    } catch {
       setError('Registration failed. Please try again.');
       setIsSubmitting(false);
     }
@@ -85,6 +107,13 @@ export default function SignUp() {
       description: 'I invest in tax credit transactions for CRA or tax benefits',
       icon: '💰',
       color: 'blue',
+    },
+    {
+      id: 'consultant' as OrgType,
+      name: 'Consultant / Advisor',
+      description: 'I advise clients on tax credit transactions',
+      icon: '📋',
+      color: 'amber',
     },
   ];
 
@@ -140,6 +169,7 @@ export default function SignUp() {
                       orgType === type.id
                         ? type.color === 'green' ? 'border-green-500 bg-green-900/20' :
                           type.color === 'purple' ? 'border-purple-500 bg-purple-900/20' :
+                          type.color === 'amber' ? 'border-amber-500 bg-amber-900/20' :
                           'border-blue-500 bg-blue-900/20'
                         : 'border-gray-700 hover:border-gray-600'
                     }`}
@@ -261,23 +291,51 @@ export default function SignUp() {
                     required
                   />
                 </div>
+
+                {/* Terms Acceptance Checkbox */}
+                <div className="pt-2">
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                    />
+                    <span className="text-sm text-gray-300">
+                      I agree to the{' '}
+                      <Link href="/terms" target="_blank" className="text-indigo-400 hover:text-indigo-300 underline">
+                        tCredex Platform Terms
+                      </Link>
+                      {' '}and the applicable{' '}
+                      <Link 
+                        href={`/terms${orgType ? scheduleAnchors[orgType] : ''}`} 
+                        target="_blank" 
+                        className="text-indigo-400 hover:text-indigo-300 underline"
+                      >
+                        {orgType ? scheduleNames[orgType] : 'Role-Specific Schedule'}
+                      </Link>
+                      , and understand that tCredex provides informational tools only and does not provide investment, legal, or tax advice.
+                    </span>
+                  </label>
+                  <p className="mt-2 ml-7 text-xs text-gray-500">
+                    Designed to support professional judgment, not replace it.
+                  </p>
+                </div>
               </div>
 
               <div className="mt-6">
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] disabled:opacity-50"
+                  disabled={isSubmitting || !termsAccepted}
+                  className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Creating Account...' : 'Create Account'}
                 </button>
               </div>
 
               <p className="mt-4 text-xs text-gray-500 text-center">
-                By creating an account, you agree to our{' '}
-                <Link href="/terms" className="text-indigo-400 hover:underline">Terms of Service</Link>
-                {' '}and{' '}
-                <Link href="/privacy" className="text-indigo-400 hover:underline">Privacy Policy</Link>.
+                View our{' '}
+                <Link href="/privacy" className="text-indigo-400 hover:underline">Privacy Policy</Link>
               </p>
             </form>
           )}

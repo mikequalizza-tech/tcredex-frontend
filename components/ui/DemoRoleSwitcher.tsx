@@ -4,8 +4,13 @@ import { useState } from 'react';
 import { useCurrentUser } from '@/lib/auth';
 
 export default function DemoRoleSwitcher() {
-  const { currentDemoRole, switchRole, userName, orgName } = useCurrentUser();
+  const { currentDemoRole, switchRole, userName, orgName, isAuthenticated } = useCurrentUser();
   const [isOpen, setIsOpen] = useState(false);
+
+  // Don't render if user is not logged in
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const roles = [
     { 
@@ -59,7 +64,8 @@ export default function DemoRoleSwitcher() {
     },
   ];
 
-  const currentRole = roles.find(r => r.id === currentDemoRole)!;
+  // Find current role with fallback to sponsor
+  const currentRole = roles.find(r => r.id === currentDemoRole) || roles[0];
 
   return (
     <div className="fixed bottom-4 right-4 z-50">

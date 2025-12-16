@@ -3,6 +3,7 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { getDealById, PROGRAM_COLORS, STATUS_CONFIG } from '@/lib/data/deals';
+import { useCurrentUser } from '@/lib/auth';
 
 interface DealPageProps {
   params: Promise<{ id: string }>;
@@ -11,10 +12,11 @@ interface DealPageProps {
 export default function DealDetailPage({ params }: DealPageProps) {
   const { id } = use(params);
   const deal = getDealById(id);
+  const { isAuthenticated } = useCurrentUser();
 
   if (!deal) {
     return (
-      <main className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white mb-4">Project Not Found</h1>
           <p className="text-gray-400 mb-6">This project may no longer be available.</p>
@@ -22,7 +24,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
             Browse Marketplace
           </Link>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -30,9 +32,9 @@ export default function DealDetailPage({ params }: DealPageProps) {
   const totalBudget = deal.useOfFunds?.reduce((sum, item) => sum + item.amount, 0) || deal.allocation;
 
   return (
-    <main className="min-h-screen bg-gray-950">
+    <>
       {/* Hero Header */}
-      <div className={`bg-gradient-to-r ${colors.gradient} py-16`}>
+      <div className={`bg-gradient-to-r ${colors.gradient} pt-8 pb-16`}>
         <div className="max-w-6xl mx-auto px-6">
           <Link href="/deals" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,12 +58,18 @@ export default function DealDetailPage({ params }: DealPageProps) {
             </div>
             
             <div className="flex gap-3">
-              <Link
-                href="/signin"
-                className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Express Interest
-              </Link>
+              {isAuthenticated ? (
+                <button className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors">
+                  Express Interest
+                </button>
+              ) : (
+                <Link
+                  href="/signin"
+                  className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  Sign In to Connect
+                </Link>
+              )}
               <button className="px-4 py-3 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -84,6 +92,16 @@ export default function DealDetailPage({ params }: DealPageProps) {
                 {deal.description || `${deal.projectName} is a ${deal.programType} project located in ${deal.city}, ${deal.state}. This ${deal.programLevel} program opportunity has an allocation of $${(deal.allocation / 1000000).toFixed(1)}M at a credit price of $${deal.creditPrice.toFixed(2)}.`}
               </p>
             </section>
+
+            {/* Community Impact */}
+            {deal.communityImpact && (
+              <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Community Impact</h2>
+                <p className="text-gray-300 leading-relaxed whitespace-pre-line">
+                  {deal.communityImpact}
+                </p>
+              </section>
+            )}
 
             {/* Highlights */}
             {deal.projectHighlights && deal.projectHighlights.length > 0 && (
@@ -222,12 +240,18 @@ export default function DealDetailPage({ params }: DealPageProps) {
               </div>
 
               <div className="mt-6 space-y-3">
-                <Link
-                  href="/signin"
-                  className="block w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-center font-semibold rounded-lg transition-colors"
-                >
-                  Express Interest
-                </Link>
+                {isAuthenticated ? (
+                  <button className="block w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-center font-semibold rounded-lg transition-colors">
+                    Express Interest
+                  </button>
+                ) : (
+                  <Link
+                    href="/signin"
+                    className="block w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-center font-semibold rounded-lg transition-colors"
+                  >
+                    Sign In to Connect
+                  </Link>
+                )}
                 <Link
                   href="/pricing"
                   className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center font-medium rounded-lg transition-colors"
@@ -236,13 +260,15 @@ export default function DealDetailPage({ params }: DealPageProps) {
                 </Link>
               </div>
 
-              <p className="text-xs text-gray-500 text-center mt-4">
-                Sign in or register to view full details and contact the sponsor.
-              </p>
+              {!isAuthenticated && (
+                <p className="text-xs text-gray-500 text-center mt-4">
+                  Sign in or register to view full details and contact the sponsor.
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
-    </main>
+    </>
   );
 }

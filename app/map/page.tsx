@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import DealCard from '@/components/DealCard';
 import { mockDeals } from '@/lib/mockData';
+import { useCurrentUser } from '@/lib/auth';
 import type { MapDeal } from '@/components/maps/InteractiveMapPlatform';
 
 // Dynamic import to avoid SSR issues with Mapbox
@@ -35,6 +36,7 @@ const DEAL_COORDINATES: Record<string, [number, number]> = {
 };
 
 export default function MapPlatformPage() {
+  const { isAuthenticated, orgType } = useCurrentUser();
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('sponsor');
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +49,13 @@ export default function MapPlatformPage() {
   
   const dealListRef = useRef<HTMLDivElement>(null);
   const dealCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Set initial view mode based on org type
+  useEffect(() => {
+    if (orgType === 'cde') setViewMode('cde');
+    else if (orgType === 'investor') setViewMode('investor');
+    else setViewMode('sponsor');
+  }, [orgType]);
 
   // Convert mockDeals to MapDeal format with coordinates
   const mapDeals: MapDeal[] = mockDeals.map(deal => ({
@@ -97,56 +106,89 @@ export default function MapPlatformPage() {
   const totalFinancingGap = filteredDeals.reduce((sum, d) => sum + d.financingGap, 0);
   const shovelReadyCount = filteredDeals.filter(d => d.shovelReady).length;
 
+  // Height class based on whether AppLayout provides header
+  const containerHeight = isAuthenticated ? 'h-full' : 'h-screen';
+
   return (
-    <div className="h-screen w-full bg-gray-950 text-white overflow-hidden flex flex-col">
-      {/* Header */}
-      <header className="flex-none bg-gray-900 border-b border-gray-800 px-4 py-3 z-50">
-        <div className="flex items-center justify-between max-w-full">
-          {/* Left: Logo + Title */}
-          <div className="flex items-center gap-4">
-            <a href="/" className="flex items-center gap-2">
-              <img src="/brand/tcredex_256x64.png" alt="tCredex" className="h-8 w-auto" />
-            </a>
-            <div className="h-6 w-px bg-gray-700" />
-            <span className="text-sm text-gray-400">Map Platform</span>
-          </div>
-
-          {/* Center: View Toggle */}
-          <div className="flex gap-2">
-            {(['sponsor', 'cde', 'investor'] as ViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  viewMode === mode
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
-                }`}
-              >
-                {mode === 'sponsor' ? 'Sponsor' : mode === 'cde' ? 'CDE' : 'Investor'}
-              </button>
-            ))}
-          </div>
-
-          {/* Right: Stats + Auth */}
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-4 text-sm">
-              <span className="text-gray-400">
-                <span className="text-green-400">●</span> {filteredDeals.length} deals
-              </span>
-              <span className="text-gray-400">
-                ${(totalProjectValue / 1000000).toFixed(0)}M total
-              </span>
+    <div className={`${containerHeight} w-full bg-gray-950 text-white overflow-hidden flex flex-col`}>
+      {/* Public Header - Only show when NOT authenticated (AppLayout handles header for logged-in users) */}
+      {!isAuthenticated && (
+        <header className="flex-none bg-gray-900 border-b border-gray-800 px-4 py-3 z-50">
+          <div className="flex items-center justify-between max-w-full">
+            {/* Left: Logo + Title */}
+            <div className="flex items-center gap-4">
+              <a href="/" className="flex items-center gap-2">
+                <img src="/brand/tcredex_256x64.png" alt="tCredex" className="h-8 w-auto" />
+              </a>
+              <div className="h-6 w-px bg-gray-700" />
+              <span className="text-sm text-gray-400">Map Platform</span>
             </div>
-            <a href="/signin" className="text-sm text-gray-400 hover:text-white transition-colors">
-              Sign In
-            </a>
-            <a href="/signup" className="px-4 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors">
-              Get Started
-            </a>
+
+            {/* Center: View Toggle */}
+            <div className="flex gap-2">
+              {(['sponsor', 'cde', 'investor'] as ViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                    viewMode === mode
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                  }`}
+                >
+                  {mode === 'sponsor' ? 'Sponsor' : mode === 'cde' ? 'CDE' : 'Investor'}
+                </button>
+              ))}
+            </div>
+
+            {/* Right: Stats + Auth */}
+            <div className="flex items-center gap-4">
+              <div className="hidden md:flex items-center gap-4 text-sm">
+                <span className="text-gray-400">
+                  <span className="text-green-400">●</span> {filteredDeals.length} deals
+                </span>
+                <span className="text-gray-400">
+                  ${(totalProjectValue / 1000000).toFixed(0)}M total
+                </span>
+              </div>
+              <a href="/signin" className="text-sm text-gray-400 hover:text-white transition-colors">
+                Sign In
+              </a>
+              <a href="/signup" className="px-4 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors">
+                Get Started
+              </a>
+            </div>
+          </div>
+        </header>
+      )}
+
+      {/* Authenticated Mini Toolbar - View toggle for logged-in users */}
+      {isAuthenticated && (
+        <div className="flex-none bg-gray-900/50 border-b border-gray-800 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-gray-300">Deal Map</span>
+            <div className="flex gap-1">
+              {(['sponsor', 'cde', 'investor'] as ViewMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    viewMode === mode
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {mode === 'sponsor' ? 'Sponsor' : mode === 'cde' ? 'CDE' : 'Investor'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <span><span className="text-green-400">●</span> {filteredDeals.length} deals</span>
+            <span>${(totalProjectValue / 1000000).toFixed(0)}M total</span>
           </div>
         </div>
-      </header>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">

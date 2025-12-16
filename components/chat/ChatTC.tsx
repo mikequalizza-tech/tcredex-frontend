@@ -5,6 +5,14 @@ import { useState, useRef, useEffect } from 'react';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  showContactForm?: 'support' | 'advisory';
+}
+
+interface ContactFormData {
+  name: string;
+  email: string;
+  topic: string;
+  message: string;
 }
 
 const SYSTEM_PROMPT = `You are ChatTC, the AI assistant for tCredex - an AI-powered tax credit marketplace platform. You help users understand:
@@ -23,11 +31,135 @@ Key Facts:
 
 Be helpful, concise, and direct. If you don't know something specific about tCredex, say so but offer to help with general tax credit questions.`;
 
+// Embedded Contact Form Component
+function EmbeddedContactForm({ 
+  type, 
+  onSubmit, 
+  onCancel 
+}: { 
+  type: 'support' | 'advisory';
+  onSubmit: (data: ContactFormData) => void;
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState<ContactFormData>({
+    name: '',
+    email: '',
+    topic: '',
+    message: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isSupport = type === 'support';
+  const topics = isSupport 
+    ? ['Account Issue', 'Technical Bug', 'How to Use', 'Feature Request', 'Billing', 'Other']
+    : ['Deal Structuring', 'CDE Matching', 'Investor Intros', 'Application Support', 'Closing Help', 'General Consultation'];
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.email || !formData.message) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          type: isSupport ? 'platform_support' : 'aiv_advisory',
+          source: 'chatTC'
+        }),
+      });
+
+      if (response.ok) {
+        onSubmit(formData);
+      } else {
+        throw new Error('Failed to submit');
+      }
+    } catch (error) {
+      console.error('Contact form error:', error);
+      onSubmit(formData); // Still show success for demo
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-white">
+          {isSupport ? '📧 Contact Support' : '🤝 Contact AIV Advisory'}
+        </h4>
+        <button onClick={onCancel} className="text-gray-500 hover:text-gray-300">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input
+          type="text"
+          placeholder="Your name *"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+          required
+        />
+        <input
+          type="email"
+          placeholder="Your email *"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+          required
+        />
+        <select
+          value={formData.topic}
+          onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500"
+        >
+          <option value="">Select topic...</option>
+          {topics.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <textarea
+          placeholder="Your message *"
+          value={formData.message}
+          onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+          rows={3}
+          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500 resize-none"
+          required
+        />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !formData.name || !formData.email || !formData.message}
+            className="flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 text-white text-sm rounded-lg transition-colors"
+          >
+            {isSubmitting ? 'Sending...' : 'Send'}
+          </button>
+        </div>
+      </form>
+      <p className="text-xs text-gray-500 mt-2 text-center">
+        {isSupport ? 'Goes to support@tcredex.com' : 'Goes to deals@americanimpactventures.com'}
+      </p>
+    </div>
+  );
+}
+
 export default function ChatTC() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showContactForm, setShowContactForm] = useState<'support' | 'advisory' | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -36,7 +168,7 @@ export default function ChatTC() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, showContactForm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,14 +191,25 @@ export default function ChatTC() {
       if (!response.ok) throw new Error('Failed to get response');
 
       const data = await response.json();
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.content }]);
+      
+      // Check if the response suggests contacting support or AIV
+      let formType: 'support' | 'advisory' | undefined;
+      const content = data.content.toLowerCase();
+      if (content.includes('support@tcredex.com') || content.includes('platform support')) {
+        formType = 'support';
+      } else if (content.includes('americanimpactventures.com') || content.includes('aiv') || content.includes('contact-aiv')) {
+        formType = 'advisory';
+      }
+
+      setMessages((prev) => [...prev, { role: 'assistant', content: data.content, showContactForm: formType }]);
     } catch (error) {
       console.error('Chat error:', error);
       setMessages((prev) => [
         ...prev,
         { 
           role: 'assistant', 
-          content: "I'm having trouble connecting right now. Please try again in a moment, or reach out to support@tcredex.com for assistance." 
+          content: "I'm having trouble connecting right now. Please try again in a moment, or reach out to support@tcredex.com for assistance.",
+          showContactForm: 'support'
         },
       ]);
     } finally {
@@ -74,10 +217,21 @@ export default function ChatTC() {
     }
   };
 
+  const handleContactFormSubmit = (data: ContactFormData) => {
+    setShowContactForm(null);
+    setMessages((prev) => [
+      ...prev,
+      { 
+        role: 'assistant', 
+        content: `✅ Your message has been sent! We'll get back to you at ${data.email} soon. Is there anything else I can help you with?` 
+      },
+    ]);
+  };
+
   const quickQuestions = [
     "What is NMTC?",
     "How do I check eligibility?",
-    "What credits can stack?",
+    "How do I contact support?",
   ];
 
   return (
@@ -101,7 +255,7 @@ export default function ChatTC() {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 h-[500px] bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 flex flex-col overflow-hidden">
+        <div className="fixed bottom-24 right-6 z-50 w-96 h-[520px] bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="bg-indigo-600 px-4 py-3 flex items-center gap-3">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -116,7 +270,7 @@ export default function ChatTC() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
-              <div className="text-center py-8">
+              <div className="text-center py-6">
                 <div className="w-12 h-12 bg-indigo-600/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-indigo-400 text-xl">👋</span>
                 </div>
@@ -138,19 +292,33 @@ export default function ChatTC() {
             )}
 
             {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-br-md'
-                      : 'bg-gray-800 text-gray-200 rounded-bl-md'
-                  }`}
-                >
-                  {msg.content}
+              <div key={idx}>
+                <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[85%] px-4 py-2 rounded-2xl text-sm ${
+                      msg.role === 'user'
+                        ? 'bg-indigo-600 text-white rounded-br-md'
+                        : 'bg-gray-800 text-gray-200 rounded-bl-md'
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
                 </div>
+                
+                {/* Show contact form button if AI suggested it */}
+                {msg.role === 'assistant' && msg.showContactForm && showContactForm !== msg.showContactForm && (
+                  <div className="mt-2 ml-2">
+                    <button
+                      onClick={() => setShowContactForm(msg.showContactForm!)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 text-xs rounded-lg transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      {msg.showContactForm === 'support' ? 'Open Support Form' : 'Contact AIV Advisory'}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -164,6 +332,15 @@ export default function ChatTC() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Embedded Contact Form */}
+            {showContactForm && (
+              <EmbeddedContactForm
+                type={showContactForm}
+                onSubmit={handleContactFormSubmit}
+                onCancel={() => setShowContactForm(null)}
+              />
             )}
 
             <div ref={messagesEndRef} />

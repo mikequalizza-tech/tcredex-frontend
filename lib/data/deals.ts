@@ -30,6 +30,7 @@ export interface Deal {
   tractType: TractType[];
   status: DealStatus;
   description?: string;
+  communityImpact?: string;  // Community impact statement for Project Profile
   projectHighlights?: string[];
   useOfFunds?: { category: string; amount: number }[];
   timeline?: { milestone: string; date: string; completed: boolean }[];
@@ -105,6 +106,16 @@ export const DEMO_DEALS: Deal[] = [
     tractType: ['QCT', 'SD'], 
     status: 'available', 
     description: 'A transformative mixed-use community facility in Chicago\'s South Side, featuring a workforce training center, community health clinic, early childhood education center, and flexible event space. The project will serve as an anchor for neighborhood revitalization in a Severely Distressed census tract.',
+    communityImpact: `This project will create transformative change for Chicago's South Side community:
+
+• 85 permanent jobs with living wages and benefits, prioritizing local hiring
+• 150 construction jobs during the 18-month build phase
+• Free workforce training programs serving 500+ residents annually
+• Community health clinic providing 10,000+ patient visits per year
+• Early childhood education center with 75 slots for low-income families
+• 28.4% poverty rate census tract - desperately underserved
+
+The project addresses critical gaps in healthcare access, job training, and childcare that have held this community back for decades. By co-locating these services, we create a one-stop resource center that removes barriers to economic mobility.`,
     projectHighlights: [
       '45,000 SF mixed-use facility',
       'Located in Qualified Census Tract with 28.4% poverty rate',

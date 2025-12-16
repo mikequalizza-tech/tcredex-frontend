@@ -191,9 +191,9 @@ export default function InternalHeader({
             </svg>
           </Link>
           <Link
-            href="/dashboard/projects/new"
+            href="/intake"
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title="New Project"
+            title="Submit New Deal"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />

@@ -12,6 +12,8 @@ const PUBLIC_ROUTES = [
   '/about',
   '/pricing',
   '/contact',
+  '/contact-aiv',
+  '/support',
   '/features',
   '/how-it-works',
   '/privacy',

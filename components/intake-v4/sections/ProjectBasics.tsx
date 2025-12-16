@@ -76,8 +76,8 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
         <p className="text-xs text-gray-500 mt-1">This will appear on your marketplace listing</p>
       </div>
 
-      {/* NEW: Community Impact Section */}
-      <div className="border-t border-gray-800 pt-6">
+      {/* Community Impact - flows from Project Description */}
+      <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
           Community Impact <span className="text-indigo-400 text-xs ml-2">Helps with matching</span>
         </label>

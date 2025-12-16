@@ -57,22 +57,17 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
     setEligibilityResult(null);
     
     try {
-      // Stage 1: Get census tract from coordinates
+      // Stage 1: Get census tract from coordinates via our API proxy
       setLookupStage('tract');
       
-      const geocodeUrl = `https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${lng}&y=${lat}&benchmark=Public_AR_Current&vintage=Current_Current&layers=Census%20Tracts&format=json`;
-      const tractResponse = await fetch(geocodeUrl);
+      const tractResponse = await fetch(`/api/geo/tract-lookup?lat=${lat}&lng=${lng}`);
       const tractData = await tractResponse.json();
 
-      if (!tractData.result?.geographies?.['Census Tracts']?.[0]) {
-        throw new Error('Could not determine census tract for this location');
+      if (!tractData.geoid) {
+        throw new Error(tractData.error || 'Could not determine census tract for this location');
       }
 
-      const tractInfo = tractData.result.geographies['Census Tracts'][0];
-      const stateFips = tractInfo.STATE;
-      const countyFips = tractInfo.COUNTY;
-      const tractCode = tractInfo.TRACT;
-      const fullTract = `${stateFips}${countyFips}${tractCode}`;
+      const fullTract = tractData.geoid;
 
       // Stage 2: Get eligibility data
       setLookupStage('eligibility');

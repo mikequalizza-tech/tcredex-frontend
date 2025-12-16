@@ -20,9 +20,9 @@ interface PipelineDeal {
 
 const demoPipeline: PipelineDeal[] = [
   {
-    id: 'D001',
-    projectName: 'Eastside Grocery Co-Op',
-    sponsor: 'Local Roots Foundation',
+    id: 'deal-001',
+    projectName: 'Downtown Community Center',
+    sponsor: 'Metro Development Corp',
     location: 'Springfield, IL',
     censusTract: '17031010100',
     projectCost: 7200000,
@@ -34,8 +34,8 @@ const demoPipeline: PipelineDeal[] = [
     distressIndicator: 'severe',
   },
   {
-    id: 'D002',
-    projectName: 'Northgate Health Center',
+    id: 'deal-002',
+    projectName: 'Riverside Health Clinic',
     sponsor: 'Community Health Partners',
     location: 'Detroit, MI',
     censusTract: '26163520100',
@@ -48,7 +48,7 @@ const demoPipeline: PipelineDeal[] = [
     distressIndicator: 'severe',
   },
   {
-    id: 'D003',
+    id: 'deal-003',
     projectName: 'Heritage Arts Center',
     sponsor: 'Baltimore Cultural Trust',
     location: 'Baltimore, MD',
@@ -62,8 +62,8 @@ const demoPipeline: PipelineDeal[] = [
     distressIndicator: 'moderate',
   },
   {
-    id: 'D004',
-    projectName: 'Manufacturing Hub',
+    id: 'deal-004',
+    projectName: 'Innovation Manufacturing Hub',
     sponsor: 'Great Lakes Economic Corp',
     location: 'Cleveland, OH',
     censusTract: '39035108100',

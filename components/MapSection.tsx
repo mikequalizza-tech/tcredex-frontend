@@ -1,8 +1,24 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import DealMap from '@/components/maps/DealMap';
+import dynamic from 'next/dynamic';
 import AddressAutocomplete from '@/components/forms/AddressAutocomplete';
+
+// Dynamic import to avoid SSR issues
+const HomeMapWithTracts = dynamic(
+  () => import('@/components/maps/HomeMapWithTracts'),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[500px] bg-gray-800 rounded-xl flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+          <p className="text-sm text-gray-400">Loading map...</p>
+        </div>
+      </div>
+    )
+  }
+);
 
 interface MapSectionProps {
   title?: string;
@@ -14,18 +30,11 @@ interface MapSectionProps {
 export default function MapSection({ 
   title = "Free Census Tract Check",
   description = "Search any U.S. address to determine NMTC, LIHTC, and HTC eligibility instantly. No login required.",
-  showLegend = true,
   showSearch = true,
 }: MapSectionProps) {
   const [searchAddress, setSearchAddress] = useState('');
   const [isLookingUp, setIsLookingUp] = useState(false);
-  
-  // Dynamic map center - starts at US center, pans to searched location
-  const [mapCenter, setMapCenter] = useState<{ latitude: number; longitude: number; name?: string }>({
-    latitude: 38.627,
-    longitude: -90.1994,
-  });
-  const [mapZoom, setMapZoom] = useState(11);
+  const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number; tract?: string } | null>(null);
   
   const [eligibilityResult, setEligibilityResult] = useState<{
     eligible: boolean;
@@ -37,20 +46,11 @@ export default function MapSection({
     note?: string;
   } | null>(null);
 
-  // Demo markers for St. Louis area
-  const dealMarkers = [
-    { latitude: 38.637, longitude: -90.1894, name: 'NMTC Project A' },
-    { latitude: 38.617, longitude: -90.2094, name: 'LIHTC Development' },
-    { latitude: 38.647, longitude: -90.1794, name: 'HTC Rehabilitation' },
-    { latitude: 38.657, longitude: -90.1694, name: 'OZ Investment' },
-  ];
-
   const handleAddressSelect = useCallback(async (suggestion: any) => {
     if (suggestion?.center) {
       const [lng, lat] = suggestion.center;
-      // Pan map to selected location
-      setMapCenter({ latitude: lat, longitude: lng, name: suggestion.place_name });
-      setMapZoom(14);
+      // Will be updated with tract once census lookup completes
+      setSearchedLocation({ lat, lng });
     }
   }, []);
 
@@ -71,11 +71,15 @@ export default function MapSection({
         eligible: data.eligible,
         tract: data.tract,
         programs: data.programs || [],
-        povertyRate: data.povertyRate,
-        medianIncomePct: data.medianIncomePct,
+        povertyRate: data.federal?.poverty_rate ?? null,
+        medianIncomePct: data.federal?.median_income_pct ?? null,
         reason: data.reason,
         note: data.note,
       });
+
+      // Update searched location with tract info
+      setSearchedLocation(prev => prev ? { ...prev, tract } : null);
+
     } catch (error) {
       console.error('Eligibility check error:', error);
       setEligibilityResult({
@@ -179,7 +183,7 @@ export default function MapSection({
                           <div>
                             <p className="text-xs text-gray-500">Median Income</p>
                             <p className="text-lg font-semibold text-gray-200">
-                              {eligibilityResult.medianIncomePct ? `${eligibilityResult.medianIncomePct.toFixed(0)}% AMI` : 'N/A'}
+                              {eligibilityResult.medianIncomePct != null ? `${Math.round(eligibilityResult.medianIncomePct)}% AMI` : 'N/A'}
                             </p>
                           </div>
                         </div>
@@ -195,42 +199,30 @@ export default function MapSection({
             </div>
           )}
 
-          {/* Map */}
+          {/* Map with tracts */}
           <div data-aos="fade-up">
-            <DealMap
-              center={mapCenter}
-              markers={dealMarkers}
+            <HomeMapWithTracts
               height="500px"
-              zoom={mapZoom}
+              searchedLocation={searchedLocation}
               className="border border-gray-700/50"
             />
           </div>
 
-          {/* Map legend */}
-          {showLegend && (
-            <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm text-gray-400">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-indigo-500 rounded-full" />
-                <span>Active Deals</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full" />
-                <span>NMTC Eligible</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-amber-500 rounded-full" />
-                <span>HTC Eligible</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-purple-500 rounded-full" />
-                <span>Opportunity Zone</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-orange-500 rounded-full" />
-                <span>Severely Distressed</span>
-              </div>
-            </div>
-          )}
+          {/* CTA below map */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-500 mb-4">
+              Hover over the map to see tract eligibility • Click a deal pin for details
+            </p>
+            <a 
+              href="/map" 
+              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              Explore Full Map Platform
+            </a>
+          </div>
         </div>
       </div>
     </section>

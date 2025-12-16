@@ -1,48 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, CensusTract, StateCredit } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const tract = searchParams.get('tract');
+  const debug = searchParams.get('debug') === 'true';
 
   if (!tract) {
     return NextResponse.json({ error: 'Census tract required' }, { status: 400 });
   }
 
   const cleanTract = tract.replace(/[-\s]/g, '').padStart(11, '0');
-  const unpadded = tract.replace(/[-\s]/g, '').replace(/^0+/, ''); // Remove leading zeros
+  const unpadded = tract.replace(/[-\s]/g, '').replace(/^0+/, '');
   
-  console.log('=== ELIGIBILITY API DEBUG ===' );
-  console.log('Input tract:', tract);
-  console.log('Clean tract (padded):', cleanTract);
-  console.log('Unpadded tract:', unpadded);
+  const debugInfo: Record<string, unknown> = {
+    input: tract,
+    cleanTract,
+    unpadded,
+  };
 
   try {
-    // Debug: Check if table has data
+    // Check table row count
     const { count, error: countError } = await supabaseAdmin
       .from('census_tracts')
       .select('*', { count: 'exact', head: true });
-    console.log('Total rows in census_tracts:', count, countError ? `Error: ${countError.message}` : '');
+    debugInfo.tableRowCount = count;
+    debugInfo.countError = countError?.message;
 
-    // Debug: Check sample data format
-    const { data: sampleData } = await supabaseAdmin
+    // Get sample GEOIDs to see format
+    const { data: sampleData, error: sampleError } = await supabaseAdmin
       .from('census_tracts')
       .select('geoid')
       .limit(5);
-    console.log('Sample GEOIDs in database:', sampleData?.map(d => d.geoid));
+    debugInfo.sampleGeoids = sampleData?.map(d => d.geoid);
+    debugInfo.sampleError = sampleError?.message;
 
-    // Try padded first
+    // Try padded query
     let { data: tractData, error: tractError } = await supabaseAdmin
       .from('census_tracts')
       .select('*')
       .eq('geoid', cleanTract)
       .single();
-
-    console.log('Padded query result:', { found: !!tractData, error: tractError?.code });
+    
+    debugInfo.paddedQueryFound = !!tractData;
+    debugInfo.paddedQueryError = tractError?.code;
 
     // If not found, try unpadded
     if (!tractData && tractError?.code === 'PGRST116') {
-      console.log('Trying unpadded query...');
       const result = await supabaseAdmin
         .from('census_tracts')
         .select('*')
@@ -50,11 +54,25 @@ export async function GET(request: NextRequest) {
         .single();
       tractData = result.data;
       tractError = result.error;
-      console.log('Unpadded query result:', { found: !!tractData, error: tractError?.code });
+      debugInfo.unpaddedQueryFound = !!tractData;
+      debugInfo.unpaddedQueryError = tractError?.code;
+    }
+
+    // If debug mode, return diagnostic info
+    if (debug) {
+      return NextResponse.json({
+        debug: true,
+        ...debugInfo,
+        tractDataFound: !!tractData,
+        tractData: tractData ? {
+          geoid: tractData.geoid,
+          state_name: tractData.state_name,
+          nmtc_eligible: tractData.nmtc_eligible,
+        } : null,
+      });
     }
 
     if (tractError && tractError.code !== 'PGRST116') {
-      // PGRST116 = not found, other errors are real problems
       console.error('Census tract query error:', tractError);
       throw tractError;
     }
@@ -81,13 +99,11 @@ export async function GET(request: NextRequest) {
 
     if (stateError && stateError.code !== 'PGRST116') {
       console.error('State credit query error:', stateError);
-      // Don't fail - just proceed without state data
     }
 
     // Build programs list
     const programs: string[] = [];
     
-    // Federal NMTC
     if (tractData.nmtc_eligible) {
       programs.push('Federal NMTC');
       if (tractData.poverty_qualifies && tractData.income_qualifies) {
@@ -95,18 +111,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // State credits
     if (stateData?.is_state_nmtc) programs.push('State NMTC');
     if (stateData?.is_state_htc) programs.push('State HTC');
     if (stateData?.is_state_brownfield) programs.push('Brownfield Credit');
 
-    // Build response
     return NextResponse.json({
       eligible: tractData.nmtc_eligible || false,
       tract: cleanTract,
       programs,
-      
-      // Federal data
       federal: {
         nmtc_eligible: tractData.nmtc_eligible,
         poverty_rate: tractData.poverty_rate,
@@ -117,8 +129,6 @@ export async function GET(request: NextRequest) {
         unemployment_qualifies: tractData.unemployment_qualifies,
         classification: tractData.classification
       },
-      
-      // State data
       state: stateData ? {
         state_name: stateData.state_name,
         nmtc: {
@@ -142,13 +152,10 @@ export async function GET(request: NextRequest) {
         stacking_notes: stateData.stacking_notes,
         credit_tags: stateData.state_credit_tags
       } : null,
-
-      // Location
       location: {
         state: tractData.state_name,
         county: tractData.county_name
       },
-
       reason: tractData.nmtc_eligible 
         ? 'Qualifies as NMTC Low-Income Community'
         : 'Does not meet NMTC Low-Income Community criteria'
@@ -163,7 +170,8 @@ export async function GET(request: NextRequest) {
       federal: null,
       state: null,
       reason: 'Error checking eligibility',
-      note: 'Please try again or verify at cdfifund.gov'
+      note: 'Please try again or verify at cdfifund.gov',
+      ...(debug ? { debug: debugInfo, error: String(error) } : {})
     }, { status: 500 });
   }
 }

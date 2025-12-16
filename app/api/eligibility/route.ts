@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       .from('census_tracts')
       .select('GEOID')
       .limit(5);
-    debugInfo.sampleGeoids = sampleData?.map(d => d.geoid);
+    debugInfo.sampleGeoids = sampleData?.map(d => d.GEOID);
     debugInfo.sampleError = sampleError?.message;
 
     // Try padded query

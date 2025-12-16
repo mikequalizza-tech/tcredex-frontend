@@ -30,6 +30,7 @@ interface InteractiveMapPlatformProps {
   selectedDealId: string | null;
   onSelectDeal: (dealId: string | null) => void;
   className?: string;
+  centerLocation?: [number, number] | null;
 }
 
 // Known coordinates for demo deals
@@ -72,10 +73,12 @@ export default function InteractiveMapPlatform({
   selectedDealId,
   onSelectDeal,
   className = '',
+  centerLocation,
 }: InteractiveMapPlatformProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -259,6 +262,49 @@ export default function InteractiveMapPlatform({
     });
   }, [selectedDealId, deals, mapLoaded]);
 
+  // Fly to searched location and add marker
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !centerLocation) return;
+
+    // Remove existing search marker
+    if (searchMarkerRef.current) {
+      searchMarkerRef.current.remove();
+      searchMarkerRef.current = null;
+    }
+
+    // Create search location marker
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div style="
+        width: 20px;
+        height: 20px;
+        background: #ef4444;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        animation: pulse 2s infinite;
+      "></div>
+      <style>
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+          70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+      </style>
+    `;
+
+    searchMarkerRef.current = new mapboxgl.Marker(el)
+      .setLngLat(centerLocation)
+      .addTo(map.current);
+
+    // Fly to the location
+    map.current.flyTo({
+      center: centerLocation,
+      zoom: 12,
+      duration: 1500,
+    });
+  }, [centerLocation, mapLoaded]);
+
   if (!mapboxToken) {
     return (
       <div className={`w-full h-full bg-gray-900 flex items-center justify-center ${className}`}>
@@ -274,8 +320,8 @@ export default function InteractiveMapPlatform({
     <div className={`relative w-full h-full ${className}`}>
       <div ref={mapContainer} className="w-full h-full" />
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-900/95 rounded-lg p-3 border border-gray-700 z-10">
+      {/* Legend - moved to avoid conflict with filter rail */}
+      <div className="absolute bottom-20 left-4 bg-gray-900/95 rounded-lg p-3 border border-gray-700 z-10">
         <p className="text-xs font-semibold text-gray-300 mb-2">Legend</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
@@ -288,6 +334,10 @@ export default function InteractiveMapPlatform({
               <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full"></div>
             </div>
             <span className="text-xs text-gray-400">Shovel Ready</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-red-500 rounded-full border border-white"></div>
+            <span className="text-xs text-gray-400">Search Location</span>
           </div>
         </div>
         <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-500">

@@ -275,6 +275,7 @@ export default function MapFilterRail({
       };
 
       setTractResult(tract);
+      setSearchError(null); // Clear any previous error on success
       if (onTractFound) {
         onTractFound(tract, [lng, lat]);
       }
@@ -332,6 +333,7 @@ export default function MapFilterRail({
       };
 
       setTractResult(tract);
+      setSearchError(null); // Clear any previous error on success
       if (onTractFound && geoData.coordinates) {
         onTractFound(tract, geoData.coordinates);
       }
@@ -458,7 +460,7 @@ export default function MapFilterRail({
                 : 'Enter full address and press Enter'}
             </p>
 
-            {searchError && (
+            {searchError && !tractResult && (
               <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
                 <p className="text-xs text-red-400">{searchError}</p>
               </div>

@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             {/* Header */}
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold text-white mb-4">tCredex Privacy Policy</h1>
-              <p className="text-gray-400">Effective Date: January 2025</p>
+              <p className="text-gray-400">Effective Date: December 15, 2025</p>
             </div>
 
             {/* Intro */}

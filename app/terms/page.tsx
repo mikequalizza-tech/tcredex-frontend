@@ -16,8 +16,8 @@ export default function TermsPage() {
             {/* Header */}
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold text-white mb-4">tCredex Platform Terms of Use</h1>
-              <p className="text-gray-400">Effective Date: January 2025</p>
-              <p className="text-gray-500 text-sm mt-2">Company: American Impact Ventures, LLC (&quot;tCredex&quot;)</p>
+              <p className="text-gray-400">Effective Date: December 15, 2025</p>
+              <p className="text-gray-500 text-sm mt-2">Company: tCredex LLC (&quot;tCredex&quot;), a Delaware Limited Liability Company. tCredex LLC is a subsidiary of American Impact Ventures LLC (&quot;AIV&quot;), a Delaware Limited Liability Company.</p>
             </div>
 
             {/* Content */}
@@ -214,8 +214,8 @@ export default function TermsPage() {
               <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-8 mt-8">
                 <h2 className="text-xl font-bold text-white mb-4">Contact</h2>
                 <p className="text-gray-300">
-                  <strong>tCredex</strong><br />
-                  An affiliate of American Impact Ventures, LLC<br />
+                  <strong>tCredex LLC</strong><br />
+                  A subsidiary of American Impact Ventures LLC<br />
                   Email: <a href="mailto:legal@tcredex.com" className="text-indigo-400 hover:text-indigo-300">legal@tcredex.com</a>
                 </p>
               </div>

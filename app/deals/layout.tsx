@@ -16,6 +16,10 @@ function DealsLayoutContent({ children }: { children: React.ReactNode }) {
   const protectedPaths = ['/deals/new'];
   const requiresAuth = protectedPaths.some(path => pathname.startsWith(path));
 
+  // The marketplace page (/deals) has its own complete layout with sidebar
+  // Don't add Header/Footer for it
+  const isMarketplacePage = pathname === '/deals';
+
   // Protected routes (e.g., /deals/new) - always use AppLayout with auth
   if (requiresAuth) {
     return (
@@ -26,21 +30,32 @@ function DealsLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Show loading spinner while checking auth
-  if (isLoading) {
+  // Marketplace page has its own layout - just render children
+  if (isMarketplacePage) {
     return (
       <>
-        <Header />
-        <main className="grow flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </main>
-        <Footer />
+        {children}
         <ChatTC />
       </>
     );
   }
 
-  // Authenticated users browsing marketplace/deals - show dashboard layout
+  // For deal detail pages (/deals/[id])
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col">
+        <Header />
+        <main className="grow flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </main>
+        <Footer />
+        <ChatTC />
+      </div>
+    );
+  }
+
+  // Authenticated users on deal detail pages - show dashboard layout
   if (isAuthenticated) {
     return (
       <>
@@ -50,16 +65,16 @@ function DealsLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // PUBLIC VIEW - Marketing layout for logged-out users
+  // PUBLIC VIEW - Marketing layout for logged-out users viewing deal details
   return (
-    <>
+    <div className="min-h-screen bg-gray-950 flex flex-col">
       <Header />
       <main className="grow">
         {children}
       </main>
       <Footer />
       <ChatTC />
-    </>
+    </div>
   );
 }
 

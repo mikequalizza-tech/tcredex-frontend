@@ -1,15 +1,5 @@
-import Header from "@/components/ui/header";
-import Footer from "@/components/ui/footer";
-
+// This file intentionally left empty - layout handled by parent /deals/layout.tsx
+// Delete this file to clean up
 export default function DealDetailLayout({ children }: { children: React.ReactNode }) {
-  // Public layout - no auth required for viewing deal details
-  return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      <Header />
-      <main className="flex-grow">
-        {children}
-      </main>
-      <Footer />
-    </div>
-  );
+  return <>{children}</>;
 }

@@ -10,14 +10,48 @@ export async function GET(request: NextRequest) {
   }
 
   const cleanTract = tract.replace(/[-\s]/g, '').padStart(11, '0');
+  const unpadded = tract.replace(/[-\s]/g, '').replace(/^0+/, ''); // Remove leading zeros
+  
+  console.log('=== ELIGIBILITY API DEBUG ===' );
+  console.log('Input tract:', tract);
+  console.log('Clean tract (padded):', cleanTract);
+  console.log('Unpadded tract:', unpadded);
 
   try {
-    // Query census_tracts table (Federal eligibility)
-    const { data: tractData, error: tractError } = await supabaseAdmin
+    // Debug: Check if table has data
+    const { count, error: countError } = await supabaseAdmin
+      .from('census_tracts')
+      .select('*', { count: 'exact', head: true });
+    console.log('Total rows in census_tracts:', count, countError ? `Error: ${countError.message}` : '');
+
+    // Debug: Check sample data format
+    const { data: sampleData } = await supabaseAdmin
+      .from('census_tracts')
+      .select('geoid')
+      .limit(5);
+    console.log('Sample GEOIDs in database:', sampleData?.map(d => d.geoid));
+
+    // Try padded first
+    let { data: tractData, error: tractError } = await supabaseAdmin
       .from('census_tracts')
       .select('*')
       .eq('geoid', cleanTract)
       .single();
+
+    console.log('Padded query result:', { found: !!tractData, error: tractError?.code });
+
+    // If not found, try unpadded
+    if (!tractData && tractError?.code === 'PGRST116') {
+      console.log('Trying unpadded query...');
+      const result = await supabaseAdmin
+        .from('census_tracts')
+        .select('*')
+        .eq('geoid', unpadded)
+        .single();
+      tractData = result.data;
+      tractError = result.error;
+      console.log('Unpadded query result:', { found: !!tractData, error: tractError?.code });
+    }
 
     if (tractError && tractError.code !== 'PGRST116') {
       // PGRST116 = not found, other errors are real problems

@@ -15,18 +15,30 @@ interface EligibilityResult {
   eligible: boolean;
   tract: string;
   programs: string[];
-  povertyRate: number | null;
-  medianIncomePct: number | null;
-  unemployment?: number | null;
+  federal: {
+    nmtc_eligible: boolean;
+    poverty_rate: number;
+    poverty_qualifies: boolean;
+    median_income_pct: number;
+    income_qualifies: boolean;
+    unemployment_rate: number;
+    unemployment_qualifies: boolean;
+    severely_distressed: boolean;
+    metro_status: string;
+  };
+  state: {
+    state_name: string;
+    nmtc: { available: boolean; transferable?: boolean; refundable?: boolean };
+    htc: { available: boolean; transferable?: boolean; refundable?: boolean };
+    brownfield: { available: boolean };
+    stacking_notes?: string;
+  } | null;
+  location: {
+    state: string;
+    county: string | number;
+  };
   reason: string;
   note?: string;
-  details?: {
-    qualifiesOnPoverty: boolean;
-    qualifiesOnIncome: boolean;
-    state: string;
-    county: string;
-    classification: string;
-  };
 }
 
 export function LocationTract({ data, onChange }: LocationTractProps) {
@@ -76,12 +88,11 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
       if (eligibility.eligible) {
         tractTypes.push('LIC'); // Low-Income Community
         
-        if (eligibility.programs?.includes('Severely Distressed') || 
-            (eligibility.povertyRate && eligibility.povertyRate >= 30)) {
+        if (eligibility.federal?.severely_distressed) {
           tractTypes.push('SD');
         }
         
-        if (eligibility.povertyRate && eligibility.povertyRate >= 20) {
+        if (eligibility.federal?.poverty_rate >= 20) {
           tractTypes.push('QCT');
         }
       }
@@ -91,16 +102,16 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
         censusTract: fullTract,
         tractType: tractTypes,
         // Store raw metrics for deal card generation
-        tractPovertyRate: eligibility.povertyRate ?? undefined,
-        tractMedianIncome: eligibility.medianIncomePct ?? undefined,
-        tractUnemployment: eligibility.unemployment ?? undefined,
+        tractPovertyRate: eligibility.federal?.poverty_rate ?? undefined,
+        tractMedianIncome: eligibility.federal?.median_income_pct ?? undefined,
+        tractUnemployment: eligibility.federal?.unemployment_rate ?? undefined,
         tractEligible: eligibility.eligible,
-        tractSeverelyDistressed: eligibility.programs?.includes('Severely Distressed') || false,
-        tractClassification: eligibility.details?.classification,
-        tractCounty: eligibility.details?.county,
-        tractState: eligibility.details?.state,
+        tractSeverelyDistressed: eligibility.federal?.severely_distressed || false,
+        tractClassification: eligibility.federal?.metro_status,
+        tractCounty: typeof eligibility.location?.county === 'string' ? eligibility.location.county : undefined,
+        tractState: eligibility.location?.state,
         // Auto-set county from eligibility if available
-        county: eligibility.details?.county || data.county,
+        county: typeof eligibility.location?.county === 'string' ? eligibility.location.county : data.county,
       });
 
       setLookupStage('done');
@@ -264,73 +275,114 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
             )}
           </div>
 
-          {/* Metrics Grid */}
+          {/* Metrics Grid - Industry Standard Format */}
           {eligibilityResult && (
             <div className="p-4 bg-gray-900/50">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Poverty Rate</div>
-                  <div className="text-2xl font-bold text-red-400">
-                    {eligibilityResult.povertyRate !== null ? `${eligibilityResult.povertyRate}%` : '—'}
-                  </div>
-                  {eligibilityResult.povertyRate !== null && eligibilityResult.povertyRate >= 20 && (
-                    <div className="text-xs text-green-400 mt-1">✓ Qualifies ≥20%</div>
-                  )}
+              {/* Header badges */}
+              <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-700">
+                {eligibilityResult.eligible && (
+                  <span className="text-green-400 font-semibold">✓ Eligible for Tax Credits!</span>
+                )}
+                {eligibilityResult.federal?.severely_distressed && (
+                  <span className="text-orange-400 font-medium">• Severely Distressed</span>
+                )}
+              </div>
+
+              {/* CDFI-style Data Table */}
+              <div className="space-y-2 font-mono text-sm">
+                <div className="flex justify-between py-1 border-b border-gray-800">
+                  <span className="text-gray-400">Census Tract:</span>
+                  <span className="text-white font-semibold">{eligibilityResult.tract}</span>
                 </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Median Income</div>
-                  <div className="text-2xl font-bold text-blue-400">
-                    {eligibilityResult.medianIncomePct !== null ? `${eligibilityResult.medianIncomePct}%` : '—'}
-                  </div>
-                  {eligibilityResult.medianIncomePct !== null && eligibilityResult.medianIncomePct <= 80 && (
-                    <div className="text-xs text-green-400 mt-1">✓ Qualifies ≤80%</div>
-                  )}
+                <div className="flex justify-between py-1 border-b border-gray-800">
+                  <span className="text-gray-400">Poverty Rate:</span>
+                  <span className="text-white">
+                    {eligibilityResult.federal?.poverty_rate}%
+                    {eligibilityResult.federal?.poverty_qualifies && (
+                      <span className="text-orange-400 ml-2">Distressed</span>
+                    )}
+                  </span>
                 </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Unemployment</div>
-                  <div className="text-2xl font-bold text-amber-400">
-                    {eligibilityResult.unemployment !== null && eligibilityResult.unemployment !== undefined 
-                      ? `${eligibilityResult.unemployment}%` 
-                      : '—'}
-                  </div>
+                <div className="flex justify-between py-1 border-b border-gray-800">
+                  <span className="text-gray-400">Median Family Income:</span>
+                  <span className="text-white">
+                    {eligibilityResult.federal?.median_income_pct}%
+                    {eligibilityResult.federal?.income_qualifies && (
+                      <span className="text-orange-400 ml-2">Distressed</span>
+                    )}
+                  </span>
                 </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">Classification</div>
-                  <div className="text-lg font-bold text-purple-400">
-                    {eligibilityResult.details?.classification || '—'}
-                  </div>
+                <div className="flex justify-between py-1 border-b border-gray-800">
+                  <span className="text-gray-400">Unemployment Rate:</span>
+                  <span className="text-white">
+                    {eligibilityResult.federal?.unemployment_rate}%
+                    {eligibilityResult.federal?.unemployment_qualifies && (
+                      <span className="text-orange-400 ml-2">Distressed</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-800">
+                  <span className="text-gray-400">Area:</span>
+                  <span className="text-white">{eligibilityResult.federal?.metro_status || '—'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-800">
+                  <span className="text-gray-400">State:</span>
+                  <span className="text-white">{eligibilityResult.location?.state || '—'}</span>
                 </div>
               </div>
 
-              {/* Qualification Badges */}
-              <div className="flex flex-wrap gap-2">
-                {data.tractType?.includes('LIC') && (
-                  <span className="px-3 py-1 bg-green-900/50 text-green-300 rounded-full text-sm font-medium border border-green-500/30">
-                    ✓ Low-Income Community
+              {/* State Credits Section */}
+              {eligibilityResult.state && (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">State Credits Available</div>
+                  <div className="flex flex-wrap gap-2">
+                    {eligibilityResult.state.nmtc?.available && (
+                      <span className="px-3 py-1 bg-green-900/50 text-green-300 rounded-full text-sm font-medium border border-green-500/30">
+                        ✓ State NMTC
+                      </span>
+                    )}
+                    {eligibilityResult.state.htc?.available && (
+                      <span className="px-3 py-1 bg-amber-900/50 text-amber-300 rounded-full text-sm font-medium border border-amber-500/30">
+                        ✓ State HTC
+                      </span>
+                    )}
+                    {eligibilityResult.state.brownfield?.available && (
+                      <span className="px-3 py-1 bg-purple-900/50 text-purple-300 rounded-full text-sm font-medium border border-purple-500/30">
+                        ✓ Brownfield
+                      </span>
+                    )}
+                    {!eligibilityResult.state.nmtc?.available && !eligibilityResult.state.htc?.available && !eligibilityResult.state.brownfield?.available && (
+                      <span className="text-gray-500 text-sm">No state credits available</span>
+                    )}
+                  </div>
+                  {eligibilityResult.state.stacking_notes && (
+                    <p className="text-xs text-gray-400 mt-2 italic">
+                      {eligibilityResult.state.stacking_notes}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Program Badges */}
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-700">
+                {eligibilityResult.programs?.map((program) => (
+                  <span 
+                    key={program}
+                    className={`px-3 py-1 rounded-full text-sm font-medium border ${
+                      program === 'Federal NMTC' ? 'bg-green-900/50 text-green-300 border-green-500/30' :
+                      program === 'Severely Distressed' ? 'bg-orange-900/50 text-orange-300 border-orange-500/30' :
+                      program === 'State NMTC' ? 'bg-blue-900/50 text-blue-300 border-blue-500/30' :
+                      program === 'State HTC' ? 'bg-amber-900/50 text-amber-300 border-amber-500/30' :
+                      'bg-gray-800 text-gray-300 border-gray-600'
+                    }`}
+                  >
+                    {program}
                   </span>
-                )}
-                {data.tractType?.includes('QCT') && (
-                  <span className="px-3 py-1 bg-blue-900/50 text-blue-300 rounded-full text-sm font-medium border border-blue-500/30">
-                    ✓ Qualified Census Tract
-                  </span>
-                )}
-                {data.tractType?.includes('SD') && (
-                  <span className="px-3 py-1 bg-red-900/50 text-red-300 rounded-full text-sm font-medium border border-red-500/30">
-                    ★ Severely Distressed
-                  </span>
-                )}
-                {eligibilityResult.details?.qualifiesOnPoverty && eligibilityResult.details?.qualifiesOnIncome && (
-                  <span className="px-3 py-1 bg-purple-900/50 text-purple-300 rounded-full text-sm font-medium border border-purple-500/30">
-                    ★ High Priority (Dual Qualification)
-                  </span>
-                )}
+                ))}
               </div>
 
               {/* Eligibility reason */}
               <p className="text-sm text-gray-400 mt-4">{eligibilityResult.reason}</p>
-              {eligibilityResult.note && (
-                <p className="text-xs text-gray-500 mt-1">{eligibilityResult.note}</p>
-              )}
             </div>
           )}
 

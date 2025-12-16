@@ -38,12 +38,41 @@ const DEAL_COORDINATES: Record<string, [number, number]> = {
 };
 
 export default function MapPlatformPage() {
-  const { isAuthenticated, orgType } = useCurrentUser();
+  // Hydration fix - track if we're mounted on client FIRST
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Set mounted state on client - BEFORE any other effects
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Return loading state until mounted to prevent hydration mismatch
+  if (!isMounted) {
+    return (
+      <div className="h-screen w-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm text-gray-400">Loading Deal Map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only render the actual content after client-side mount
+  return <MapContent />;
+}
+
+// Separate component for actual content - only rendered client-side
+function MapContent() {
+  const { isAuthenticated, orgType, isLoading } = useCurrentUser();
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('sponsor');
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [autoMatchEnabled, setAutoMatchEnabled] = useState(false);
   const [searchedLocation, setSearchedLocation] = useState<[number, number] | null>(null);
+  
+  // Panel visibility states - both slide in/out
+  const [showFilterRail, setShowFilterRail] = useState(true);
   const [showDealPanel, setShowDealPanel] = useState(true);
   
   const dealListRef = useRef<HTMLDivElement>(null);
@@ -74,7 +103,7 @@ export default function MapPlatformPage() {
   });
 
   // Handle tract found from address search
-  const handleTractFound = useCallback((tract: any, coordinates: [number, number]) => {
+  const handleTractFound = useCallback((tract: unknown, coordinates: [number, number]) => {
     setSearchedLocation(coordinates);
   }, []);
 
@@ -98,10 +127,13 @@ export default function MapPlatformPage() {
   const totalProjectValue = filteredDeals.reduce((sum, d) => sum + d.projectCost, 0);
   const shovelReadyCount = filteredDeals.filter(d => d.shovelReady).length;
 
+  // Show auth-dependent UI only after auth loaded
+  const showAuthUI = !isLoading && isAuthenticated;
+
   return (
     <div className="h-screen w-screen bg-gray-950 text-white overflow-hidden flex flex-col">
       {/* Top Navigation Bar - Only for authenticated users */}
-      {isAuthenticated && (
+      {showAuthUI && (
         <div className="flex-none h-12 bg-gray-900 border-b border-gray-800 px-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link 
@@ -136,19 +168,26 @@ export default function MapPlatformPage() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Filter Rail */}
-        <MapFilterRail
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          filters={filters}
-          onFiltersChange={setFilters}
-          onTractFound={handleTractFound}
-          autoMatchEnabled={autoMatchEnabled}
-          onAutoMatchToggle={setAutoMatchEnabled}
-        />
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Left: Filter Rail - Slides in/out */}
+        <div 
+          className={`absolute left-0 top-0 bottom-0 z-20 transition-transform duration-300 ease-in-out ${
+            showFilterRail ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <MapFilterRail
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            filters={filters}
+            onFiltersChange={setFilters}
+            onTractFound={handleTractFound}
+            autoMatchEnabled={autoMatchEnabled}
+            onAutoMatchToggle={setAutoMatchEnabled}
+            onClose={() => setShowFilterRail(false)}
+          />
+        </div>
 
-        {/* Center: Map */}
+        {/* Center: Map - Full width, panels overlay */}
         <div className="flex-1 h-full relative">
           <InteractiveMapPlatform
             deals={filteredDeals}
@@ -157,7 +196,24 @@ export default function MapPlatformPage() {
             centerLocation={searchedLocation}
           />
           
-          {/* Map Overlay Controls */}
+          {/* Map Overlay Controls - Top Left */}
+          <div className="absolute top-4 left-4 flex gap-2 z-10">
+            {/* Toggle Filter Rail */}
+            {!showFilterRail && (
+              <button
+                onClick={() => setShowFilterRail(true)}
+                className="px-3 py-2 bg-gray-900/90 hover:bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 flex items-center gap-2 transition-colors"
+                title="Show Filters"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                Filters
+              </button>
+            )}
+          </div>
+
+          {/* Map Overlay Controls - Top Right */}
           <div className="absolute top-4 right-4 flex gap-2 z-10">
             <button
               onClick={() => setShowDealPanel(!showDealPanel)}
@@ -200,8 +256,12 @@ export default function MapPlatformPage() {
           </div>
         </div>
 
-        {/* Right: Deal Panel */}
-        {showDealPanel && (
+        {/* Right: Deal Panel - Slides in/out */}
+        <div 
+          className={`absolute right-0 top-0 bottom-0 z-20 transition-transform duration-300 ease-in-out ${
+            showDealPanel ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
           <div className="w-80 h-full flex flex-col bg-gray-950 border-l border-gray-800">
             {/* Panel Header */}
             <div className="flex-none px-4 py-3 border-b border-gray-800 flex items-center justify-between">
@@ -209,14 +269,25 @@ export default function MapPlatformPage() {
                 {viewMode === 'cde' ? 'Matching Deals' : viewMode === 'investor' ? 'Investment Opportunities' : 'Active Deals'}
                 <span className="ml-2 text-xs font-normal text-gray-500">({filteredDeals.length})</span>
               </h2>
-              {selectedDealId && (
+              <div className="flex items-center gap-2">
+                {selectedDealId && (
+                  <button
+                    onClick={() => setSelectedDealId(null)}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
                 <button
-                  onClick={() => setSelectedDealId(null)}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  onClick={() => setShowDealPanel(false)}
+                  className="p-1 text-gray-500 hover:text-white transition-colors"
+                  title="Close panel"
                 >
-                  Clear
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
-              )}
+              </div>
             </div>
 
             {/* View-specific banner */}
@@ -274,7 +345,7 @@ export default function MapPlatformPage() {
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -152,7 +152,7 @@ function MapContent() {
           </div>
           <div className="flex items-center gap-4">
             <Link 
-              href="/intake" 
+              href="/deals/new" 
               className="px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
             >
               + New Deal

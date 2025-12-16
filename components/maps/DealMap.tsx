@@ -27,12 +27,18 @@ export default function DealMap({
 }: DealMapProps) {
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const [selectedMarker, setSelectedMarker] = useState<DealLocation | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   
   const [viewState, setViewState] = useState({
     latitude: center.latitude,
     longitude: center.longitude,
     zoom: zoom
   });
+
+  // Hydration guard
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Update view when props change
   useEffect(() => {
@@ -42,6 +48,21 @@ export default function DealMap({
       zoom: zoom
     });
   }, [center.latitude, center.longitude, zoom]);
+
+  // Show placeholder during SSR
+  if (!isMounted) {
+    return (
+      <div 
+        className={`rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center ${className}`} 
+        style={{ height }}
+      >
+        <div className="text-center p-8">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-400">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!mapboxToken) {
     return (

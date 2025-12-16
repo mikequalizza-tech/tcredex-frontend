@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { data: tractData, error: tractError } = await supabaseAdmin
       .from('census_tracts')
       .select('*')
-      .eq('tract_id', cleanTract)
+      .eq('geoid', cleanTract)
       .single();
 
     if (tractError && tractError.code !== 'PGRST116') {

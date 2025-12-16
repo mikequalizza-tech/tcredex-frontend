@@ -15,7 +15,7 @@ export const supabaseAdmin = createClient(
 
 // Types for our tables
 export interface CensusTract {
-  tract_id: string;
+  geoid: string;
   state_name: string;
   county_name: string;
   nmtc_eligible: boolean;

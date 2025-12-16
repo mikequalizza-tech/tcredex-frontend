@@ -35,7 +35,7 @@ export interface IntakeData {
   latitude?: number;
   longitude?: number;
   programs?: ProgramType[];
-  programLevel?: 'federal' | 'state';
+  programLevel?: ('federal' | 'state')[];
   stateProgram?: string;
   totalProjectCost?: number;
   landCost?: number;

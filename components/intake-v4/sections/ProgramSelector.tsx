@@ -5,8 +5,8 @@ import { ProgramType } from '../IntakeShell';
 interface ProgramSelectorProps {
   programs: ProgramType[];
   onChange: (programs: ProgramType[]) => void;
-  programLevel?: 'federal' | 'state';
-  onLevelChange?: (level: 'federal' | 'state') => void;
+  programLevel?: ('federal' | 'state')[];
+  onLevelChange?: (levels: ('federal' | 'state')[]) => void;
 }
 
 const PROGRAMS: { id: ProgramType; label: string; description: string; color: string }[] = [
@@ -16,28 +16,57 @@ const PROGRAMS: { id: ProgramType; label: string; description: string; color: st
   { id: 'OZ', label: 'Opportunity Zone', description: 'Capital gains deferral and exclusion for designated areas', color: 'amber' },
 ];
 
-export function ProgramSelector({ programs, onChange, programLevel, onLevelChange }: ProgramSelectorProps) {
+export function ProgramSelector({ programs, onChange, programLevel = [], onLevelChange }: ProgramSelectorProps) {
   const toggleProgram = (programId: ProgramType) => {
     if (programs.includes(programId)) onChange(programs.filter(p => p !== programId));
     else onChange([...programs, programId]);
   };
 
+  // Toggle program level (allows selecting both Federal AND State)
+  const toggleLevel = (level: 'federal' | 'state') => {
+    const currentLevels = programLevel || [];
+    if (currentLevels.includes(level)) {
+      onLevelChange?.(currentLevels.filter(l => l !== level));
+    } else {
+      onLevelChange?.([...currentLevels, level]);
+    }
+  };
+
+  const isFederalSelected = programLevel?.includes('federal') ?? false;
+  const isStateSelected = programLevel?.includes('state') ?? false;
+
   return (
     <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">Program Level</label>
+        <p className="text-xs text-gray-500 mb-3">Select one or both - many deals layer federal and state credits</p>
         <div className="flex gap-3">
-          <button type="button" onClick={() => onLevelChange?.('federal')}
-            className={`flex-1 px-4 py-3 rounded-lg border-2 text-center transition-all ${programLevel === 'federal' || !programLevel ? 'border-indigo-500 bg-indigo-900/30 text-indigo-300' : 'border-gray-700 text-gray-400 hover:border-gray-600'}`}>
-            <div className="font-medium">Federal</div>
-            <div className="text-xs opacity-75">CDFI Fund allocated credits</div>
+          <button type="button" onClick={() => toggleLevel('federal')}
+            className={`flex-1 px-4 py-3 rounded-lg border-2 text-center transition-all ${isFederalSelected ? 'border-indigo-500 bg-indigo-900/30 text-indigo-300' : 'border-gray-700 text-gray-400 hover:border-gray-600'}`}>
+            <div className="flex items-center justify-center gap-2">
+              <span className={`w-5 h-5 rounded flex items-center justify-center text-xs border ${isFederalSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-gray-600'}`}>
+                {isFederalSelected ? '✓' : ''}
+              </span>
+              <span className="font-medium">Federal</span>
+            </div>
+            <div className="text-xs opacity-75 mt-1">CDFI Fund allocated credits</div>
           </button>
-          <button type="button" onClick={() => onLevelChange?.('state')}
-            className={`flex-1 px-4 py-3 rounded-lg border-2 text-center transition-all ${programLevel === 'state' ? 'border-sky-500 bg-sky-900/30 text-sky-300' : 'border-gray-700 text-gray-400 hover:border-gray-600'}`}>
-            <div className="font-medium">State</div>
-            <div className="text-xs opacity-75">State-allocated credits</div>
+          <button type="button" onClick={() => toggleLevel('state')}
+            className={`flex-1 px-4 py-3 rounded-lg border-2 text-center transition-all ${isStateSelected ? 'border-sky-500 bg-sky-900/30 text-sky-300' : 'border-gray-700 text-gray-400 hover:border-gray-600'}`}>
+            <div className="flex items-center justify-center gap-2">
+              <span className={`w-5 h-5 rounded flex items-center justify-center text-xs border ${isStateSelected ? 'bg-sky-500 border-sky-500 text-white' : 'border-gray-600'}`}>
+                {isStateSelected ? '✓' : ''}
+              </span>
+              <span className="font-medium">State</span>
+            </div>
+            <div className="text-xs opacity-75 mt-1">State-allocated credits</div>
           </button>
         </div>
+        {isFederalSelected && isStateSelected && (
+          <div className="mt-3 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+            <p className="text-sm text-green-300">✓ Federal + State selected - maximize your credit stack!</p>
+          </div>
+        )}
       </div>
 
       <div>

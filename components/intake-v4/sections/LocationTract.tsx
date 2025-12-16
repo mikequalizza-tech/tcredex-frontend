@@ -154,6 +154,9 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
   const StatusIndicator = () => {
     if (lookupStage === 'idle') return null;
     
+    // Don't show error if we have valid data populated
+    if (lookupStage === 'error' && (eligibilityResult || data.city)) return null;
+    
     const stages = {
       geocoding: { text: 'Getting coordinates...', icon: '📍' },
       tract: { text: 'Finding census tract...', icon: '🗺️' },
@@ -395,8 +398,8 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
         </div>
       )}
 
-      {/* Error state with retry option */}
-      {lookupStage === 'error' && (
+      {/* Error state with retry option - only show if we don't have valid data */}
+      {lookupStage === 'error' && !eligibilityResult && !data.city && (
         <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <span className="text-xl">⚠️</span>

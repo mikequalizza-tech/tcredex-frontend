@@ -22,7 +22,7 @@
     "aos": "3.0.0-beta.6",
     "date-fns": "^4.1.0",
     "mapbox-gl": "^3.17.0",
-    "next": "15.1.9",
+    "next": "15.1.11",
     "next-mdx-remote": "^5.0.0",
     "pdf-parse": "^1.1.1",
     "react": "19.0.0",

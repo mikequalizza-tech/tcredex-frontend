@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 export default function AdminDashboard() {
   // Sample stats
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
               <a href="/admin/deals" className="block w-full px-4 py-3 bg-indigo-600 text-white text-center rounded-lg hover:bg-indigo-500 transition-colors">
                 Review Pending Deals
               </a>
-              <a href="/intake" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
+              <a href="/deals/new" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
                 Submit New Deal
               </a>
               <a href="/matching" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">

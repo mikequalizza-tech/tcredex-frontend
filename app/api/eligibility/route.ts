@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     // Get sample GEOIDs to see format
     const { data: sampleData, error: sampleError } = await supabaseAdmin
       .from('census_tracts')
-      .select('geoid')
+      .select('GEOID')
       .limit(5);
     debugInfo.sampleGeoids = sampleData?.map(d => d.geoid);
     debugInfo.sampleError = sampleError?.message;
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     let { data: tractData, error: tractError } = await supabaseAdmin
       .from('census_tracts')
       .select('*')
-      .eq('geoid', cleanTract)
+      .eq('GEOID', cleanTract)
       .single();
     
     debugInfo.paddedQueryFound = !!tractData;
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       const result = await supabaseAdmin
         .from('census_tracts')
         .select('*')
-        .eq('geoid', unpadded)
+        .eq('GEOID', unpadded)
         .single();
       tractData = result.data;
       tractError = result.error;
@@ -65,9 +65,17 @@ export async function GET(request: NextRequest) {
         ...debugInfo,
         tractDataFound: !!tractData,
         tractData: tractData ? {
-          geoid: tractData.geoid,
+          GEOID: tractData.GEOID,
           state_name: tractData.state_name,
-          nmtc_eligible: tractData.nmtc_eligible,
+          county_fips: tractData.county_fips,
+          is_nmtc_lic: tractData.is_nmtc_lic,
+          poverty_rate_pct: tractData.poverty_rate_pct,
+          poverty_qualifies: tractData.poverty_qualifies,
+          mfi_pct: tractData.mfi_pct,
+          mfi_qualifies: tractData.mfi_qualifies,
+          unemployment_rate_pct: tractData.unemployment_rate_pct,
+          unemployment_ratio_qualifies: tractData.unemployment_ratio_qualifies,
+          omb_metro_non_metro: tractData.omb_metro_non_metro,
         } : null,
       });
     }
@@ -91,22 +99,35 @@ export async function GET(request: NextRequest) {
     }
 
     // Query state_credit_matrix for state-level credits
+    const stateName = (tractData.state_name || '').trim();
     const { data: stateData, error: stateError } = await supabaseAdmin
       .from('state_credit_matrix')
       .select('*')
-      .eq('state_name', tractData.state_name)
+      .eq('state_name', stateName)
       .single();
 
     if (stateError && stateError.code !== 'PGRST116') {
       console.error('State credit query error:', stateError);
     }
 
+    // Map actual column names (is_nmtc_lic is text 'YES'/'NO')
+    const isNmtcEligible = tractData.is_nmtc_lic === 'YES';
+    const povertyRate = parseFloat(tractData.poverty_rate_pct) || 0;
+    const medianIncomePct = parseFloat(tractData.mfi_pct) || 0;
+    const unemploymentRate = parseFloat(tractData.unemployment_rate_pct) || 0;
+    
+    // Use database qualifies columns directly (text 'YES'/'NO')
+    const povertyQualifies = tractData.poverty_qualifies === 'YES';
+    const incomeQualifies = tractData.mfi_qualifies === 'YES';
+    const unemploymentQualifies = tractData.unemployment_ratio_qualifies === 'YES';
+    const isSeverelyDistressed = povertyQualifies || incomeQualifies || unemploymentQualifies;
+
     // Build programs list
     const programs: string[] = [];
     
-    if (tractData.nmtc_eligible) {
+    if (isNmtcEligible) {
       programs.push('Federal NMTC');
-      if (tractData.poverty_qualifies && tractData.income_qualifies) {
+      if (isSeverelyDistressed) {
         programs.push('Severely Distressed');
       }
     }
@@ -116,18 +137,19 @@ export async function GET(request: NextRequest) {
     if (stateData?.is_state_brownfield) programs.push('Brownfield Credit');
 
     return NextResponse.json({
-      eligible: tractData.nmtc_eligible || false,
+      eligible: isNmtcEligible,
       tract: cleanTract,
       programs,
       federal: {
-        nmtc_eligible: tractData.nmtc_eligible,
-        poverty_rate: tractData.poverty_rate,
-        poverty_qualifies: tractData.poverty_qualifies,
-        median_income_pct: tractData.median_income_pct,
-        income_qualifies: tractData.income_qualifies,
-        unemployment_rate: tractData.unemployment_rate,
-        unemployment_qualifies: tractData.unemployment_qualifies,
-        classification: tractData.classification
+        nmtc_eligible: isNmtcEligible,
+        poverty_rate: povertyRate,
+        poverty_qualifies: povertyQualifies,
+        median_income_pct: medianIncomePct,
+        income_qualifies: incomeQualifies,
+        unemployment_rate: unemploymentRate,
+        unemployment_qualifies: unemploymentQualifies,
+        severely_distressed: isSeverelyDistressed,
+        metro_status: tractData.omb_metro_non_metro
       },
       state: stateData ? {
         state_name: stateData.state_name,
@@ -153,10 +175,10 @@ export async function GET(request: NextRequest) {
         credit_tags: stateData.state_credit_tags
       } : null,
       location: {
-        state: tractData.state_name,
-        county: tractData.county_name
+        state: stateName,
+        county: tractData.county_name || 'Unknown'
       },
-      reason: tractData.nmtc_eligible 
+      reason: isNmtcEligible 
         ? 'Qualifies as NMTC Low-Income Community'
         : 'Does not meet NMTC Low-Income Community criteria'
     });

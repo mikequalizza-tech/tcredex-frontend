@@ -87,33 +87,40 @@ function NavDropdownMenu({ dropdown, isLoggedIn }: { dropdown: NavDropdown; isLo
 }
 
 export default function Header() {
+  // Hydration fix: track mount state
+  const [isMounted, setIsMounted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLLIElement>(null);
 
-  // Check auth state on mount
+  // Set mounted state first
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const session = localStorage.getItem('tcredex_session');
-      if (session) {
-        try {
-          const { role } = JSON.parse(session);
-          setIsLoggedIn(true);
-          // Get user name based on role
-          const names: Record<string, string> = {
-            cde: 'Sarah Chen',
-            sponsor: 'John Martinez',
-            investor: 'Michael Thompson',
-            admin: 'Platform Admin',
-          };
-          setUserName(names[role] || 'User');
-        } catch {
-          setIsLoggedIn(false);
-        }
+    setIsMounted(true);
+  }, []);
+
+  // Check auth state AFTER mount
+  useEffect(() => {
+    if (!isMounted) return;
+    
+    const session = localStorage.getItem('tcredex_session');
+    if (session) {
+      try {
+        const { role } = JSON.parse(session);
+        setIsLoggedIn(true);
+        // Get user name based on role
+        const names: Record<string, string> = {
+          cde: 'Sarah Chen',
+          sponsor: 'John Martinez',
+          investor: 'Michael Thompson',
+          admin: 'Platform Admin',
+        };
+        setUserName(names[role] || 'User');
+      } catch {
+        setIsLoggedIn(false);
       }
     }
-  }, []);
+  }, [isMounted]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -127,13 +134,103 @@ export default function Header() {
   }, []);
 
   const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('tcredex_session');
-      localStorage.removeItem('tcredex_demo_role');
-      setIsLoggedIn(false);
-      setUserMenuOpen(false);
-      window.location.href = '/';
+    localStorage.removeItem('tcredex_session');
+    localStorage.removeItem('tcredex_demo_role');
+    setIsLoggedIn(false);
+    setUserMenuOpen(false);
+    window.location.href = '/';
+  };
+
+  // Render auth buttons placeholder while checking auth to prevent hydration mismatch
+  const renderAuthButtons = () => {
+    // Until mounted, render a placeholder with same dimensions to prevent layout shift
+    if (!isMounted) {
+      return (
+        <li className="w-[140px]">
+          {/* Placeholder to prevent layout shift */}
+        </li>
+      );
     }
+
+    if (isLoggedIn) {
+      return (
+        <>
+          {/* Dashboard link */}
+          <li>
+            <Link
+              href="/dashboard"
+              className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
+            >
+              Dashboard
+            </Link>
+          </li>
+          {/* User menu */}
+          <li className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+                {userName.charAt(0)}
+              </div>
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden z-50">
+                <div className="px-4 py-3 border-b border-gray-800">
+                  <p className="text-sm font-medium text-gray-200">{userName}</p>
+                  <p className="text-xs text-gray-500">Logged in</p>
+                </div>
+                <Link
+                  href="/dashboard"
+                  className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                  onClick={() => setUserMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/dashboard/settings"
+                  className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                  onClick={() => setUserMenuOpen(false)}
+                >
+                  Settings
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors border-t border-gray-800"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </li>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <li>
+          <Link
+            href="/signin"
+            className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
+          >
+            Login
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/signup"
+            className="btn-sm bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] py-[5px] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]"
+          >
+            Register
+          </Link>
+        </li>
+      </>
+    );
   };
 
   return (
@@ -162,81 +259,7 @@ export default function Header() {
 
           {/* Desktop auth */}
           <ul className="flex flex-1 items-center justify-end gap-3">
-            {isLoggedIn ? (
-              <>
-                {/* Dashboard link */}
-                <li>
-                  <Link
-                    href="/dashboard"
-                    className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
-                  >
-                    Dashboard
-                  </Link>
-                </li>
-                {/* User menu */}
-                <li className="relative" ref={userMenuRef}>
-                  <button
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
-                  >
-                    <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                      {userName.charAt(0)}
-                    </div>
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden z-50">
-                      <div className="px-4 py-3 border-b border-gray-800">
-                        <p className="text-sm font-medium text-gray-200">{userName}</p>
-                        <p className="text-xs text-gray-500">Logged in</p>
-                      </div>
-                      <Link
-                        href="/dashboard"
-                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        Dashboard
-                      </Link>
-                      <Link
-                        href="/dashboard/settings"
-                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        Settings
-                      </Link>
-                      <button
-                        onClick={handleLogout}
-                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors border-t border-gray-800"
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  )}
-                </li>
-              </>
-            ) : (
-              <>
-                <li>
-                  <Link
-                    href="/signin"
-                    className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
-                  >
-                    Login
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/signup"
-                    className="btn-sm bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] py-[5px] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]"
-                  >
-                    Register
-                  </Link>
-                </li>
-              </>
-            )}
+            {renderAuthButtons()}
             <li>
               <MobileMenu />
             </li>

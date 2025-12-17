@@ -59,9 +59,83 @@ export default function HomeMapWithTracts({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [loadingTract, setLoadingTract] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(11);
   const [tractData, setTractData] = useState<Map<string, TractData>>(new Map());
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const MIN_TRACT_ZOOM = 10;
+
+  // Load tracts for current viewport - direct function that doesn't depend on React state
+  const loadTractsForViewportDirect = async () => {
+    if (!map.current) return;
+    
+    const zoom = map.current.getZoom();
+    if (zoom < MIN_TRACT_ZOOM) return;
+
+    setLoadingTract(true);
+    
+    try {
+      const bounds = map.current.getBounds();
+      if (!bounds) return;
+      
+      const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
+      
+      // Fetch tract geometries
+      const geoRes = await fetch(`/api/geo/tracts?bbox=${bbox}&limit=100`);
+      if (!geoRes.ok) throw new Error('Failed to fetch tracts');
+      
+      const geojson = await geoRes.json();
+      if (!geojson.features?.length) {
+        setLoadingTract(false);
+        return;
+      }
+      
+      // Enrich with eligibility data (fetch in parallel for up to 20 tracts)
+      const tractsToFetch = geojson.features.slice(0, 20);
+      const eligibilityPromises = tractsToFetch.map(async (feature: GeoJSON.Feature) => {
+        const geoid = feature.properties?.GEOID;
+        if (!geoid) return feature;
+        
+        try {
+          const res = await fetch(`/api/eligibility?tract=${geoid}`);
+          const data = await res.json();
+          
+          return {
+            ...feature,
+            id: geoid,
+            properties: {
+              ...feature.properties,
+              geoid,
+              eligible: data.eligible,
+              programs: JSON.stringify(data.programs || []),
+              povertyRate: data.federal?.poverty_rate?.toFixed(1) || null,
+              medianIncomePct: data.federal?.median_income_pct?.toFixed(0) || null,
+              stateName: data.location?.state || null,
+              countyName: data.location?.county || null,
+              severelyDistressed: data.federal?.severely_distressed || false,
+            }
+          };
+        } catch {
+          return feature;
+        }
+      });
+      
+      const enrichedFeatures = await Promise.all(eligibilityPromises);
+      
+      // Update the map source
+      const source = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
+      if (source) {
+        source.setData({
+          type: 'FeatureCollection',
+          features: enrichedFeatures,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading tracts for viewport:', error);
+    } finally {
+      setLoadingTract(false);
+    }
+  };
 
   // Hydration guard
   useEffect(() => {
@@ -275,6 +349,27 @@ export default function HomeMapWithTracts({
 
       // Add demo deal markers
       addDealMarkers(DEMO_DEALS);
+      
+      // Load tracts on pan/zoom (debounced)
+      let moveendTimeout: NodeJS.Timeout | null = null;
+      map.current.on('moveend', () => {
+        if (moveendTimeout) clearTimeout(moveendTimeout);
+        moveendTimeout = setTimeout(() => {
+          loadTractsForViewportDirect();
+        }, 300);
+      });
+      
+      // Track zoom level
+      map.current.on('zoom', () => {
+        if (map.current) {
+          setCurrentZoom(map.current.getZoom());
+        }
+      });
+      
+      // Load tracts for initial viewport
+      setTimeout(() => {
+        loadTractsForViewportDirect();
+      }, 500);
     });
 
     return () => {

@@ -36,7 +36,7 @@ export default function FeaturedDeals() {
             return (
               <Link
                 key={deal.id}
-                href={`/deals/${deal.id}`}
+                href={`/signin?redirect=/deals/${deal.id}`}
                 className="group bg-gray-900 rounded-xl border border-gray-800 hover:border-gray-700 transition-all duration-300 overflow-hidden hover:shadow-xl hover:shadow-indigo-900/10 hover:-translate-y-1"
               >
                 {/* Card Header with Program Badge */}
@@ -84,10 +84,10 @@ export default function FeaturedDeals() {
         {/* CTA */}
         <div className="text-center mt-12">
           <Link
-            href="/deals"
+            href="/signin?redirect=/deals"
             className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
           >
-            Browse All Projects
+            Sign In to Browse Projects
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>

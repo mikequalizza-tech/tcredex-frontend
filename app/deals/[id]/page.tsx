@@ -1,7 +1,8 @@
 'use client';
 
-import { use } from 'react';
+import { use, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { getDealById, PROGRAM_COLORS, STATUS_CONFIG } from '@/lib/data/deals';
 import { useCurrentUser } from '@/lib/auth';
 
@@ -11,8 +12,28 @@ interface DealPageProps {
 
 export default function DealDetailPage({ params }: DealPageProps) {
   const { id } = use(params);
+  const router = useRouter();
   const deal = getDealById(id);
-  const { isAuthenticated } = useCurrentUser();
+  const { isAuthenticated, isLoading } = useCurrentUser();
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push(`/signin?redirect=/deals/${id}`);
+    }
+  }, [isLoading, isAuthenticated, router, id]);
+
+  // Show loading state
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading deal...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!deal) {
     return (

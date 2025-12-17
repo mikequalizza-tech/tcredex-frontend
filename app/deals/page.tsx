@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCurrentUser } from '@/lib/auth';
 import MarketplaceFooter from '@/components/layout/MarketplaceFooter';
 import { 
   DEMO_DEALS, 
@@ -23,6 +25,10 @@ type SortField = 'projectName' | 'sponsorName' | 'programType' | 'allocation' | 
 type SortDirection = 'asc' | 'desc';
 
 export default function MarketplacePage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useCurrentUser();
+
+  // ALL HOOKS MUST BE AT TOP - before any conditional returns
   const [selectedDeals, setSelectedDeals] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>('submittedDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -35,6 +41,25 @@ export default function MarketplacePage() {
   const [activeView, setActiveView] = useState<EntityView>('deals');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const itemsPerPage = 50;
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/signin?redirect=/deals');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  // Show loading or redirect state - AFTER all hooks
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading marketplace...</p>
+        </div>
+      </div>
+    );
+  }
 
   const uniqueStates = useMemo(() => [...new Set(DEMO_DEALS.map(d => d.state))].sort(), []);
   const programStats = getProgramStats();

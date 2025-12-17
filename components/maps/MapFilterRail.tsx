@@ -42,6 +42,7 @@ interface TractData {
   stateNmtc: boolean;
   stateHtc: boolean;
   stateBrownfield: boolean;
+  opportunityZone: boolean;
   stackingNotes?: string;
   programs: string[];
 }
@@ -270,6 +271,7 @@ export default function MapFilterRail({
         stateNmtc: eligibilityData.state?.nmtc?.available || false,
         stateHtc: eligibilityData.state?.htc?.available || false,
         stateBrownfield: eligibilityData.state?.brownfield?.available || false,
+        opportunityZone: eligibilityData.federal?.opportunity_zone || false,
         stackingNotes: eligibilityData.state?.stacking_notes,
         programs: eligibilityData.programs || [],
       };
@@ -328,6 +330,7 @@ export default function MapFilterRail({
         stateNmtc: eligibilityData.state?.nmtc?.available || false,
         stateHtc: eligibilityData.state?.htc?.available || false,
         stateBrownfield: eligibilityData.state?.brownfield?.available || false,
+        opportunityZone: eligibilityData.federal?.opportunity_zone || false,
         stackingNotes: eligibilityData.state?.stacking_notes,
         programs: eligibilityData.programs || [],
       };
@@ -479,6 +482,9 @@ export default function MapFilterRail({
                     {tractResult.severelyDistressed && (
                       <span className="text-orange-400 font-medium text-sm">• Severely Distressed</span>
                     )}
+                    {tractResult.opportunityZone && (
+                      <span className="text-blue-400 font-medium text-sm">• Opportunity Zone</span>
+                    )}
                     {!tractResult.nmtcEligible && (
                       <span className="text-gray-400 font-medium text-sm">Not NMTC Eligible</span>
                     )}
@@ -521,9 +527,9 @@ export default function MapFilterRail({
                   </div>
                 </div>
 
-                {(tractResult.stateNmtc || tractResult.stateHtc || tractResult.stateBrownfield) && (
+                {(tractResult.stateNmtc || tractResult.stateHtc || tractResult.stateBrownfield || tractResult.opportunityZone) && (
                   <div className="px-3 py-2 border-t border-gray-700 bg-gray-900/50">
-                    <div className="text-xs text-gray-500 mb-1.5">State Credits:</div>
+                    <div className="text-xs text-gray-500 mb-1.5">Available Credits:</div>
                     <div className="flex flex-wrap gap-1">
                       {tractResult.stateNmtc && (
                         <span className="px-2 py-0.5 text-xs font-medium bg-green-900/50 text-green-400 border border-green-800 rounded">NMTC ✓</span>
@@ -533,6 +539,9 @@ export default function MapFilterRail({
                       )}
                       {tractResult.stateBrownfield && (
                         <span className="px-2 py-0.5 text-xs font-medium bg-purple-900/50 text-purple-400 border border-purple-800 rounded">Brownfield ✓</span>
+                      )}
+                      {tractResult.opportunityZone && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-blue-900/50 text-blue-400 border border-blue-800 rounded">OZ ✓</span>
                       )}
                     </div>
                   </div>

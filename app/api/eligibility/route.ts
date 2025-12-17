@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
     const incomeQualifies = tractData.mfi_qualifies === 'YES';
     const unemploymentQualifies = tractData.unemployment_ratio_qualifies === 'YES';
     const isSeverelyDistressed = povertyQualifies || incomeQualifies || unemploymentQualifies;
+    const isOzDesignated = tractData.oz_designated === true;
 
     // Build programs list
     const programs: string[] = [];
@@ -135,6 +136,7 @@ export async function GET(request: NextRequest) {
     if (stateData?.is_state_nmtc) programs.push('State NMTC');
     if (stateData?.is_state_htc) programs.push('State HTC');
     if (stateData?.is_state_brownfield) programs.push('Brownfield Credit');
+    if (isOzDesignated) programs.push('Opportunity Zone');
 
     return NextResponse.json({
       eligible: isNmtcEligible,
@@ -149,7 +151,8 @@ export async function GET(request: NextRequest) {
         unemployment_rate: unemploymentRate,
         unemployment_qualifies: unemploymentQualifies,
         severely_distressed: isSeverelyDistressed,
-        metro_status: tractData.omb_metro_non_metro
+        metro_status: tractData.omb_metro_non_metro,
+        opportunity_zone: isOzDesignated
       },
       state: stateData ? {
         state_name: stateData.state_name,

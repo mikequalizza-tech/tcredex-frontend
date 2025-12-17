@@ -44,22 +44,22 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
   };
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+    <footer className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-800 text-gray-100 z-40 backdrop-blur">
       {/* Expanded Chat Panel */}
       {isExpanded && (
-        <div className="border-b border-gray-200 bg-gray-50">
+        <div className="border-b border-gray-800 bg-gray-900/95">
           <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center">
                   <span className="text-white text-xs font-bold">TC</span>
                 </div>
-                <span className="font-medium text-gray-900">ChatTC</span>
-                <span className="text-xs text-gray-500">AI Assistant</span>
+                <span className="font-medium text-white">ChatTC</span>
+                <span className="text-xs text-gray-400">AI Assistant</span>
               </div>
               <button
                 onClick={() => setIsExpanded(false)}
-                className="text-gray-400 hover:text-gray-600 p-1"
+                className="text-gray-500 hover:text-gray-300 p-1"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -73,10 +73,10 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                  className={`max-w-[80%] px-4 py-2 rounded-lg ${
                       msg.role === 'user'
                         ? 'bg-green-600 text-white'
-                        : 'bg-white border border-gray-200 text-gray-700'
+                        : 'bg-gray-800 border border-gray-700 text-gray-100'
                     }`}
                   >
                     <p className="text-sm">{msg.content}</p>
@@ -93,22 +93,22 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
         {/* Left - Logo & Links */}
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">tC</span>
             </div>
-            <span className="font-semibold text-gray-900 hidden sm:inline">tCredex</span>
+            <span className="font-semibold text-white hidden sm:inline">tCredex</span>
           </Link>
           <nav className="hidden md:flex items-center gap-4 text-sm">
-            <Link href="/about" className="text-gray-600 hover:text-gray-900">
+            <Link href="/about" className="text-gray-300 hover:text-white">
               About
             </Link>
-            <Link href="/features" className="text-gray-600 hover:text-gray-900">
+            <Link href="/features" className="text-gray-300 hover:text-white">
               Features
             </Link>
-            <Link href="/contact" className="text-gray-600 hover:text-gray-900">
+            <Link href="/contact" className="text-gray-300 hover:text-white">
               Contact
             </Link>
-            <Link href="/support" className="text-gray-600 hover:text-gray-900">
+            <Link href="/support" className="text-gray-300 hover:text-white">
               Support
             </Link>
           </nav>
@@ -120,9 +120,9 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="absolute left-3 text-gray-400 hover:text-green-600"
+              className="absolute left-3 text-gray-400 hover:text-indigo-400"
             >
-              <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center">
                 <span className="text-white text-xs font-bold">TC</span>
               </div>
             </button>
@@ -132,11 +132,11 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
               onChange={(e) => setChatMessage(e.target.value)}
               onFocus={() => setIsExpanded(true)}
               placeholder="Ask ChatTC anything..."
-              className="w-full pl-12 pr-24 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
+              className="w-full pl-12 pr-24 py-2 border border-gray-700 rounded-full bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             />
             <button
               type="submit"
-              className="absolute right-2 px-3 py-1 bg-green-600 text-white rounded-full text-sm font-medium hover:bg-green-700 transition-colors"
+              className="absolute right-2 px-3 py-1 bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-indigo-500 transition-colors"
             >
               Send
             </button>
@@ -144,7 +144,7 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
         </form>
 
         {/* Right - Copyright */}
-        <div className="hidden lg:flex items-center gap-4 text-sm text-gray-500">
+        <div className="hidden lg:flex items-center gap-4 text-sm text-gray-400">
           <span>© 2025 tCredex</span>
         </div>
       </div>

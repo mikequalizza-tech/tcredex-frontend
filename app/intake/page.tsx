@@ -14,8 +14,6 @@ export default function IntakePage() {
 
   const handleSave = async (data: IntakeData, _readinessScore: number) => {
     // TODO: integrate save endpoint
-    console.log('Saving draft...', data);
-    
     // For now, save to localStorage as backup
     try {
       localStorage.setItem('tcredex_draft', JSON.stringify(data));
@@ -55,8 +53,6 @@ export default function IntakePage() {
 
   const handleSubmitToMarketplace = async (deal: Deal) => {
     // TODO: Submit to API
-    console.log('Submitting deal to marketplace:', deal);
-    
     try {
       // In production, this would POST to /api/deals
       // const response = await fetch('/api/deals', {

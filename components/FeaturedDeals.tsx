@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { getFeaturedDeals, PROGRAM_COLORS, type Deal } from '@/lib/data/deals';
+import { getFeaturedDeals, PROGRAM_COLORS } from '@/lib/data/deals';
 
 export default function FeaturedDeals() {
   const deals = getFeaturedDeals();

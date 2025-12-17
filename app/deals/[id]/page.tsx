@@ -50,7 +50,9 @@ export default function DealDetailPage({ params }: DealPageProps) {
   }
 
   const colors = PROGRAM_COLORS[deal.programType];
-  const totalBudget = deal.useOfFunds?.reduce((sum, item) => sum + item.amount, 0) || deal.allocation;
+  const totalBudget = deal.useOfFunds && deal.useOfFunds.length > 0
+    ? deal.useOfFunds.reduce((sum, item) => sum + item.amount, 0)
+    : deal.allocation;
 
   return (
     <>

@@ -59,8 +59,6 @@ export default function HomeMapWithTracts({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [loadingTract, setLoadingTract] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState(11);
-  const [tractData, setTractData] = useState<Map<string, TractData>>(new Map());
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const MIN_TRACT_ZOOM = 10;
@@ -358,14 +356,7 @@ export default function HomeMapWithTracts({
           loadTractsForViewportDirect();
         }, 300);
       });
-      
-      // Track zoom level
-      map.current.on('zoom', () => {
-        if (map.current) {
-          setCurrentZoom(map.current.getZoom());
-        }
-      });
-      
+
       // Load tracts for initial viewport
       setTimeout(() => {
         loadTractsForViewportDirect();
@@ -556,16 +547,6 @@ export default function HomeMapWithTracts({
           features: [tractFeature]
         });
       }
-
-      // Store tract data
-      setTractData(prev => new Map(prev).set(geoid, {
-        geoid,
-        eligible: eligibility.eligible,
-        programs: eligibility.programs || [],
-        povertyRate: eligibility.federal?.poverty_rate,
-        medianIncomePct: eligibility.federal?.median_income_pct,
-        geometry: geometry as GeoJSON.Geometry,
-      }));
 
       // Fit map to tract bounds if we have real geometry
       if (geometry && geometry.type === 'Polygon' && map.current) {

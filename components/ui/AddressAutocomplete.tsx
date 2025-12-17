@@ -56,6 +56,13 @@ export function AddressAutocomplete({
   const [inputValue, setInputValue] = useState(value);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // CRITICAL FIX: Sync inputValue when value prop changes from parent
+  useEffect(() => {
+    if (value !== inputValue) {
+      setInputValue(value);
+    }
+  }, [value]);
+
   // Load Google Places API
   useEffect(() => {
     if (typeof window === 'undefined') return;

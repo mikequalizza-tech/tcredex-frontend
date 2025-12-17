@@ -4,14 +4,10 @@ import { IntakeData } from '../IntakeShell';
 
 interface ProjectCostsProps {
   data: IntakeData;
-  onChange: (data: IntakeData) => void;
+  onChange: (updates: Partial<IntakeData>) => void;
 }
 
 export function ProjectCosts({ data, onChange }: ProjectCostsProps) {
-  const updateField = (field: keyof IntakeData, value: any) => {
-    onChange({ ...data, [field]: value });
-  };
-
   const formatCurrency = (value: number | undefined) => {
     if (!value) return '';
     return value.toLocaleString();
@@ -30,29 +26,29 @@ export function ProjectCosts({ data, onChange }: ProjectCostsProps) {
     <div className="space-y-6">
       {/* Total Project Cost */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Total Project Cost <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-gray-300 mb-1">
+          Total Project Cost <span className="text-red-400">*</span>
         </label>
         <div className="relative">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
           <input
             type="text"
             value={formatCurrency(data.totalProjectCost)}
-            onChange={(e) => updateField('totalProjectCost', parseCurrency(e.target.value))}
+            onChange={(e) => onChange({ totalProjectCost: parseCurrency(e.target.value) })}
             placeholder="0"
-            className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
           />
         </div>
         <p className="text-xs text-gray-500 mt-1">Total all-in project cost including land, construction, and soft costs</p>
       </div>
 
       {/* Cost Breakdown */}
-      <div className="border-t border-gray-100 pt-6">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Cost Breakdown (Optional)</h3>
+      <div className="border-t border-gray-800 pt-6">
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">Cost Breakdown (Optional)</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1">
               Land / Acquisition
             </label>
             <div className="relative">
@@ -60,31 +56,31 @@ export function ProjectCosts({ data, onChange }: ProjectCostsProps) {
               <input
                 type="text"
                 value={formatCurrency(data.landCost)}
-                onChange={(e) => updateField('landCost', parseCurrency(e.target.value))}
+                onChange={(e) => onChange({ landCost: parseCurrency(e.target.value) })}
                 placeholder="0"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Construction / Hard Costs
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Construction (Hard Costs)
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
               <input
                 type="text"
                 value={formatCurrency(data.constructionCost)}
-                onChange={(e) => updateField('constructionCost', parseCurrency(e.target.value))}
+                onChange={(e) => onChange({ constructionCost: parseCurrency(e.target.value) })}
                 placeholder="0"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1">
               Soft Costs
             </label>
             <div className="relative">
@@ -92,88 +88,72 @@ export function ProjectCosts({ data, onChange }: ProjectCostsProps) {
               <input
                 type="text"
                 value={formatCurrency(data.softCosts)}
-                onChange={(e) => updateField('softCosts', parseCurrency(e.target.value))}
+                onChange={(e) => onChange({ softCosts: parseCurrency(e.target.value) })}
                 placeholder="0"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
             </div>
+            <p className="text-xs text-gray-500 mt-1">Architecture, legal, financing fees, etc.</p>
           </div>
         </div>
 
-        {/* Breakdown Summary */}
-        {totalCost > 0 && data.totalProjectCost && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-600">Breakdown Total:</span>
-              <span className="font-medium">${formatCurrency(totalCost)}</span>
-            </div>
+        {/* Summary */}
+        {totalCost > 0 && (
+          <div className="mt-4 p-4 bg-gray-800 rounded-lg">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Difference:</span>
-              <span className={`font-medium ${Math.abs(gap) > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                ${formatCurrency(Math.abs(gap))} {gap !== 0 && (gap > 0 ? 'unallocated' : 'over')}
-              </span>
+              <span className="text-gray-400">Breakdown Total:</span>
+              <span className="font-medium text-gray-100">${formatCurrency(totalCost)}</span>
             </div>
+            {data.totalProjectCost && Math.abs(gap) > 1 && (
+              <div className="flex justify-between text-sm mt-2">
+                <span className="text-gray-400">Difference:</span>
+                <span className={`font-medium ${gap > 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {gap > 0 ? '+' : ''}${formatCurrency(gap)}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Financing Gap */}
-      <div className="border-t border-gray-100 pt-6">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Financing Gap</h3>
+      <div className="border-t border-gray-800 pt-6">
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">Financing Gap</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Financing Gap <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-              <input
-                type="text"
-                value={formatCurrency(data.financingGap)}
-                onChange={(e) => updateField('financingGap', parseCurrency(e.target.value))}
-                placeholder="0"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Amount needed from tax credit financing</p>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Financing Gap (Amount Seeking)
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <input
+              type="text"
+              value={formatCurrency(data.financingGap)}
+              onChange={(e) => onChange({ financingGap: parseCurrency(e.target.value) })}
+              placeholder="0"
+              className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Requested Allocation
-            </label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-              <input
-                type="text"
-                value={formatCurrency(data.requestedAllocation)}
-                onChange={(e) => updateField('requestedAllocation', parseCurrency(e.target.value))}
-                placeholder="0"
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">NMTC/LIHTC allocation amount requested</p>
-          </div>
+          <p className="text-xs text-gray-500 mt-1">The financing gap that tax credit equity will help fill</p>
         </div>
+      </div>
 
-        {/* Gap Percentage */}
-        {data.totalProjectCost && data.financingGap && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-green-700">Gap as % of Total Cost</span>
-              <span className="text-lg font-bold text-green-700">
-                {((data.financingGap / data.totalProjectCost) * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="h-2 bg-green-200 rounded-full mt-2 overflow-hidden">
-              <div 
-                className="h-full bg-green-500 rounded-full"
-                style={{ width: `${Math.min((data.financingGap / data.totalProjectCost) * 100, 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
+      {/* Requested Allocation */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1">
+          Requested NMTC Allocation
+        </label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+          <input
+            type="text"
+            value={formatCurrency(data.requestedAllocation)}
+            onChange={(e) => onChange({ requestedAllocation: parseCurrency(e.target.value) })}
+            placeholder="0"
+            className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          />
+        </div>
+        <p className="text-xs text-gray-500 mt-1">Qualified Equity Investment (QEI) amount being requested</p>
       </div>
     </div>
   );

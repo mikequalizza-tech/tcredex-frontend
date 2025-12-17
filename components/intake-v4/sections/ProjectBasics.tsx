@@ -5,7 +5,7 @@ import { IntakeData } from '../IntakeShell';
 
 interface ProjectBasicsProps {
   data: IntakeData;
-  onChange: (data: IntakeData) => void;
+  onChange: (updates: Partial<IntakeData>) => void;
 }
 
 const PROJECT_TYPES = ['Community Facility', 'Healthcare', 'Education', 'Manufacturing', 'Mixed-Use', 'Office', 'Retail', 'Affordable Housing', 'Historic Rehabilitation', 'Industrial', 'Other'];
@@ -13,9 +13,12 @@ const PROJECT_TYPES = ['Community Facility', 'Healthcare', 'Education', 'Manufac
 export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
   const [uploadingImages, setUploadingImages] = useState(false);
   
-  const updateField = (field: keyof IntakeData, value: any) => onChange({ ...data, [field]: value });
+  // FIXED: Send only the changed field, not spreading data
+  const updateField = (field: keyof IntakeData, value: any) => {
+    onChange({ [field]: value });
+  };
 
-  // Handle image upload (demo - stores as base64 or file names)
+  // Handle image upload - store File object along with blob URL
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -23,31 +26,30 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
     setUploadingImages(true);
     
     const currentImages = data.projectImages || [];
-    const newImages: { name: string; url: string; size: number }[] = [];
+    const newImages: { name: string; url: string; size: number; file?: File }[] = [];
     
     for (let i = 0; i < Math.min(files.length, 5 - currentImages.length); i++) {
       const file = files[i];
-      // In production, upload to storage. For demo, create object URL
       const url = URL.createObjectURL(file);
       newImages.push({
         name: file.name,
         url: url,
-        size: file.size
+        size: file.size,
+        file: file // Store the actual file for later upload
       });
     }
     
-    updateField('projectImages', [...currentImages, ...newImages]);
+    onChange({ projectImages: [...currentImages, ...newImages] });
     setUploadingImages(false);
   };
 
   const removeImage = (index: number) => {
     const images = [...(data.projectImages || [])];
-    // Revoke object URL to free memory
     if (images[index]?.url?.startsWith('blob:')) {
       URL.revokeObjectURL(images[index].url);
     }
     images.splice(index, 1);
-    updateField('projectImages', images);
+    onChange({ projectImages: images });
   };
 
   return (
@@ -76,7 +78,6 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
         <p className="text-xs text-gray-500 mt-1">This will appear on your marketplace listing</p>
       </div>
 
-      {/* Community Impact - flows from Project Description */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
           Community Impact <span className="text-indigo-400 text-xs ml-2">Helps with matching</span>
@@ -90,7 +91,7 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
         </p>
       </div>
 
-      {/* NEW: Project Images Section */}
+      {/* Project Images Section */}
       <div className="border-t border-gray-800 pt-6">
         <label className="block text-sm font-medium text-gray-300 mb-2">
           Project Images <span className="text-gray-500 text-xs ml-2">(up to 5 images)</span>
@@ -99,7 +100,6 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
           Upload photos of the site, renderings, or related project images for your Project Profile
         </p>
         
-        {/* Image Upload Area */}
         <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-indigo-500 transition-colors">
           <input
             type="file"
@@ -130,11 +130,10 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
           </label>
         </div>
 
-        {/* Image Preview Grid */}
         {data.projectImages && data.projectImages.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
             {data.projectImages.map((image, index) => (
-              <div key={index} className="relative group">
+              <div key={`${image.name}-${index}`} className="relative group">
                 <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden">
                   <img 
                     src={image.url} 

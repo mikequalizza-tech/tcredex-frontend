@@ -32,18 +32,48 @@ export interface ReadinessResult {
 }
 
 /**
- * Readiness Dimensions (v1 – LOCKED)
+ * Readiness Dimensions (v2 – Updated for Intake v4 form alignment)
  * 
  * | Dimension              | Max  |
  * |------------------------|------|
+ * | Project Basics         | 20   |
+ * | Location & Tract       | 20   |
  * | Site Control           | 20   |
- * | Capital Stack          | 25   |
- * | Documentation          | 25   |
- * | Approvals/Entitlements | 20   |
- * | Timeline Certainty     | 10   |
+ * | Capital Stack          | 20   |
+ * | Timeline               | 10   |
+ * | Approvals              | 10   |
  * | Total                  | 100  |
+ * 
+ * NOTE: Aligned with actual form sections to prevent progress/readiness mismatch
  */
 export const READINESS_RULES: ReadinessRule[] = [
+  {
+    id: 'project_basics',
+    label: 'Project Basics',
+    weight: 20,
+    description: 'Core project identity: name, type, sponsor',
+    evaluate: (data) => {
+      let score = 0;
+      if (data.projectName) score += 8;
+      if (data.projectType) score += 4;
+      if (data.sponsorName) score += 8;
+      return score;
+    },
+  },
+  {
+    id: 'location_tract',
+    label: 'Location & Census Tract',
+    weight: 20,
+    description: 'Project address and eligibility verification',
+    evaluate: (data) => {
+      let score = 0;
+      if (data.address) score += 5;
+      if (data.city && data.state && data.zipCode) score += 5;
+      if (data.censusTract) score += 5;
+      if (data.tractEligible) score += 5;
+      return score;
+    },
+  },
   {
     id: 'site_control',
     label: 'Site Control',
@@ -58,45 +88,22 @@ export const READINESS_RULES: ReadinessRule[] = [
   },
   {
     id: 'capital_stack',
-    label: 'Capital Stack Identified',
-    weight: 25,
-    description: 'Percentage of capital sources committed or identified',
-    evaluate: (data) => {
-      const pct = data.committedCapitalPct ?? data.capitalStackPct ?? 0;
-      if (pct >= 80) return 25;
-      if (pct >= 60) return 15;
-      if (pct >= 40) return 10;
-      if (pct >= 20) return 5;
-      return 0;
-    },
-  },
-  {
-    id: 'documentation',
-    label: 'Core Documentation',
-    weight: 25,
-    description: 'Required documents uploaded and complete',
-    evaluate: (data) => {
-      const uploaded = data.docsUploaded ?? 0;
-      const required = data.docsRequired ?? 1;
-      const ratio = uploaded / required;
-      
-      if (ratio >= 1) return 25;
-      if (ratio >= 0.75) return 20;
-      if (ratio >= 0.5) return 15;
-      if (ratio >= 0.25) return 5;
-      return 0;
-    },
-  },
-  {
-    id: 'approvals',
-    label: 'Approvals / Entitlements',
+    label: 'Capital Stack',
     weight: 20,
-    description: 'Zoning, permits, and regulatory approvals status',
+    description: 'Capital sources identified and project financials',
     evaluate: (data) => {
-      if (data.entitlementsApproved || data.approvalsComplete) return 20;
-      if (data.entitlementsSubmitted || data.approvalsSubmitted) return 10;
-      if (data.entitlementsStarted || data.approvalsStarted) return 5;
-      return 0;
+      let score = 0;
+      // Total project cost filled = 5 pts
+      if (data.totalProjectCost && data.totalProjectCost > 0) score += 5;
+      // Financing gap calculated = 5 pts
+      if (data.financingGap !== undefined) score += 5;
+      // Capital committed >= 60% = 10 pts
+      const pct = data.committedCapitalPct ?? 0;
+      if (pct >= 60) score += 10;
+      else if (pct >= 40) score += 7;
+      else if (pct >= 20) score += 4;
+      else if (pct > 0) score += 2;
+      return score;
     },
   },
   {
@@ -105,10 +112,24 @@ export const READINESS_RULES: ReadinessRule[] = [
     weight: 10,
     description: 'Months until construction start',
     evaluate: (data) => {
-      const months = data.constructionStartMonths ?? data.monthsToConstruction ?? 999;
+      // Has construction date = baseline
+      if (!data.constructionStartDate) return 0;
+      const months = data.constructionStartMonths ?? 999;
       if (months <= 6) return 10;
-      if (months <= 12) return 5;
-      if (months <= 18) return 2;
+      if (months <= 12) return 7;
+      if (months <= 18) return 4;
+      return 2; // Date provided but >18 months out
+    },
+  },
+  {
+    id: 'approvals',
+    label: 'Approvals / Entitlements',
+    weight: 10,
+    description: 'Zoning, permits, and regulatory approvals status',
+    evaluate: (data) => {
+      if (data.entitlementsApproved || data.approvalsComplete) return 10;
+      if (data.entitlementsSubmitted || data.approvalsSubmitted) return 6;
+      if (data.entitlementsStarted || data.approvalsStarted || data.zoningApproved) return 3;
       return 0;
     },
   },

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { IntakeData } from '../IntakeShell';
 import AddressAutocomplete, { AddressData } from '@/components/ui/AddressAutocomplete';
 
 interface LocationTractProps {
   data: IntakeData;
-  onChange: (data: IntakeData) => void;
+  onChange: (updates: Partial<IntakeData>) => void;
 }
 
 const US_STATES = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'];
@@ -46,18 +46,13 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
   const [eligibilityResult, setEligibilityResult] = useState<EligibilityResult | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
-  // Update multiple fields at once and auto-populate derived data
-  const updateFields = useCallback((updates: Partial<IntakeData>) => {
-    onChange({ ...data, ...updates });
-  }, [data, onChange]);
-
   // Full auto-lookup pipeline: coordinates → tract → eligibility → auto-populate
-  const runAutoLookup = useCallback(async (lat: number, lng: number) => {
+  const runAutoLookup = useCallback(async (lat: number, lng: number, currentCounty?: string) => {
     setLookupError(null);
     setEligibilityResult(null);
     
     try {
-      // Stage 1: Get census tract from coordinates via our API proxy
+      // Stage 1: Get census tract from coordinates
       setLookupStage('tract');
       
       const tractResponse = await fetch(`/api/geo/tract-lookup?lat=${lat}&lng=${lng}`);
@@ -81,22 +76,19 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
       const tractTypes: ('QCT' | 'SD' | 'LIC' | 'DDA')[] = [];
       
       if (eligibility.eligible) {
-        tractTypes.push('LIC'); // Low-Income Community
-        
+        tractTypes.push('LIC');
         if (eligibility.federal?.severely_distressed) {
           tractTypes.push('SD');
         }
-        
         if (eligibility.federal?.poverty_rate >= 20) {
           tractTypes.push('QCT');
         }
       }
 
-      // Update form with ALL derived data
-      updateFields({
+      // FIXED: Send all updates at once, don't spread data
+      onChange({
         censusTract: fullTract,
         tractType: tractTypes,
-        // Store raw metrics for deal card generation
         tractPovertyRate: eligibility.federal?.poverty_rate ?? undefined,
         tractMedianIncome: eligibility.federal?.median_income_pct ?? undefined,
         tractUnemployment: eligibility.federal?.unemployment_rate ?? undefined,
@@ -105,13 +97,10 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
         tractClassification: eligibility.federal?.metro_status,
         tractCounty: typeof eligibility.location?.county === 'string' ? eligibility.location.county : undefined,
         tractState: eligibility.location?.state,
-        // Auto-set county from eligibility if available
-        county: typeof eligibility.location?.county === 'string' ? eligibility.location.county : data.county,
+        county: typeof eligibility.location?.county === 'string' ? eligibility.location.county : currentCounty,
       });
 
       setLookupStage('done');
-      
-      // Reset to idle after showing success briefly
       setTimeout(() => setLookupStage('idle'), 2000);
 
     } catch (error) {
@@ -119,37 +108,34 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
       setLookupError(error instanceof Error ? error.message : 'Lookup failed');
       setLookupStage('error');
     }
-  }, [updateFields, data.county]);
+  }, [onChange]);
 
   // Handle address selection - triggers full auto-lookup
   const handleAddressSelect = useCallback(async (addressData: AddressData) => {
     setLookupStage('geocoding');
     
-    // Update address fields immediately
-    updateFields({
+    // FIXED: Update address fields in one call
+    onChange({
       address: addressData.address,
       city: addressData.city,
       state: addressData.state,
       zipCode: addressData.zipCode,
       county: addressData.county,
-      // Store coordinates for map
       latitude: addressData.lat,
       longitude: addressData.lng,
     });
 
     // Auto-run tract lookup if we have coordinates
     if (addressData.lat && addressData.lng) {
-      await runAutoLookup(addressData.lat, addressData.lng);
+      await runAutoLookup(addressData.lat, addressData.lng, addressData.county);
     } else {
       setLookupStage('idle');
     }
-  }, [updateFields, runAutoLookup]);
+  }, [onChange, runAutoLookup]);
 
   // Status indicator component
   const StatusIndicator = () => {
     if (lookupStage === 'idle') return null;
-    
-    // Don't show error if we have valid tract data populated
     if (lookupStage === 'error' && (eligibilityResult || data.censusTract)) return null;
     
     const stages = {
@@ -196,20 +182,19 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
           Type and select address → City, State, ZIP, Census Tract, and eligibility auto-populate
         </p>
         
-        {/* Inline status indicator */}
         <div className="mt-2">
           <StatusIndicator />
         </div>
       </div>
 
-      {/* Auto-filled Address Fields - Read-only appearance but editable */}
+      {/* Auto-filled Address Fields */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">City</label>
           <input
             type="text"
             value={data.city || ''}
-            onChange={(e) => updateFields({ city: e.target.value })}
+            onChange={(e) => onChange({ city: e.target.value })}
             placeholder="Auto-filled"
             className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-600"
           />
@@ -218,7 +203,7 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
           <label className="block text-sm font-medium text-gray-300 mb-1">State</label>
           <select
             value={data.state || ''}
-            onChange={(e) => updateFields({ state: e.target.value })}
+            onChange={(e) => onChange({ state: e.target.value })}
             className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-100"
           >
             <option value="">Auto-filled</option>
@@ -232,7 +217,7 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
           <input
             type="text"
             value={data.zipCode || ''}
-            onChange={(e) => updateFields({ zipCode: e.target.value })}
+            onChange={(e) => onChange({ zipCode: e.target.value })}
             placeholder="Auto-filled"
             maxLength={10}
             className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-600"
@@ -243,17 +228,16 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
           <input
             type="text"
             value={data.county || data.tractCounty || ''}
-            onChange={(e) => updateFields({ county: e.target.value })}
+            onChange={(e) => onChange({ county: e.target.value })}
             placeholder="Auto-filled"
             className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-600"
           />
         </div>
       </div>
 
-      {/* Census Tract & Eligibility - Auto-populated */}
+      {/* Census Tract & Eligibility */}
       {(data.censusTract || eligibilityResult) && (
         <div className="border border-gray-700 rounded-xl overflow-hidden">
-          {/* Header with tract number */}
           <div className="bg-gray-800 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🗺️</span>
@@ -273,10 +257,8 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
             )}
           </div>
 
-          {/* Metrics Grid - Industry Standard Format */}
           {eligibilityResult && (
             <div className="p-4 bg-gray-900/50">
-              {/* Header badges */}
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-700">
                 {eligibilityResult.eligible && (
                   <span className="text-green-400 font-semibold">✓ Eligible for Tax Credits!</span>
@@ -286,7 +268,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
                 )}
               </div>
 
-              {/* CDFI-style Data Table */}
               <div className="space-y-2 font-mono text-sm">
                 <div className="flex justify-between py-1 border-b border-gray-800">
                   <span className="text-gray-400">Census Tract:</span>
@@ -329,7 +310,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
                 </div>
               </div>
 
-              {/* State Credits Section */}
               {eligibilityResult.state && (
                 <div className="mt-4 pt-4 border-t border-gray-700">
                   <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">State Credits Available</div>
@@ -361,7 +341,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
                 </div>
               )}
 
-              {/* Program Badges */}
               <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-700">
                 {eligibilityResult.programs?.map((program) => (
                   <span 
@@ -379,12 +358,10 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
                 ))}
               </div>
 
-              {/* Eligibility reason */}
               <p className="text-sm text-gray-400 mt-4">{eligibilityResult.reason}</p>
             </div>
           )}
 
-          {/* Manual override section - collapsed by default */}
           {!eligibilityResult && data.censusTract && (
             <div className="p-4 bg-gray-900/50 text-center text-gray-500">
               <p className="text-sm">Eligibility data loading...</p>
@@ -393,7 +370,7 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
         </div>
       )}
 
-      {/* Error state with retry option - show if tract lookup failed */}
+      {/* Error state with retry */}
       {lookupStage === 'error' && !eligibilityResult && !data.censusTract && (
         <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
           <div className="flex items-start gap-3">
@@ -407,7 +384,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
             </div>
           </div>
           
-          {/* Manual tract entry */}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-300 mb-1">
               Manual Census Tract Entry
@@ -415,7 +391,7 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
             <input
               type="text"
               value={data.censusTract || ''}
-              onChange={(e) => updateFields({ censusTract: e.target.value })}
+              onChange={(e) => onChange({ censusTract: e.target.value })}
               placeholder="11-digit FIPS code (e.g., 17031839100)"
               className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 font-mono"
             />
@@ -423,7 +399,7 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
         </div>
       )}
 
-      {/* Help text when no address entered */}
+      {/* Help text */}
       {!data.address && !data.censusTract && lookupStage === 'idle' && (
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 text-center">
           <div className="text-4xl mb-3">📍</div>

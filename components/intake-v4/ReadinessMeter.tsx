@@ -1,169 +1,343 @@
 'use client';
 
-import { calculateReadiness, getTierDisplay } from '@/lib/intake';
-import { ProgramType, IntakeData } from './IntakeShell';
+import { IntakeData, ProgramType, TIER_CONFIG } from '@/types/intake';
+import { useEffect } from 'react';
 
 interface ReadinessMeterProps {
   data: IntakeData;
   programs: ProgramType[];
-  onSave?: () => void;
-  onSubmit?: () => void;
-  isSaving?: boolean;
+  onScoreChange?: (score: number) => void;
 }
 
-export function ReadinessMeter({ data, programs, onSave, onSubmit, isSaving }: ReadinessMeterProps) {
-  const result = calculateReadiness(data);
-  const tierDisplay = getTierDisplay(result.tier);
+export function ReadinessMeter({ data, programs, onScoreChange }: ReadinessMeterProps) {
+  // Calculate tier completion
+  const tier1Fields: (keyof IntakeData)[] = [
+    'projectName', 'sponsorName', 'address', 'censusTract', 
+    'programs', 'totalProjectCost', 'financingGap'
+  ];
+  
+  const tier2Fields: (keyof IntakeData)[] = [
+    ...tier1Fields,
+    'projectDescription', 'communityImpact', 'permanentJobsFTE', 
+    'constructionJobsFTE', 'siteControl', 'constructionStartDate',
+    'qalicbGrossIncome', 'qalicbTangibleProperty', 'qalicbEmployeeServices'
+  ];
+  
+  const tier3Fields: (keyof IntakeData)[] = [
+    ...tier2Fields,
+    'phaseIEnvironmental', 'zoningApproval', 'buildingPermits',
+    'constructionDrawings', 'constructionContract'
+  ];
 
-  const suggestions = getSuggestions(data, result);
+  const countComplete = (fields: (keyof IntakeData)[]) => {
+    return fields.filter(field => {
+      const val = data[field];
+      if (val === undefined || val === null || val === '') return false;
+      if (Array.isArray(val) && val.length === 0) return false;
+      return true;
+    }).length;
+  };
+
+  const tier1Complete = countComplete(tier1Fields);
+  const tier2Complete = countComplete(tier2Fields);
+  const tier3Complete = countComplete(tier3Fields);
+
+  const tier1Pct = Math.round((tier1Complete / tier1Fields.length) * 100);
+  const tier2Pct = Math.round((tier2Complete / tier2Fields.length) * 100);
+  const tier3Pct = Math.round((tier3Complete / tier3Fields.length) * 100);
+
+  // Determine current tier
+  const currentTier = tier3Pct >= 95 ? 3 : tier2Pct >= 70 ? 2 : tier1Pct >= 80 ? 1 : 0;
+
+  // Calculate overall readiness score
+  const readinessScore = Math.round((tier1Pct * 0.4 + tier2Pct * 0.35 + tier3Pct * 0.25));
+
+  // Report score changes
+  useEffect(() => {
+    if (onScoreChange) {
+      onScoreChange(readinessScore);
+    }
+  }, [readinessScore, onScoreChange]);
+
+  // Eligibility indicators
+  const hasEligibleTract = data.tractEligible === true;
+  const isSeverelyDistressed = data.tractSeverelyDistressed === true;
+  const passesQALICB = programs.includes('NMTC') ? (
+    (data.qalicbGrossIncome ?? 0) >= 50 &&
+    (data.qalicbTangibleProperty ?? 0) >= 40 &&
+    (data.qalicbEmployeeServices ?? 0) >= 40 &&
+    data.isProhibitedBusiness === false
+  ) : true;
+
+  // Calculate financing metrics
+  const financingGapPct = data.totalProjectCost && data.financingGap 
+    ? Math.round((data.financingGap / data.totalProjectCost) * 100) 
+    : 0;
 
   return (
-    <div className="space-y-4 sticky top-24">
-      {/* Readiness Score Card */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-        <h3 className="text-sm font-semibold text-gray-300 mb-4">Readiness Score</h3>
+    <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 sticky top-24 h-fit space-y-6">
+      {/* Main Readiness Score */}
+      <div className="text-center">
+        <div className="relative inline-flex items-center justify-center">
+          {/* Circular progress */}
+          <svg className="w-32 h-32 transform -rotate-90">
+            <circle
+              cx="64"
+              cy="64"
+              r="56"
+              stroke="currentColor"
+              strokeWidth="8"
+              fill="none"
+              className="text-gray-800"
+            />
+            <circle
+              cx="64"
+              cy="64"
+              r="56"
+              stroke="currentColor"
+              strokeWidth="8"
+              fill="none"
+              strokeDasharray={`${2 * Math.PI * 56}`}
+              strokeDashoffset={`${2 * Math.PI * 56 * (1 - readinessScore / 100)}`}
+              className={`transition-all duration-700 ${
+                currentTier >= 3 ? 'text-amber-500' :
+                currentTier >= 2 ? 'text-emerald-500' :
+                currentTier >= 1 ? 'text-indigo-500' :
+                'text-gray-600'
+              }`}
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className={`text-3xl font-bold ${
+              currentTier >= 3 ? 'text-amber-400' :
+              currentTier >= 2 ? 'text-emerald-400' :
+              currentTier >= 1 ? 'text-indigo-400' :
+              'text-gray-400'
+            }`}>
+              {readinessScore}%
+            </span>
+            <span className="text-xs text-gray-500">Ready</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Current Tier Badge */}
+      <div className={`p-3 rounded-lg text-center border ${
+        currentTier >= 3 ? 'bg-amber-900/20 border-amber-500/30' :
+        currentTier >= 2 ? 'bg-emerald-900/20 border-emerald-500/30' :
+        currentTier >= 1 ? 'bg-indigo-900/20 border-indigo-500/30' :
+        'bg-gray-800/50 border-gray-700'
+      }`}>
+        <div className="text-2xl mb-1">
+          {currentTier >= 3 ? '✅' : currentTier >= 2 ? '📊' : currentTier >= 1 ? '📋' : '🔒'}
+        </div>
+        <div className={`text-sm font-semibold ${
+          currentTier >= 3 ? 'text-amber-300' :
+          currentTier >= 2 ? 'text-emerald-300' :
+          currentTier >= 1 ? 'text-indigo-300' :
+          'text-gray-400'
+        }`}>
+          {currentTier >= 3 ? 'Due Diligence Ready' :
+           currentTier >= 2 ? 'Project Profile Ready' :
+           currentTier >= 1 ? 'DealCard Ready' :
+           'In Progress'}
+        </div>
+        <div className="text-xs text-gray-500 mt-1">
+          {currentTier >= 3 ? 'Ready for closing room' :
+           currentTier >= 2 ? 'Ready for CDE matching' :
+           currentTier >= 1 ? 'Ready for marketplace' :
+           'Complete Tier 1 fields'}
+        </div>
+      </div>
+
+      {/* Tier Progress Breakdown */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tier Progress</h4>
         
-        <div className="flex items-center gap-4 mb-4">
-          <div className="relative w-20 h-20">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" fill="none" stroke="#374151" strokeWidth="10" />
-              <circle cx="50" cy="50" r="40" fill="none"
-                stroke={result.tier === 'shovel-ready' ? '#10b981' : result.tier === 'advanced' ? '#6366f1' : result.tier === 'developing' ? '#f59e0b' : '#6b7280'}
-                strokeWidth="10" strokeLinecap="round" strokeDasharray={2 * Math.PI * 40}
-                strokeDashoffset={2 * Math.PI * 40 * (1 - result.percentage / 100)} className="transition-all duration-500" />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl font-bold text-gray-100">{result.totalScore}</span>
-            </div>
+        {/* Tier 1 */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-indigo-400 font-medium">📋 Tier 1: DealCard</span>
+            <span className={tier1Pct >= 80 ? 'text-green-400' : 'text-gray-500'}>{tier1Pct}%</span>
           </div>
-          <div>
-            <div className={`inline-flex px-2 py-1 rounded-full text-sm font-medium ${
-              result.tier === 'shovel-ready' ? 'bg-green-900/50 text-green-400' :
-              result.tier === 'advanced' ? 'bg-indigo-900/50 text-indigo-400' :
-              result.tier === 'developing' ? 'bg-amber-900/50 text-amber-400' : 'bg-gray-800 text-gray-400'
-            }`}>{tierDisplay.label}</div>
-            <p className="text-xs text-gray-500 mt-1">out of {result.maxScore} points</p>
+          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-indigo-500 transition-all duration-500"
+              style={{ width: `${tier1Pct}%` }}
+            />
           </div>
         </div>
 
-        <div className="space-y-3">
-          {result.breakdown.map((item) => (
-            <div key={item.id}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-400">{item.label}</span>
-                <span className={`font-medium ${item.status === 'complete' ? 'text-green-400' : item.status === 'partial' ? 'text-amber-400' : 'text-gray-500'}`}>
-                  {item.score}/{item.maxScore}
-                </span>
-              </div>
-              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-300 ${item.status === 'complete' ? 'bg-green-500' : item.status === 'partial' ? 'bg-amber-500' : 'bg-gray-700'}`}
-                  style={{ width: `${(item.score / item.maxScore) * 100}%` }} />
-              </div>
-            </div>
-          ))}
+        {/* Tier 2 */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-emerald-400 font-medium">📊 Tier 2: Profile</span>
+            <span className={tier2Pct >= 70 ? 'text-green-400' : 'text-gray-500'}>{tier2Pct}%</span>
+          </div>
+          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-emerald-500 transition-all duration-500"
+              style={{ width: `${tier2Pct}%` }}
+            />
+          </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-800">
-          {result.totalScore >= 40 ? (
-            <div className="flex items-center gap-2 text-green-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm font-medium">Ready for Marketplace</span>
-            </div>
+        {/* Tier 3 */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-amber-400 font-medium">✅ Tier 3: Due Diligence</span>
+            <span className={tier3Pct >= 95 ? 'text-green-400' : 'text-gray-500'}>{tier3Pct}%</span>
+          </div>
+          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-amber-500 transition-all duration-500"
+              style={{ width: `${tier3Pct}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Eligibility Indicators */}
+      <div className="space-y-2 pt-4 border-t border-gray-800">
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Eligibility</h4>
+        
+        {/* Tract Eligibility */}
+        <div className="flex items-center justify-between py-1.5 px-2 rounded bg-gray-800/50">
+          <span className="text-xs text-gray-400">Census Tract</span>
+          {data.censusTract ? (
+            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+              hasEligibleTract 
+                ? isSeverelyDistressed 
+                  ? 'bg-purple-900/50 text-purple-300' 
+                  : 'bg-green-900/50 text-green-300'
+                : 'bg-red-900/50 text-red-300'
+            }`}>
+              {hasEligibleTract 
+                ? isSeverelyDistressed ? 'Severely Distressed' : 'Eligible'
+                : 'Not Eligible'}
+            </span>
           ) : (
-            <div className="flex items-center gap-2 text-amber-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="text-sm font-medium">Score 40+ to submit</span>
-            </div>
+            <span className="text-xs text-gray-500">—</span>
           )}
         </div>
-      </div>
 
-      {/* AI Suggestions */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">TC</span>
+        {/* QALICB Status (NMTC only) */}
+        {programs.includes('NMTC') && (
+          <div className="flex items-center justify-between py-1.5 px-2 rounded bg-gray-800/50">
+            <span className="text-xs text-gray-400">QALICB Tests</span>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+              passesQALICB 
+                ? 'bg-green-900/50 text-green-300' 
+                : 'bg-yellow-900/50 text-yellow-300'
+            }`}>
+              {passesQALICB ? 'Pass' : 'Incomplete'}
+            </span>
           </div>
-          <h3 className="text-sm font-semibold text-gray-300">ChatTC Suggestions</h3>
-        </div>
-
-        {suggestions.length > 0 ? (
-          <ul className="space-y-2">
-            {suggestions.slice(0, 4).map((suggestion, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-sm">
-                <span className="text-amber-400 mt-0.5">💡</span>
-                <span className="text-gray-400">{suggestion}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-green-400">✓ Looking good! Your submission is well-prepared.</p>
         )}
+
+        {/* Programs */}
+        <div className="flex items-center justify-between py-1.5 px-2 rounded bg-gray-800/50">
+          <span className="text-xs text-gray-400">Programs</span>
+          <div className="flex gap-1">
+            {programs.length > 0 ? programs.map(p => (
+              <span key={p} className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                p === 'NMTC' ? 'bg-emerald-900/50 text-emerald-300' :
+                p === 'HTC' ? 'bg-blue-900/50 text-blue-300' :
+                p === 'LIHTC' ? 'bg-purple-900/50 text-purple-300' :
+                p === 'OZ' ? 'bg-amber-900/50 text-amber-300' :
+                'bg-gray-700 text-gray-300'
+              }`}>
+                {p}
+              </span>
+            )) : (
+              <span className="text-xs text-gray-500">None selected</span>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Program Requirements */}
-      {programs.length > 0 && (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <h3 className="text-sm font-semibold text-gray-300 mb-3">Program Requirements</h3>
-          <div className="space-y-2">
-            {programs.map((program) => (
-              <div key={program} className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  program === 'NMTC' ? 'bg-emerald-900/50 text-emerald-400' :
-                  program === 'HTC' ? 'bg-blue-900/50 text-blue-400' :
-                  program === 'LIHTC' ? 'bg-purple-900/50 text-purple-400' :
-                  'bg-amber-900/50 text-amber-400'
-                }`}>{program}</span>
-                <span className="text-xs text-gray-500">{getProgramRequirementSummary(program, data)}</span>
+      {/* Financial Summary */}
+      {data.totalProjectCost && (
+        <div className="space-y-2 pt-4 border-t border-gray-800">
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Financials</h4>
+          
+          <div className="bg-gray-800/50 rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">Total Project Cost</span>
+              <span className="text-sm font-semibold text-gray-200">
+                ${(data.totalProjectCost || 0).toLocaleString()}
+              </span>
+            </div>
+            
+            {data.financingGap !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Financing Gap</span>
+                <span className="text-sm font-semibold text-indigo-400">
+                  ${(data.financingGap || 0).toLocaleString()}
+                  <span className="text-xs text-gray-500 ml-1">({financingGapPct}%)</span>
+                </span>
               </div>
-            ))}
+            )}
+            
+            {data.requestedAllocation && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Requested NMTC</span>
+                <span className="text-sm font-semibold text-emerald-400">
+                  ${(data.requestedAllocation || 0).toLocaleString()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-        <h3 className="text-sm font-semibold text-gray-300 mb-3">Quick Actions</h3>
-        <div className="space-y-2">
-          <button onClick={onSave} disabled={isSaving}
-            className="w-full px-4 py-2 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-800 disabled:opacity-50">
-            💾 Save Draft
-          </button>
-          <button onClick={onSubmit} disabled={isSaving || result.totalScore < 40}
-            className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
-            🚀 Submit to Marketplace
-          </button>
+      {/* Jobs Summary */}
+      {(data.permanentJobsFTE || data.constructionJobsFTE) && (
+        <div className="space-y-2 pt-4 border-t border-gray-800">
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Community Impact</h4>
+          
+          <div className="grid grid-cols-2 gap-2">
+            {data.permanentJobsFTE !== undefined && (
+              <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-blue-400">{data.permanentJobsFTE}</div>
+                <div className="text-xs text-gray-500">Permanent Jobs</div>
+              </div>
+            )}
+            {data.constructionJobsFTE !== undefined && (
+              <div className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-orange-400">{data.constructionJobsFTE}</div>
+                <div className="text-xs text-gray-500">Construction Jobs</div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Next Step Prompt */}
+      {currentTier < 3 && (
+        <div className="pt-4 border-t border-gray-800">
+          <div className="bg-gray-800/50 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <span className="text-lg">💡</span>
+              <div>
+                <p className="text-xs font-medium text-gray-300">
+                  {currentTier === 0 ? 'Complete basics to create DealCard' :
+                   currentTier === 1 ? 'Add impact data for Project Profile' :
+                   'Upload documents for closing readiness'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {currentTier === 0 ? 'Need: Name, location, costs, programs' :
+                   currentTier === 1 ? 'Need: Jobs, timeline, QALICB tests' :
+                   'Need: Phase I, permits, legal docs'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-function getSuggestions(data: IntakeData, result: any): string[] {
-  const suggestions: string[] = [];
-  if (!data.siteControl || data.siteControl === 'None') suggestions.push('Add site control status to improve readiness score by up to 20 points');
-  else if (data.siteControl === 'LOI') suggestions.push('Converting LOI to contract will increase site control score');
-  if ((data.committedCapitalPct || 0) < 60) suggestions.push('Identify more capital sources to reach 60%+ commitment level');
-  if ((data.docsUploaded || 0) < (data.docsRequired || 8) * 0.5) suggestions.push('Upload core documents to increase documentation score');
-  if (!data.entitlementsApproved && !data.entitlementsSubmitted) suggestions.push('Submit entitlement applications to improve approvals score');
-  if ((data.constructionStartMonths || 999) > 12) suggestions.push('Projects starting within 12 months score higher on timeline');
-  if (data.programs?.includes('NMTC') && data.isProhibitedBusiness === undefined) suggestions.push('Complete QALICB eligibility tests for NMTC');
-  if (data.programs?.includes('HTC') && !data.historicStatus) suggestions.push('Confirm historic status for HTC eligibility');
-  return suggestions;
-}
-
-function getProgramRequirementSummary(program: ProgramType, data: IntakeData): string {
-  switch (program) {
-    case 'NMTC': return data.qalicbGrossIncome !== undefined && data.isProhibitedBusiness !== undefined ? 'QALICB tests complete' : 'QALICB tests needed';
-    case 'HTC': return data.historicStatus && data.part1Status ? `${data.historicStatus}, Part 1 ${data.part1Status}` : 'Historic status needed';
-    case 'LIHTC': return data.totalUnits && data.affordableUnits ? `${data.affordableUnits}/${data.totalUnits} affordable units` : 'Unit mix needed';
-    case 'OZ': return data.ozInvestmentDate ? 'Investment timeline set' : 'Investment date needed';
-    default: return 'Requirements pending';
-  }
 }
 
 export default ReadinessMeter;

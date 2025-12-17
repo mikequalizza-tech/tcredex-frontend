@@ -4,7 +4,7 @@ import { IntakeData } from '../IntakeShell';
 
 interface SiteControlProps {
   data: IntakeData;
-  onChange: (data: IntakeData) => void;
+  onChange: (updates: Partial<IntakeData>) => void;
 }
 
 const SITE_CONTROL_OPTIONS = [
@@ -15,15 +15,11 @@ const SITE_CONTROL_OPTIONS = [
 ];
 
 export function SiteControl({ data, onChange }: SiteControlProps) {
-  const updateField = (field: keyof IntakeData, value: any) => {
-    onChange({ ...data, [field]: value });
-  };
-
   const selectedOption = SITE_CONTROL_OPTIONS.find(o => o.value === data.siteControl);
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-400">
         Site control is a key readiness indicator. Stronger site control = higher readiness score.
       </p>
 
@@ -35,19 +31,19 @@ export function SiteControl({ data, onChange }: SiteControlProps) {
             <button
               key={option.value}
               type="button"
-              onClick={() => updateField('siteControl', option.value)}
+              onClick={() => onChange({ siteControl: option.value as IntakeData['siteControl'] })}
               className={`p-4 rounded-lg border-2 text-left transition-all ${
                 isSelected
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-green-500 bg-green-900/20'
+                  : 'border-gray-700 hover:border-gray-600 bg-gray-800'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={`font-medium ${isSelected ? 'text-green-700' : 'text-gray-900'}`}>
+                <span className={`font-medium ${isSelected ? 'text-green-400' : 'text-gray-200'}`}>
                   {option.label}
                 </span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  isSelected ? 'bg-green-200 text-green-700' : 'bg-gray-100 text-gray-500'
+                  isSelected ? 'bg-green-800 text-green-300' : 'bg-gray-700 text-gray-400'
                 }`}>
                   +{option.points} pts
                 </span>
@@ -60,12 +56,12 @@ export function SiteControl({ data, onChange }: SiteControlProps) {
 
       {/* Additional Details */}
       {data.siteControl && data.siteControl !== 'None' && (
-        <div className="border-t border-gray-100 pt-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Site Control Details</h3>
+        <div className="border-t border-gray-800 pt-6">
+          <h3 className="text-sm font-semibold text-gray-300 mb-4">Site Control Details</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 {data.siteControl === 'Owned' ? 'Date Acquired' :
                  data.siteControl === 'Under Contract' ? 'Contract Date' :
                  'LOI Date'}
@@ -73,21 +69,21 @@ export function SiteControl({ data, onChange }: SiteControlProps) {
               <input
                 type="date"
                 value={data.siteControlDate || ''}
-                onChange={(e) => updateField('siteControlDate', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                onChange={(e) => onChange({ siteControlDate: e.target.value })}
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
             </div>
 
             {data.siteControl === 'Under Contract' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Contract Expiration
                 </label>
                 <input
                   type="date"
                   value={data.contractExpiration || ''}
-                  onChange={(e) => updateField('contractExpiration', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  onChange={(e) => onChange({ contractExpiration: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
                 />
               </div>
             )}
@@ -95,73 +91,78 @@ export function SiteControl({ data, onChange }: SiteControlProps) {
         </div>
       )}
 
-      {/* Zoning Status */}
-      <div className="border-t border-gray-100 pt-6">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Zoning & Entitlements</h3>
+      {/* Zoning & Entitlements */}
+      <div className="border-t border-gray-800 pt-6">
+        <h3 className="text-sm font-semibold text-gray-300 mb-4">Zoning & Entitlements</h3>
         
         <div className="space-y-3">
-          <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+          <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-700 hover:bg-gray-800 cursor-pointer">
             <input
               type="checkbox"
               checked={data.zoningApproved || false}
-              onChange={(e) => updateField('zoningApproved', e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              onChange={(e) => onChange({ zoningApproved: e.target.checked })}
+              className="mt-0.5 w-4 h-4 rounded border-gray-600 text-green-600 focus:ring-green-500 bg-gray-800"
             />
             <div>
-              <span className="font-medium text-gray-900">Zoning Approved</span>
+              <span className="font-medium text-gray-200">Zoning Approved</span>
               <p className="text-xs text-gray-500">Property is properly zoned for intended use</p>
             </div>
           </label>
 
-          <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+          <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-700 hover:bg-gray-800 cursor-pointer">
             <input
               type="checkbox"
               checked={data.entitlementsApproved || false}
               onChange={(e) => {
-                updateField('entitlementsApproved', e.target.checked);
                 if (e.target.checked) {
-                  updateField('entitlementsSubmitted', true);
-                  updateField('entitlementsStarted', true);
+                  onChange({ 
+                    entitlementsApproved: true, 
+                    entitlementsSubmitted: true, 
+                    entitlementsStarted: true 
+                  });
+                } else {
+                  onChange({ entitlementsApproved: false });
                 }
               }}
-              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              className="mt-0.5 w-4 h-4 rounded border-gray-600 text-green-600 focus:ring-green-500 bg-gray-800"
             />
             <div>
-              <span className="font-medium text-gray-900">Entitlements Approved</span>
+              <span className="font-medium text-gray-200">Entitlements Approved</span>
               <p className="text-xs text-gray-500">All necessary permits and approvals in place (+20 pts)</p>
             </div>
           </label>
 
           {!data.entitlementsApproved && (
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ml-6">
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-700 hover:bg-gray-800 cursor-pointer ml-6">
               <input
                 type="checkbox"
                 checked={data.entitlementsSubmitted || false}
                 onChange={(e) => {
-                  updateField('entitlementsSubmitted', e.target.checked);
                   if (e.target.checked) {
-                    updateField('entitlementsStarted', true);
+                    onChange({ entitlementsSubmitted: true, entitlementsStarted: true });
+                  } else {
+                    onChange({ entitlementsSubmitted: false });
                   }
                 }}
-                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                className="mt-0.5 w-4 h-4 rounded border-gray-600 text-green-600 focus:ring-green-500 bg-gray-800"
               />
               <div>
-                <span className="font-medium text-gray-900">Entitlements Submitted</span>
+                <span className="font-medium text-gray-200">Entitlements Submitted</span>
                 <p className="text-xs text-gray-500">Applications filed, pending approval (+10 pts)</p>
               </div>
             </label>
           )}
 
           {!data.entitlementsApproved && !data.entitlementsSubmitted && (
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer ml-6">
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-700 hover:bg-gray-800 cursor-pointer ml-6">
               <input
                 type="checkbox"
                 checked={data.entitlementsStarted || false}
-                onChange={(e) => updateField('entitlementsStarted', e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                onChange={(e) => onChange({ entitlementsStarted: e.target.checked })}
+                className="mt-0.5 w-4 h-4 rounded border-gray-600 text-green-600 focus:ring-green-500 bg-gray-800"
               />
               <div>
-                <span className="font-medium text-gray-900">Entitlement Process Started</span>
+                <span className="font-medium text-gray-200">Entitlement Process Started</span>
                 <p className="text-xs text-gray-500">Pre-application meetings or initial filings (+5 pts)</p>
               </div>
             </label>
@@ -171,13 +172,13 @@ export function SiteControl({ data, onChange }: SiteControlProps) {
 
       {/* Score Summary */}
       {selectedOption && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+        <div className="p-4 bg-green-900/30 border border-green-700 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm font-medium text-green-700">Site Control Score</span>
-              <p className="text-xs text-green-600">{selectedOption.label}</p>
+              <span className="text-sm font-medium text-green-400">Site Control Score</span>
+              <p className="text-xs text-green-500">{selectedOption.label}</p>
             </div>
-            <span className="text-2xl font-bold text-green-700">{selectedOption.points}/20</span>
+            <span className="text-2xl font-bold text-green-400">{selectedOption.points}/20</span>
           </div>
         </div>
       )}

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { IntakeData } from '../IntakeShell';
+import { useState, useCallback, useEffect } from 'react';
+import { IntakeData, ProgramType } from '@/types/intake';
 import AddressAutocomplete, { AddressData } from '@/components/ui/AddressAutocomplete';
+import { useStateCredits, StateCreditMatch } from '@/lib/credits';
 
 interface LocationTractProps {
   data: IntakeData;
@@ -10,6 +11,20 @@ interface LocationTractProps {
 }
 
 const US_STATES = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'];
+
+// Map state names to abbreviations for API
+const STATE_ABBREV: Record<string, string> = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+  'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
+  'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
+  'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
+  'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+  'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
+  'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+  'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY'
+};
 
 interface EligibilityResult {
   eligible: boolean;
@@ -45,6 +60,22 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
   const [lookupStage, setLookupStage] = useState<'idle' | 'geocoding' | 'tract' | 'eligibility' | 'done' | 'error'>('idle');
   const [eligibilityResult, setEligibilityResult] = useState<EligibilityResult | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
+
+  // Get state abbreviation for credit lookup
+  const stateAbbrev = data.state ? (STATE_ABBREV[data.state] || data.state) : undefined;
+  
+  // Map IntakeData programs to CreditProgram type
+  const creditPrograms = (data.programs || []).filter(
+    (p): p is 'NMTC' | 'HTC' | 'LIHTC' | 'OZ' | 'Brownfield' => 
+      ['NMTC', 'HTC', 'LIHTC', 'OZ', 'Brownfield'].includes(p)
+  );
+
+  // Fetch state credits when state or programs change
+  const { credits: stateCredits, isLoading: creditsLoading } = useStateCredits({
+    state: stateAbbrev,
+    programs: creditPrograms.length > 0 ? creditPrograms : undefined,
+    enabled: !!stateAbbrev,
+  });
 
   // Full auto-lookup pipeline: coordinates → tract → eligibility → auto-populate
   const runAutoLookup = useCallback(async (lat: number, lng: number, currentCounty?: string) => {
@@ -85,7 +116,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
         }
       }
 
-      // FIXED: Send all updates at once, don't spread data
       onChange({
         censusTract: fullTract,
         tractType: tractTypes,
@@ -114,7 +144,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
   const handleAddressSelect = useCallback(async (addressData: AddressData) => {
     setLookupStage('geocoding');
     
-    // FIXED: Update address fields in one call
     onChange({
       address: addressData.address,
       city: addressData.city,
@@ -125,7 +154,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
       longitude: addressData.lng,
     });
 
-    // Auto-run tract lookup if we have coordinates
     if (addressData.lat && addressData.lng) {
       await runAutoLookup(addressData.lat, addressData.lng, addressData.county);
     } else {
@@ -165,6 +193,63 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
       </div>
     );
   };
+
+  // State Credit Card component
+  const StateCreditCard = ({ credit }: { credit: StateCreditMatch }) => (
+    <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <span className="text-sm font-semibold text-gray-200">{credit.program}</span>
+          {credit.rate && (
+            <span className="ml-2 text-xs font-mono text-indigo-400">{credit.rate}%</span>
+          )}
+        </div>
+        {credit.maxCredit && (
+          <span className="text-xs text-gray-400">
+            Est. ${credit.maxCredit.toLocaleString()}
+          </span>
+        )}
+      </div>
+      
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {credit.transferable && (
+          <span className="px-2 py-0.5 bg-green-900/50 text-green-300 rounded text-xs">
+            Transferable
+          </span>
+        )}
+        {credit.refundable && (
+          <span className="px-2 py-0.5 bg-blue-900/50 text-blue-300 rounded text-xs">
+            Refundable
+          </span>
+        )}
+        {credit.stackableWithNMTC && (
+          <span className="px-2 py-0.5 bg-emerald-900/50 text-emerald-300 rounded text-xs">
+            +NMTC
+          </span>
+        )}
+        {credit.stackableWithFederalHTC && (
+          <span className="px-2 py-0.5 bg-amber-900/50 text-amber-300 rounded text-xs">
+            +Fed HTC
+          </span>
+        )}
+      </div>
+      
+      {credit.notes && (
+        <p className="text-xs text-gray-500 line-clamp-2">{credit.notes}</p>
+      )}
+      
+      {credit.url && (
+        <a 
+          href={credit.url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-xs text-indigo-400 hover:text-indigo-300 mt-1 inline-block"
+        >
+          Learn more →
+        </a>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -310,37 +395,6 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
                 </div>
               </div>
 
-              {eligibilityResult.state && (
-                <div className="mt-4 pt-4 border-t border-gray-700">
-                  <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">State Credits Available</div>
-                  <div className="flex flex-wrap gap-2">
-                    {eligibilityResult.state.nmtc?.available && (
-                      <span className="px-3 py-1 bg-green-900/50 text-green-300 rounded-full text-sm font-medium border border-green-500/30">
-                        ✓ State NMTC
-                      </span>
-                    )}
-                    {eligibilityResult.state.htc?.available && (
-                      <span className="px-3 py-1 bg-amber-900/50 text-amber-300 rounded-full text-sm font-medium border border-amber-500/30">
-                        ✓ State HTC
-                      </span>
-                    )}
-                    {eligibilityResult.state.brownfield?.available && (
-                      <span className="px-3 py-1 bg-purple-900/50 text-purple-300 rounded-full text-sm font-medium border border-purple-500/30">
-                        ✓ Brownfield
-                      </span>
-                    )}
-                    {!eligibilityResult.state.nmtc?.available && !eligibilityResult.state.htc?.available && !eligibilityResult.state.brownfield?.available && (
-                      <span className="text-gray-500 text-sm">No state credits available</span>
-                    )}
-                  </div>
-                  {eligibilityResult.state.stacking_notes && (
-                    <p className="text-xs text-gray-400 mt-2 italic">
-                      {eligibilityResult.state.stacking_notes}
-                    </p>
-                  )}
-                </div>
-              )}
-
               <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-700">
                 {eligibilityResult.programs?.map((program) => (
                   <span 
@@ -361,12 +415,61 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
               <p className="text-sm text-gray-400 mt-4">{eligibilityResult.reason}</p>
             </div>
           )}
+        </div>
+      )}
 
-          {!eligibilityResult && data.censusTract && (
-            <div className="p-4 bg-gray-900/50 text-center text-gray-500">
-              <p className="text-sm">Eligibility data loading...</p>
+      {/* State Credits from Matcher - Enhanced Display */}
+      {stateAbbrev && (stateCredits.length > 0 || creditsLoading) && (
+        <div className="border border-indigo-500/30 rounded-xl overflow-hidden bg-indigo-900/10">
+          <div className="bg-indigo-900/30 px-4 py-3 flex items-center justify-between border-b border-indigo-500/30">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">💳</span>
+              <div>
+                <div className="text-sm text-indigo-300 font-medium">
+                  State Tax Credits — {data.state || stateAbbrev}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {stateCredits.length} program{stateCredits.length !== 1 ? 's' : ''} available
+                  {creditPrograms.length > 0 && ` for ${creditPrograms.join(', ')}`}
+                </div>
+              </div>
             </div>
-          )}
+            {creditsLoading && (
+              <svg className="w-5 h-5 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+          </div>
+          
+          <div className="p-4">
+            {stateCredits.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {stateCredits.map((credit, idx) => (
+                  <StateCreditCard key={`${credit.program}-${idx}`} credit={credit} />
+                ))}
+              </div>
+            ) : creditsLoading ? (
+              <div className="text-center py-4 text-gray-400 text-sm">
+                Loading state credit programs...
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                No state credits found for selected programs
+              </div>
+            )}
+            
+            {stateCredits.some(c => c.stackableWithNMTC || c.stackableWithFederalHTC) && (
+              <div className="mt-4 pt-3 border-t border-gray-700">
+                <div className="flex items-start gap-2 text-xs text-emerald-400">
+                  <span>💡</span>
+                  <span>
+                    Some state credits can be stacked with federal programs for combined benefit.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -405,7 +508,7 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
           <div className="text-4xl mb-3">📍</div>
           <p className="text-gray-300 font-medium">Enter Project Address Above</p>
           <p className="text-sm text-gray-500 mt-1">
-            Select from dropdown to auto-populate all location data and eligibility metrics
+            Select from dropdown to auto-populate all location data, eligibility metrics, and available state credits
           </p>
         </div>
       )}

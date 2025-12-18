@@ -110,12 +110,19 @@ const SubmitDealIcon = () => (
   </svg>
 );
 
+const AllocationsIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  </svg>
+);
+
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: <HomeIcon /> },
   { name: 'Submit Deal', href: '/deals/new', icon: <SubmitDealIcon />, orgTypes: ['sponsor', 'cde'] },
   { name: 'Map', href: '/map', icon: <MapIcon /> },
   { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, orgTypes: ['sponsor'] },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: <PipelineIcon />, orgTypes: ['cde'] },
+  { name: 'Allocations', href: '/dashboard/allocations', icon: <AllocationsIcon />, orgTypes: ['cde'] },
   { name: 'AutoMatch AI', href: '/dashboard/automatch', icon: <AutoMatchIcon />, orgTypes: ['cde', 'investor'] },
   { name: 'Marketplace', href: '/deals', icon: <DealsIcon /> },
   { name: 'Portfolio', href: '/dashboard/portfolio', icon: <PortfolioIcon />, orgTypes: ['investor'] },

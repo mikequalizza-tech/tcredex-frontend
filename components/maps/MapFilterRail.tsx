@@ -304,7 +304,10 @@ export default function MapFilterRail({
       const geoData = await geoResponse.json();
 
       if (!geoResponse.ok || !geoData.geoid) {
-        throw new Error(geoData.error || 'Could not determine census tract for this address');
+        // Don't throw - just set error message and return
+        setSearchError(geoData.error || 'Could not determine census tract for this address. Try a more specific address.');
+        setIsSearching(false);
+        return;
       }
 
       // Get eligibility data

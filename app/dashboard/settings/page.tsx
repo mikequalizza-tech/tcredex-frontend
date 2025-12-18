@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useCurrentUser } from '@/lib/auth';
 
 interface UserSettings {
   fullName: string;
@@ -15,11 +16,39 @@ interface UserSettings {
   twoFactorEnabled: boolean;
 }
 
-const DEMO_SETTINGS: UserSettings = {
-  fullName: 'John Smith',
-  email: 'john.smith@example.com',
-  phone: '(312) 555-0123',
-  title: 'Development Director',
+// Demo user profiles to simulate different logged-in users
+const USER_PROFILES: Record<string, Partial<UserSettings>> = {
+  'sponsor': {
+    fullName: 'Michael Chen',
+    email: 'mchen@localrootsfoundation.org',
+    phone: '(312) 555-0123',
+    title: 'Development Director',
+  },
+  'cde': {
+    fullName: 'Sarah Johnson',
+    email: 'sjohnson@midwestcde.org',
+    phone: '(314) 555-0456',
+    title: 'Senior Investment Officer',
+  },
+  'investor': {
+    fullName: 'David Park',
+    email: 'dpark@capitalinvestors.com',
+    phone: '(212) 555-0789',
+    title: 'Managing Director',
+  },
+  'admin': {
+    fullName: 'Admin User',
+    email: 'admin@tcredex.com',
+    phone: '(555) 555-0000',
+    title: 'Platform Administrator',
+  },
+};
+
+const DEFAULT_SETTINGS: UserSettings = {
+  fullName: 'User',
+  email: 'user@example.com',
+  phone: '',
+  title: '',
   timezone: 'America/Chicago',
   emailNotifications: true,
   dealAlerts: true,
@@ -36,7 +65,16 @@ const TIMEZONES = [
 ];
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<UserSettings>(DEMO_SETTINGS);
+  const { orgType, isAuthenticated, isLoading } = useCurrentUser();
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+
+  // Update settings when user loads
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && orgType) {
+      const userProfile = USER_PROFILES[orgType] || {};
+      setSettings(prev => ({ ...prev, ...userProfile }));
+    }
+  }, [orgType, isAuthenticated, isLoading]);
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'security'>('profile');
   const [saved, setSaved] = useState(false);
 

@@ -2,199 +2,457 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { useCurrentUser } from '@/lib/auth';
 
-interface Project {
+type ProjectStatus = 'draft' | 'submitted' | 'matched' | 'closing' | 'closed' | 'withdrawn';
+
+interface SponsorProject {
   id: string;
-  name: string;
-  address: string;
+  projectName: string;
+  city: string;
+  state: string;
+  programType: 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
+  allocationRequest: number;
+  totalProjectCost: number;
+  status: ProjectStatus;
+  submittedDate?: string;
+  matchedCDE?: string;
+  matchScore?: number;
+  tractType: string[];
   censusTract: string;
-  status: 'draft' | 'submitted' | 'matched' | 'term_sheet' | 'closing' | 'closed';
-  projectCost: number;
-  nmtcRequested: number;
-  submittedAt?: string;
-  matchCount?: number;
+  lastUpdated: string;
+  completionPercent: number;
 }
 
-const demoProjects: Project[] = [
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; bgColor: string }> = {
+  draft: { label: 'Draft', color: 'text-gray-400', bgColor: 'bg-gray-800' },
+  submitted: { label: 'Submitted', color: 'text-blue-400', bgColor: 'bg-blue-900/50' },
+  matched: { label: 'Matched', color: 'text-green-400', bgColor: 'bg-green-900/50' },
+  closing: { label: 'Closing', color: 'text-purple-400', bgColor: 'bg-purple-900/50' },
+  closed: { label: 'Closed', color: 'text-emerald-400', bgColor: 'bg-emerald-900/50' },
+  withdrawn: { label: 'Withdrawn', color: 'text-red-400', bgColor: 'bg-red-900/50' },
+};
+
+const DEMO_PROJECTS: SponsorProject[] = [
   {
-    id: 'P001',
-    name: 'Community Health Center',
-    address: '123 Main St, Springfield, IL',
-    censusTract: '17031010100',
+    id: 'proj-1',
+    projectName: 'Southside Community Health Center',
+    city: 'Chicago',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 15000000,
+    totalProjectCost: 38000000,
     status: 'matched',
-    projectCost: 8500000,
-    nmtcRequested: 6000000,
-    submittedAt: '2024-11-15',
-    matchCount: 4,
+    submittedDate: '2024-11-15',
+    matchedCDE: 'Midwest Impact CDE',
+    matchScore: 94,
+    tractType: ['SD', 'QCT'],
+    censusTract: '17031840100',
+    lastUpdated: '2024-12-18',
+    completionPercent: 100,
   },
   {
-    id: 'P002',
-    name: 'Downtown Grocery Store',
-    address: '456 Market Ave, Detroit, MI',
-    censusTract: '26163520100',
-    status: 'term_sheet',
-    projectCost: 5200000,
-    nmtcRequested: 3500000,
-    submittedAt: '2024-10-20',
-    matchCount: 2,
+    id: 'proj-2',
+    projectName: 'Downtown Mixed-Use Development',
+    city: 'Milwaukee',
+    state: 'WI',
+    programType: 'NMTC',
+    allocationRequest: 8000000,
+    totalProjectCost: 22000000,
+    status: 'submitted',
+    submittedDate: '2024-12-10',
+    tractType: ['QCT'],
+    censusTract: '55079185100',
+    lastUpdated: '2024-12-10',
+    completionPercent: 100,
   },
   {
-    id: 'P003',
-    name: 'Youth Training Center',
-    address: '789 Oak Blvd, Memphis, TN',
-    censusTract: '47157003900',
+    id: 'proj-3',
+    projectName: 'Historic Theater Renovation',
+    city: 'St. Louis',
+    state: 'MO',
+    programType: 'HTC',
+    allocationRequest: 4500000,
+    totalProjectCost: 12000000,
+    status: 'closing',
+    submittedDate: '2024-09-20',
+    matchedCDE: 'Gateway Historic CDE',
+    matchScore: 88,
+    tractType: ['LIC'],
+    censusTract: '29510127100',
+    lastUpdated: '2024-12-15',
+    completionPercent: 100,
+  },
+  {
+    id: 'proj-4',
+    projectName: 'Workforce Training Facility',
+    city: 'Indianapolis',
+    state: 'IN',
+    programType: 'NMTC',
+    allocationRequest: 6000000,
+    totalProjectCost: 15000000,
     status: 'draft',
-    projectCost: 3800000,
-    nmtcRequested: 2500000,
+    tractType: ['SD'],
+    censusTract: '18097352200',
+    lastUpdated: '2024-12-17',
+    completionPercent: 65,
+  },
+  {
+    id: 'proj-5',
+    projectName: 'Rural Healthcare Clinic',
+    city: 'Springfield',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 3000000,
+    totalProjectCost: 8000000,
+    status: 'closed',
+    submittedDate: '2024-03-15',
+    matchedCDE: 'Central Illinois CDE',
+    matchScore: 91,
+    tractType: ['SD', 'Non-Metro'],
+    censusTract: '17167000400',
+    lastUpdated: '2024-08-30',
+    completionPercent: 100,
   },
 ];
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Draft', color: 'bg-gray-700 text-gray-300' },
-  submitted: { label: 'Submitted', color: 'bg-blue-900/50 text-blue-300' },
-  matched: { label: 'Matched', color: 'bg-purple-900/50 text-purple-300' },
-  term_sheet: { label: 'Term Sheet', color: 'bg-amber-900/50 text-amber-300' },
-  closing: { label: 'Closing', color: 'bg-indigo-900/50 text-indigo-300' },
-  closed: { label: 'Closed', color: 'bg-green-900/50 text-green-300' },
-};
-
 export default function ProjectsPage() {
-  const [projects] = useState<Project[]>(demoProjects);
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  return (
+    <ProtectedRoute>
+      <ProjectsContent />
+    </ProtectedRoute>
+  );
+}
+
+function ProjectsContent() {
+  const { orgName } = useCurrentUser();
+  const [projects] = useState<SponsorProject[]>(DEMO_PROJECTS);
+  const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all');
+  const [selectedProject, setSelectedProject] = useState<SponsorProject | null>(null);
+
+  const formatCurrency = (num: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
 
   const filteredProjects = filterStatus === 'all' 
     ? projects 
     : projects.filter(p => p.status === filterStatus);
 
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-    return `$${(amount / 1000).toFixed(0)}K`;
-  };
+  // Stats
+  const totalRequested = projects.reduce((sum, p) => sum + p.allocationRequest, 0);
+  const activeProjects = projects.filter(p => ['submitted', 'matched', 'closing'].includes(p.status)).length;
+  const matchedProjects = projects.filter(p => ['matched', 'closing', 'closed'].includes(p.status)).length;
+  const closedProjects = projects.filter(p => p.status === 'closed').length;
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-100">My Projects</h1>
-          <p className="text-gray-400 mt-1">Manage your submitted projects and track their progress.</p>
+          <h1 className="text-2xl font-bold text-gray-100">My Projects</h1>
+          <p className="text-gray-400 mt-1">{orgName || 'Demo Sponsor Organization'}</p>
         </div>
         <Link
-          href="/dashboard/projects/new"
-          className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          href="/deals/new"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 flex items-center gap-2"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          New Project
+          Submit New Project
         </Link>
       </div>
 
-      {/* Status Filter */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {['all', 'draft', 'submitted', 'matched', 'term_sheet', 'closing', 'closed'].map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilterStatus(status)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              filterStatus === status
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            {status === 'all' ? 'All Projects' : statusConfig[status]?.label || status}
-          </button>
-        ))}
+      {/* Summary Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Total Projects</div>
+          <div className="text-2xl font-bold text-white">{projects.length}</div>
+        </div>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Total Requested</div>
+          <div className="text-2xl font-bold text-indigo-400">{formatCurrency(totalRequested)}</div>
+        </div>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Matched</div>
+          <div className="text-2xl font-bold text-green-400">{matchedProjects}</div>
+        </div>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Closed</div>
+          <div className="text-2xl font-bold text-emerald-400">{closedProjects}</div>
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setFilterStatus('all')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          All ({projects.length})
+        </button>
+        <button
+          onClick={() => setFilterStatus('draft')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'draft' ? 'bg-gray-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Drafts ({projects.filter(p => p.status === 'draft').length})
+        </button>
+        <button
+          onClick={() => setFilterStatus('submitted')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'submitted' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Submitted ({projects.filter(p => p.status === 'submitted').length})
+        </button>
+        <button
+          onClick={() => setFilterStatus('matched')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'matched' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Matched ({projects.filter(p => p.status === 'matched').length})
+        </button>
+        <button
+          onClick={() => setFilterStatus('closing')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'closing' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Closing ({projects.filter(p => p.status === 'closing').length})
+        </button>
+        <button
+          onClick={() => setFilterStatus('closed')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'closed' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Closed ({projects.filter(p => p.status === 'closed').length})
+        </button>
       </div>
 
       {/* Projects Grid */}
-      <div className="grid gap-4">
-        {filteredProjects.map((project) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredProjects.map(project => (
           <div
             key={project.id}
-            className="bg-gray-900 rounded-xl border border-gray-800 p-6 hover:border-gray-700 transition-colors"
+            className="bg-gray-900 rounded-xl border border-gray-800 p-5 hover:border-indigo-500 transition-colors cursor-pointer"
+            onClick={() => setSelectedProject(project)}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-100">{project.name}</h3>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[project.status].color}`}>
-                    {statusConfig[project.status].label}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-400">{project.address}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Census Tract: <span className="font-mono">{project.censusTract}</span>
-                </p>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-gray-100">{project.projectName}</h3>
+                <p className="text-sm text-gray-500">{project.city}, {project.state}</p>
               </div>
-              
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Project Cost</p>
-                <p className="text-xl font-bold text-indigo-400">{formatCurrency(project.projectCost)}</p>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[project.status].bgColor} ${STATUS_CONFIG[project.status].color}`}>
+                {STATUS_CONFIG[project.status].label}
+              </span>
+            </div>
+
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Allocation Request</span>
+                <span className="text-indigo-400 font-medium">{formatCurrency(project.allocationRequest)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Total Cost</span>
+                <span className="text-gray-300">{formatCurrency(project.totalProjectCost)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Program</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  project.programType === 'NMTC' ? 'bg-indigo-900/50 text-indigo-400' :
+                  project.programType === 'HTC' ? 'bg-amber-900/50 text-amber-400' :
+                  'bg-green-900/50 text-green-400'
+                }`}>
+                  {project.programType}
+                </span>
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between">
-              <div className="flex gap-6 text-sm">
-                <div>
-                  <span className="text-gray-500">NMTC Requested:</span>
-                  <span className="ml-2 text-gray-300">{formatCurrency(project.nmtcRequested)}</span>
-                </div>
-                {project.submittedAt && (
-                  <div>
-                    <span className="text-gray-500">Submitted:</span>
-                    <span className="ml-2 text-gray-300">{project.submittedAt}</span>
-                  </div>
-                )}
-                {project.matchCount && project.matchCount > 0 && (
-                  <div>
-                    <span className="text-gray-500">Matches:</span>
-                    <span className="ml-2 text-purple-400 font-medium">{project.matchCount} CDEs</span>
-                  </div>
-                )}
-              </div>
+            {/* Tract Types */}
+            <div className="flex gap-1 mb-4">
+              {project.tractType.map(tract => (
+                <span
+                  key={tract}
+                  className={`px-1.5 py-0.5 rounded text-xs ${
+                    tract === 'SD' ? 'bg-red-900/50 text-red-400' : 'bg-gray-800 text-gray-400'
+                  }`}
+                >
+                  {tract}
+                </span>
+              ))}
+            </div>
 
-              <div className="flex gap-2">
-                {project.status === 'draft' && (
-                  <Link
-                    href={`/dashboard/projects/${project.id}/edit`}
-                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
-                  >
-                    Continue Editing
-                  </Link>
-                )}
-                {project.status !== 'draft' && (
-                  <Link
-                    href={`/dashboard/projects/${project.id}`}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm transition-colors"
-                  >
-                    View Details
-                  </Link>
-                )}
-                {project.status === 'matched' && (
-                  <Link
-                    href={`/dashboard/projects/${project.id}/matches`}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm transition-colors"
-                  >
-                    View Matches
-                  </Link>
-                )}
+            {/* Draft Progress */}
+            {project.status === 'draft' && (
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-500">Intake Progress</span>
+                  <span className="text-gray-400">{project.completionPercent}%</span>
+                </div>
+                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-500"
+                    style={{ width: `${project.completionPercent}%` }}
+                  />
+                </div>
               </div>
+            )}
+
+            {/* Matched CDE */}
+            {project.matchedCDE && (
+              <div className="pt-3 border-t border-gray-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">Matched with</p>
+                    <p className="text-sm text-green-400 font-medium">{project.matchedCDE}</p>
+                  </div>
+                  {project.matchScore && (
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Score</p>
+                      <p className="text-lg font-bold text-green-400">{project.matchScore}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between text-xs text-gray-500">
+              <span>Updated {new Date(project.lastUpdated).toLocaleDateString()}</span>
+              <span className="font-mono">{project.censusTract}</span>
             </div>
           </div>
         ))}
-
-        {filteredProjects.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400">No projects found.</p>
-            <Link
-              href="/dashboard/projects/new"
-              className="mt-4 inline-block px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg"
-            >
-              Submit Your First Project
-            </Link>
-          </div>
-        )}
       </div>
+
+      {/* Empty State */}
+      {filteredProjects.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-300 mb-2">No projects found</h3>
+          <p className="text-gray-500 mb-4">No projects match the selected filter</p>
+          <button onClick={() => setFilterStatus('all')} className="text-indigo-400 hover:text-indigo-300">
+            View all projects
+          </button>
+        </div>
+      )}
+
+      {/* Project Detail Modal */}
+      {selectedProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setSelectedProject(null)} />
+          <div className="relative bg-gray-900 rounded-xl p-6 w-full max-w-2xl mx-4 border border-gray-800 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_CONFIG[selectedProject.status].bgColor} ${STATUS_CONFIG[selectedProject.status].color}`}>
+                    {STATUS_CONFIG[selectedProject.status].label}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    selectedProject.programType === 'NMTC' ? 'bg-indigo-900/50 text-indigo-400' :
+                    'bg-amber-900/50 text-amber-400'
+                  }`}>
+                    {selectedProject.programType}
+                  </span>
+                </div>
+                <h3 className="text-xl font-semibold text-white">{selectedProject.projectName}</h3>
+                <p className="text-gray-400">{selectedProject.city}, {selectedProject.state}</p>
+              </div>
+              <button onClick={() => setSelectedProject(null)} className="text-gray-500 hover:text-white">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Allocation Request</div>
+                <div className="text-xl font-bold text-indigo-400">{formatCurrency(selectedProject.allocationRequest)}</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Total Project Cost</div>
+                <div className="text-xl font-bold text-white">{formatCurrency(selectedProject.totalProjectCost)}</div>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Census Tract</span>
+                  <p className="text-gray-200 font-mono">{selectedProject.censusTract}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Tract Designations</span>
+                  <div className="flex gap-1 mt-1">
+                    {selectedProject.tractType.map(tract => (
+                      <span key={tract} className={`px-1.5 py-0.5 rounded text-xs ${
+                        tract === 'SD' ? 'bg-red-900/50 text-red-400' : 'bg-gray-800 text-gray-400'
+                      }`}>
+                        {tract}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {selectedProject.submittedDate && (
+                <div className="text-sm">
+                  <span className="text-gray-500">Submitted</span>
+                  <p className="text-gray-200">{new Date(selectedProject.submittedDate).toLocaleDateString()}</p>
+                </div>
+              )}
+              {selectedProject.matchedCDE && (
+                <div className="p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-green-400 font-medium">Matched CDE</p>
+                      <p className="text-white font-semibold">{selectedProject.matchedCDE}</p>
+                    </div>
+                    {selectedProject.matchScore && (
+                      <div className="text-right">
+                        <p className="text-xs text-green-400">Match Score</p>
+                        <p className="text-2xl font-bold text-green-400">{selectedProject.matchScore}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              {selectedProject.status === 'draft' && (
+                <Link
+                  href={`/deals/new?continue=${selectedProject.id}`}
+                  className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 font-medium text-center"
+                >
+                  Continue Editing
+                </Link>
+              )}
+              <Link
+                href={`/deals/${selectedProject.id}`}
+                className="flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 text-center"
+              >
+                View Details
+              </Link>
+              <Link
+                href={`/deals/${selectedProject.id}/profile`}
+                className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-500 font-medium text-center"
+              >
+                Project Profile
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

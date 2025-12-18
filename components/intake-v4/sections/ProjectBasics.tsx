@@ -18,7 +18,7 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
     onChange({ [field]: value });
   };
 
-  // Handle image upload - store File object along with blob URL
+  // Handle image upload - store as base64 to survive re-renders
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -26,16 +26,23 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
     setUploadingImages(true);
     
     const currentImages = data.projectImages || [];
-    const newImages: { name: string; url: string; size: number; file?: File }[] = [];
+    const newImages: { id: string; name: string; url: string; size: number; type: string }[] = [];
     
     for (let i = 0; i < Math.min(files.length, 5 - currentImages.length); i++) {
       const file = files[i];
-      const url = URL.createObjectURL(file);
+      // Convert to base64 to survive state updates and re-renders
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      
       newImages.push({
+        id: `img_${Date.now()}_${i}`, // Stable unique ID
         name: file.name,
-        url: url,
+        url: base64, // Base64 survives re-renders unlike blob URLs
         size: file.size,
-        file: file // Store the actual file for later upload
+        type: file.type,
       });
     }
     
@@ -45,9 +52,7 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
 
   const removeImage = (index: number) => {
     const images = [...(data.projectImages || [])];
-    if (images[index]?.url?.startsWith('blob:')) {
-      URL.revokeObjectURL(images[index].url);
-    }
+    // No need to revoke - we now use base64 data URLs
     images.splice(index, 1);
     onChange({ projectImages: images });
   };
@@ -133,7 +138,7 @@ export function ProjectBasics({ data, onChange }: ProjectBasicsProps) {
         {data.projectImages && data.projectImages.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
             {data.projectImages.map((image, index) => (
-              <div key={`${image.name}-${index}`} className="relative group">
+              <div key={image.id || `${image.name}-${index}`} className="relative group">
                 <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden">
                   <img 
                     src={image.url} 

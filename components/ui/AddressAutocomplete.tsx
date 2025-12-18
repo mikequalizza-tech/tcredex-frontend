@@ -56,10 +56,21 @@ export function AddressAutocomplete({
   const [inputValue, setInputValue] = useState(value);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // CRITICAL FIX: Sync inputValue when value prop changes from parent
+  // CRITICAL FIX: Only sync inputValue from prop when explicitly empty or on initial mount
+  // Prevents race condition where parent re-render overwrites user selection
+  const isInitialMount = useRef(true);
+  
   useEffect(() => {
-    if (value !== inputValue) {
-      setInputValue(value);
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (value) {
+        setInputValue(value);
+      }
+      return;
+    }
+    // Only sync if parent explicitly clears the value (form reset)
+    if (value === '' && inputValue !== '') {
+      setInputValue('');
     }
   }, [value]);
 

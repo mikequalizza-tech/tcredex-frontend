@@ -56,8 +56,11 @@ export default function InternalHeader({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{type: string; title: string; href: string}[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -68,10 +71,44 @@ export default function InternalHeader({
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setNotificationsOpen(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Demo search - filter demo results based on query
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const demoSearchItems = [
+      { type: 'deal', title: 'Eastside Grocery Co-Op', href: '/deals/D12345' },
+      { type: 'deal', title: 'Northgate Health Center', href: '/deals/D12346' },
+      { type: 'deal', title: 'Youth Training Center', href: '/deals/D12347' },
+      { type: 'project', title: 'Community Health Center', href: '/dashboard/projects/P001' },
+      { type: 'document', title: 'Phase I Environmental', href: '/dashboard/documents' },
+      { type: 'document', title: 'Budget Projections', href: '/dashboard/documents' },
+      { type: 'page', title: 'Deal Map', href: '/map' },
+      { type: 'page', title: 'Marketplace', href: '/deals' },
+      { type: 'page', title: 'Closing Room', href: '/closing-room' },
+      { type: 'page', title: 'AutoMatch AI', href: '/dashboard/automatch' },
+    ];
+
+    const filtered = demoSearchItems.filter(item => 
+      item.title.toLowerCase().includes(query) || 
+      item.type.toLowerCase().includes(query)
+    );
+    
+    setSearchResults(filtered.slice(0, 5));
+    setShowSearchResults(filtered.length > 0);
+  }, [searchQuery]);
 
   // Auto-generate breadcrumbs from pathname if not provided
   const autoBreadcrumbs = (): Breadcrumb[] => {
@@ -158,7 +195,7 @@ export default function InternalHeader({
 
       {/* Center: Search (optional) */}
       {showSearch && (
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
+        <div className="hidden md:flex flex-1 max-w-md mx-8" ref={searchRef}>
           <div className="relative w-full">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -167,12 +204,40 @@ export default function InternalHeader({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
               placeholder="Search deals, documents, projects..."
               className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
             />
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden lg:inline-flex px-2 py-0.5 text-xs text-gray-500 bg-gray-700 rounded">
               ⌘K
             </kbd>
+
+            {/* Search Results Dropdown */}
+            {showSearchResults && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-50">
+                {searchResults.map((result, index) => (
+                  <Link
+                    key={index}
+                    href={result.href}
+                    onClick={() => {
+                      setShowSearchResults(false);
+                      setSearchQuery('');
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-700/50 transition-colors"
+                  >
+                    <span className={`px-2 py-0.5 text-xs rounded ${
+                      result.type === 'deal' ? 'bg-green-900/50 text-green-400' :
+                      result.type === 'project' ? 'bg-indigo-900/50 text-indigo-400' :
+                      result.type === 'document' ? 'bg-amber-900/50 text-amber-400' :
+                      'bg-gray-700 text-gray-400'
+                    }`}>
+                      {result.type}
+                    </span>
+                    <span className="text-sm text-gray-200">{result.title}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -226,9 +291,11 @@ export default function InternalHeader({
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {notifications.map((notification) => (
-                  <div
+                  <Link
                     key={notification.id}
-                    className={`p-4 border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer transition-colors ${
+                    href="/dashboard/notifications"
+                    onClick={() => setNotificationsOpen(false)}
+                    className={`block p-4 border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer transition-colors ${
                       notification.unread ? 'bg-gray-700/20' : ''
                     }`}
                   >
@@ -242,7 +309,7 @@ export default function InternalHeader({
                         <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
               <Link

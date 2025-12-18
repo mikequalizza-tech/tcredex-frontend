@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getDealById, PROGRAM_COLORS, STATUS_CONFIG } from '@/lib/data/deals';
@@ -14,7 +14,21 @@ export default function DealDetailPage({ params }: DealPageProps) {
   const { id } = use(params);
   const router = useRouter();
   const deal = getDealById(id);
-  const { isAuthenticated, isLoading } = useCurrentUser();
+  const { isAuthenticated, isLoading, orgType, userName, orgName } = useCurrentUser();
+  const [showInterestModal, setShowInterestModal] = useState(false);
+  const [interestMessage, setInterestMessage] = useState('');
+  const [interestSubmitting, setInterestSubmitting] = useState(false);
+  const [interestSubmitted, setInterestSubmitted] = useState(false);
+
+  const handleExpressInterest = async () => {
+    setInterestSubmitting(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setInterestSubmitting(false);
+    setInterestSubmitted(true);
+    setShowInterestModal(false);
+    setInterestMessage('');
+  };
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -82,8 +96,16 @@ export default function DealDetailPage({ params }: DealPageProps) {
             
             <div className="flex gap-3">
               {isAuthenticated ? (
-                <button className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors">
-                  Express Interest
+                <button 
+                  onClick={() => setShowInterestModal(true)}
+                  disabled={interestSubmitted}
+                  className={`px-6 py-3 font-semibold rounded-lg transition-colors ${
+                    interestSubmitted 
+                      ? 'bg-green-600 text-white cursor-default' 
+                      : 'bg-white text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  {interestSubmitted ? '✓ Interest Submitted' : 'Express Interest'}
                 </button>
               ) : (
                 <Link
@@ -264,8 +286,16 @@ export default function DealDetailPage({ params }: DealPageProps) {
 
               <div className="mt-6 space-y-3">
                 {isAuthenticated ? (
-                  <button className="block w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-center font-semibold rounded-lg transition-colors">
-                    Express Interest
+                  <button 
+                    onClick={() => setShowInterestModal(true)}
+                    disabled={interestSubmitted}
+                    className={`block w-full py-3 text-center font-semibold rounded-lg transition-colors ${
+                      interestSubmitted
+                        ? 'bg-green-600 text-white cursor-default'
+                        : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                    }`}
+                  >
+                    {interestSubmitted ? '✓ Interest Submitted' : 'Express Interest'}
                   </button>
                 ) : (
                   <Link
@@ -275,6 +305,21 @@ export default function DealDetailPage({ params }: DealPageProps) {
                     Sign In to Connect
                   </Link>
                 )}
+                <Link
+                  href={`/deals/${id}/profile`}
+                  className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-center font-medium rounded-lg transition-colors"
+                >
+                  View Project Profile
+                </Link>
+                <Link
+                  href={`/deals/${id}/card`}
+                  className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download Deal Card
+                </Link>
                 <Link
                   href="/pricing"
                   className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center font-medium rounded-lg transition-colors"
@@ -292,6 +337,80 @@ export default function DealDetailPage({ params }: DealPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Express Interest Modal */}
+      {showInterestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowInterestModal(false)} />
+          <div className="relative bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 shadow-xl border border-gray-800">
+            <h3 className="text-xl font-semibold text-white mb-2">Express Interest</h3>
+            <p className="text-gray-400 text-sm mb-6">Submit your interest in {deal.projectName}</p>
+            
+            <div className="space-y-4">
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-400">Your Organization</span>
+                  <span className="text-white font-medium">{orgName || 'Demo Organization'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Contact</span>
+                  <span className="text-white">{userName || 'User'}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Message to Sponsor (Optional)</label>
+                <textarea
+                  value={interestMessage}
+                  onChange={(e) => setInterestMessage(e.target.value)}
+                  placeholder="Introduce yourself and explain your interest in this project..."
+                  rows={4}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="bg-indigo-900/30 border border-indigo-500/30 rounded-lg p-3">
+                <p className="text-xs text-indigo-300">
+                  <strong>What happens next:</strong> The sponsor will receive your contact information and message. They typically respond within 24-48 hours.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowInterestModal(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExpressInterest}
+                disabled={interestSubmitting}
+                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-wait transition-colors font-medium"
+              >
+                {interestSubmitting ? 'Submitting...' : 'Submit Interest'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {interestSubmitted && (
+        <div className="fixed bottom-6 right-6 z-50 bg-green-900 border border-green-700 rounded-xl p-4 shadow-xl animate-in slide-in-from-bottom">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-green-100">Interest Submitted!</p>
+              <p className="text-sm text-green-300">The sponsor will contact you soon.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

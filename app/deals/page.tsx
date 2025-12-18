@@ -42,27 +42,9 @@ export default function MarketplacePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const itemsPerPage = 50;
 
-  // Redirect to sign-in if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/signin?redirect=/deals');
-    }
-  }, [isLoading, isAuthenticated, router]);
-
-  // Show loading or redirect state - AFTER all hooks
-  if (isLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Loading marketplace...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // ALL useMemo hooks MUST be before any conditional returns
   const uniqueStates = useMemo(() => [...new Set(DEMO_DEALS.map(d => d.state))].sort(), []);
-  const programStats = getProgramStats();
+  const programStats = useMemo(() => getProgramStats(), []);
 
   const filteredDeals = useMemo(() => {
     let result = DEMO_DEALS.filter(d => d.visible);
@@ -86,8 +68,27 @@ export default function MarketplacePage() {
     return result;
   }, [searchQuery, programFilter, levelFilter, statusFilter, stateFilter, sortField, sortDirection]);
 
-  const totalPages = Math.ceil(filteredDeals.length / itemsPerPage);
-  const paginatedDeals = filteredDeals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = useMemo(() => Math.ceil(filteredDeals.length / itemsPerPage), [filteredDeals.length, itemsPerPage]);
+  const paginatedDeals = useMemo(() => filteredDeals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [filteredDeals, currentPage, itemsPerPage]);
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/signin?redirect=/deals');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  // Show loading or redirect state - AFTER all hooks
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading marketplace...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');

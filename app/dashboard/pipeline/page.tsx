@@ -2,214 +2,431 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { useCurrentUser } from '@/lib/auth';
+
+type PipelineStage = 'new' | 'reviewing' | 'due_diligence' | 'approved' | 'closing' | 'closed' | 'declined';
 
 interface PipelineDeal {
   id: string;
   projectName: string;
-  sponsor: string;
-  location: string;
-  censusTract: string;
-  projectCost: number;
-  nmtcRequested: number;
+  sponsorName: string;
+  city: string;
+  state: string;
+  programType: 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
+  allocationRequest: number;
+  stage: PipelineStage;
   matchScore: number;
-  stage: 'new' | 'reviewing' | 'due_diligence' | 'term_sheet' | 'committed' | 'closing';
-  receivedAt: string;
-  povertyRate: number;
-  distressIndicator: 'severe' | 'moderate' | 'standard';
+  tractType: string[];
+  daysInStage: number;
+  submittedDate: string;
+  assignedTo?: string;
+  notes?: string;
+  nextAction?: string;
+  nextActionDate?: string;
 }
 
-const demoPipeline: PipelineDeal[] = [
+const STAGE_CONFIG: Record<PipelineStage, { label: string; color: string; bgColor: string }> = {
+  new: { label: 'New', color: 'text-blue-400', bgColor: 'bg-blue-900/50' },
+  reviewing: { label: 'Under Review', color: 'text-yellow-400', bgColor: 'bg-yellow-900/50' },
+  due_diligence: { label: 'Due Diligence', color: 'text-purple-400', bgColor: 'bg-purple-900/50' },
+  approved: { label: 'Approved', color: 'text-green-400', bgColor: 'bg-green-900/50' },
+  closing: { label: 'Closing', color: 'text-indigo-400', bgColor: 'bg-indigo-900/50' },
+  closed: { label: 'Closed', color: 'text-emerald-400', bgColor: 'bg-emerald-900/50' },
+  declined: { label: 'Declined', color: 'text-red-400', bgColor: 'bg-red-900/50' },
+};
+
+const DEMO_PIPELINE: PipelineDeal[] = [
   {
-    id: 'deal-001',
-    projectName: 'Downtown Community Center',
-    sponsor: 'Metro Development Corp',
-    location: 'Springfield, IL',
-    censusTract: '17031010100',
-    projectCost: 7200000,
-    nmtcRequested: 5000000,
-    matchScore: 92,
-    stage: 'due_diligence',
-    receivedAt: '2024-11-20',
-    povertyRate: 32,
-    distressIndicator: 'severe',
-  },
-  {
-    id: 'deal-002',
-    projectName: 'Riverside Health Clinic',
-    sponsor: 'Community Health Partners',
-    location: 'Detroit, MI',
-    censusTract: '26163520100',
-    projectCost: 12500000,
-    nmtcRequested: 8000000,
-    matchScore: 85,
-    stage: 'term_sheet',
-    receivedAt: '2024-11-15',
-    povertyRate: 38,
-    distressIndicator: 'severe',
-  },
-  {
-    id: 'deal-003',
-    projectName: 'Heritage Arts Center',
-    sponsor: 'Baltimore Cultural Trust',
-    location: 'Baltimore, MD',
-    censusTract: '24510030100',
-    projectCost: 4800000,
-    nmtcRequested: 3000000,
-    matchScore: 78,
+    id: 'pipe-1',
+    projectName: 'Chicago South Side Community Center',
+    sponsorName: 'Metro Development Corp',
+    city: 'Chicago',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 15000000,
     stage: 'new',
-    receivedAt: '2024-12-10',
-    povertyRate: 28,
-    distressIndicator: 'moderate',
+    matchScore: 94,
+    tractType: ['SD', 'QCT'],
+    daysInStage: 2,
+    submittedDate: '2024-12-15',
+    nextAction: 'Initial call with sponsor',
+    nextActionDate: '2024-12-20',
   },
   {
-    id: 'deal-004',
-    projectName: 'Innovation Manufacturing Hub',
-    sponsor: 'Great Lakes Economic Corp',
-    location: 'Cleveland, OH',
-    censusTract: '39035108100',
-    projectCost: 18500000,
-    nmtcRequested: 12000000,
-    matchScore: 95,
-    stage: 'committed',
-    receivedAt: '2024-10-01',
-    povertyRate: 41,
-    distressIndicator: 'severe',
+    id: 'pipe-2',
+    projectName: 'Milwaukee Workforce Training Hub',
+    sponsorName: 'Badger Community Partners',
+    city: 'Milwaukee',
+    state: 'WI',
+    programType: 'NMTC',
+    allocationRequest: 8000000,
+    stage: 'reviewing',
+    matchScore: 87,
+    tractType: ['QCT'],
+    daysInStage: 5,
+    submittedDate: '2024-12-10',
+    assignedTo: 'Sarah Johnson',
+    nextAction: 'Review financial projections',
+    nextActionDate: '2024-12-18',
+  },
+  {
+    id: 'pipe-3',
+    projectName: 'Springfield Healthcare Clinic',
+    sponsorName: 'Central IL Health Corp',
+    city: 'Springfield',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 4000000,
+    stage: 'due_diligence',
+    matchScore: 82,
+    tractType: ['LIC'],
+    daysInStage: 12,
+    submittedDate: '2024-12-01',
+    assignedTo: 'Mike Thompson',
+    nextAction: 'Site visit scheduled',
+    nextActionDate: '2024-12-22',
+  },
+  {
+    id: 'pipe-4',
+    projectName: 'St. Louis Manufacturing Expansion',
+    sponsorName: 'Gateway Industrial LLC',
+    city: 'St. Louis',
+    state: 'MO',
+    programType: 'NMTC',
+    allocationRequest: 12000000,
+    stage: 'approved',
+    matchScore: 79,
+    tractType: ['SD'],
+    daysInStage: 3,
+    submittedDate: '2024-11-15',
+    assignedTo: 'Sarah Johnson',
+    nextAction: 'Draft commitment letter',
+    nextActionDate: '2024-12-19',
+  },
+  {
+    id: 'pipe-5',
+    projectName: 'Indianapolis Charter School',
+    sponsorName: 'Crossroads Education Foundation',
+    city: 'Indianapolis',
+    state: 'IN',
+    programType: 'NMTC',
+    allocationRequest: 6000000,
+    stage: 'closing',
+    matchScore: 91,
+    tractType: ['SD', 'QCT'],
+    daysInStage: 8,
+    submittedDate: '2024-10-28',
+    assignedTo: 'Mike Thompson',
+    nextAction: 'Closing call with counsel',
+    nextActionDate: '2024-12-21',
+  },
+  {
+    id: 'pipe-6',
+    projectName: 'Detroit Tech Incubator',
+    sponsorName: 'Motor City Ventures',
+    city: 'Detroit',
+    state: 'MI',
+    programType: 'NMTC',
+    allocationRequest: 10000000,
+    stage: 'closed',
+    matchScore: 88,
+    tractType: ['SD', 'QCT'],
+    daysInStage: 0,
+    submittedDate: '2024-09-15',
+    assignedTo: 'Sarah Johnson',
   },
 ];
 
-const stageConfig: Record<string, { label: string; color: string }> = {
-  new: { label: 'New', color: 'bg-blue-900/50 text-blue-300 border-blue-500/30' },
-  reviewing: { label: 'Reviewing', color: 'bg-purple-900/50 text-purple-300 border-purple-500/30' },
-  due_diligence: { label: 'Due Diligence', color: 'bg-amber-900/50 text-amber-300 border-amber-500/30' },
-  term_sheet: { label: 'Term Sheet', color: 'bg-orange-900/50 text-orange-300 border-orange-500/30' },
-  committed: { label: 'Committed', color: 'bg-green-900/50 text-green-300 border-green-500/30' },
-  closing: { label: 'Closing', color: 'bg-indigo-900/50 text-indigo-300 border-indigo-500/30' },
-};
-
 export default function PipelinePage() {
-  const [pipeline] = useState<PipelineDeal[]>(demoPipeline);
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  return (
+    <ProtectedRoute>
+      <PipelineContent />
+    </ProtectedRoute>
+  );
+}
 
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-    return `$${(amount / 1000).toFixed(0)}K`;
-  };
+function PipelineContent() {
+  const { orgName } = useCurrentUser();
+  const [pipeline, setPipeline] = useState<PipelineDeal[]>(DEMO_PIPELINE);
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [selectedDeal, setSelectedDeal] = useState<PipelineDeal | null>(null);
 
-  const getMatchScoreColor = (score: number) => {
+  const formatCurrency = (num: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
+
+  const getStageDeals = (stage: PipelineStage) => 
+    pipeline.filter(d => d.stage === stage);
+
+  const totalPipeline = pipeline
+    .filter(d => !['closed', 'declined'].includes(d.stage))
+    .reduce((sum, d) => sum + d.allocationRequest, 0);
+
+  const stages: PipelineStage[] = ['new', 'reviewing', 'due_diligence', 'approved', 'closing'];
+
+  const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-400';
-    if (score >= 75) return 'text-amber-400';
+    if (score >= 80) return 'text-yellow-400';
+    if (score >= 70) return 'text-orange-400';
     return 'text-red-400';
   };
 
-  // Stats
-  const totalPipeline = pipeline.reduce((sum, d) => sum + d.nmtcRequested, 0);
-  const newDeals = pipeline.filter(d => d.stage === 'new').length;
-  const activeDeals = pipeline.filter(d => !['new', 'committed', 'closing'].includes(d.stage)).length;
-
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-100">Pipeline</h1>
-          <p className="text-gray-400 mt-1">Manage incoming deals and track your allocation deployment.</p>
+          <h1 className="text-2xl font-bold text-gray-100">Deal Pipeline</h1>
+          <p className="text-gray-400 mt-1">{orgName || 'Midwest Community Development Entity'}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-sm text-gray-400">Active Pipeline Value</div>
+            <div className="text-2xl font-bold text-indigo-400">{formatCurrency(totalPipeline)}</div>
+          </div>
+          <div className="flex bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                viewMode === 'kanban' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Board
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                viewMode === 'list' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              List
+            </button>
+          </div>
           <Link
-            href="/dashboard/automatch"
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            href="/deals"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            Run AutoMatch
+            + Add Deal
           </Link>
-          <button
-            onClick={() => setViewMode(viewMode === 'list' ? 'kanban' : 'list')}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors"
-          >
-            {viewMode === 'list' ? 'Kanban View' : 'List View'}
-          </button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">Total Pipeline</p>
-          <p className="text-2xl font-bold text-indigo-400">{formatCurrency(totalPipeline)}</p>
-        </div>
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">New Deals</p>
-          <p className="text-2xl font-bold text-blue-400">{newDeals}</p>
-        </div>
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">Active Deals</p>
-          <p className="text-2xl font-bold text-amber-400">{activeDeals}</p>
-        </div>
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">Total Deals</p>
-          <p className="text-2xl font-bold text-gray-300">{pipeline.length}</p>
-        </div>
-      </div>
-
-      {/* Pipeline List */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-800">
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Project</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Match Score</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">NMTC Request</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Distress</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Stage</th>
-              <th className="text-right px-6 py-4 text-sm font-medium text-gray-400">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pipeline.map((deal) => (
-              <tr key={deal.id} className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50">
-                <td className="px-6 py-4">
-                  <div>
-                    <p className="font-medium text-gray-200">{deal.projectName}</p>
-                    <p className="text-xs text-gray-500">{deal.sponsor} • {deal.location}</p>
+      {/* Kanban View */}
+      {viewMode === 'kanban' && (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {stages.map(stage => {
+            const stageDeals = getStageDeals(stage);
+            const stageTotal = stageDeals.reduce((sum, d) => sum + d.allocationRequest, 0);
+            
+            return (
+              <div key={stage} className="flex-shrink-0 w-72">
+                {/* Column Header */}
+                <div className="bg-gray-900 rounded-t-lg p-3 border border-gray-800 border-b-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-sm font-semibold ${STAGE_CONFIG[stage].color}`}>
+                      {STAGE_CONFIG[stage].label}
+                    </span>
+                    <span className="text-xs text-gray-500">{stageDeals.length}</span>
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`text-2xl font-bold ${getMatchScoreColor(deal.matchScore)}`}>
-                    {deal.matchScore}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-gray-200 font-medium">{formatCurrency(deal.nmtcRequested)}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    deal.distressIndicator === 'severe' ? 'bg-orange-900/50 text-orange-300' :
-                    deal.distressIndicator === 'moderate' ? 'bg-amber-900/50 text-amber-300' :
-                    'bg-gray-800 text-gray-400'
-                  }`}>
-                    {deal.distressIndicator}
-                  </span>
-                  <span className="ml-2 text-xs text-gray-500">{deal.povertyRate}% poverty</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${stageConfig[deal.stage].color}`}>
-                    {stageConfig[deal.stage].label}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <Link
-                    href={`/deals/${deal.id}`}
-                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition-colors"
-                  >
-                    Review
-                  </Link>
-                </td>
+                  <div className="text-xs text-gray-500">{formatCurrency(stageTotal)}</div>
+                </div>
+                
+                {/* Cards */}
+                <div className="bg-gray-900/50 rounded-b-lg p-2 border border-gray-800 border-t-0 min-h-[400px] space-y-2">
+                  {stageDeals.map(deal => (
+                    <div
+                      key={deal.id}
+                      onClick={() => setSelectedDeal(deal)}
+                      className="bg-gray-900 rounded-lg p-3 border border-gray-800 cursor-pointer hover:border-indigo-500 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-medium text-gray-100 text-sm line-clamp-1">{deal.projectName}</h3>
+                        <span className={`text-sm font-bold ${getScoreColor(deal.matchScore)}`}>
+                          {deal.matchScore}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">{deal.sponsorName}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-indigo-400">
+                          {formatCurrency(deal.allocationRequest)}
+                        </span>
+                        <div className="flex gap-1">
+                          {deal.tractType.map(tract => (
+                            <span
+                              key={tract}
+                              className={`px-1 py-0.5 rounded text-xs ${
+                                tract === 'SD' ? 'bg-red-900/50 text-red-400' : 'bg-gray-800 text-gray-400'
+                              }`}
+                            >
+                              {tract}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {deal.nextAction && (
+                        <div className="mt-2 pt-2 border-t border-gray-800">
+                          <p className="text-xs text-gray-400 line-clamp-1">{deal.nextAction}</p>
+                          {deal.nextActionDate && (
+                            <p className="text-xs text-amber-400 mt-0.5">
+                              Due: {new Date(deal.nextActionDate).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800">
+                        <span className="text-xs text-gray-500">{deal.city}, {deal.state}</span>
+                        <span className="text-xs text-gray-500">{deal.daysInStage}d</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-800/50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Project</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Stage</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Allocation</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Score</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Assigned</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Next Action</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Days</th>
+                <th className="px-4 py-3"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {pipeline.filter(d => !['closed', 'declined'].includes(d.stage)).map(deal => (
+                <tr key={deal.id} className="hover:bg-gray-800/50">
+                  <td className="px-4 py-3">
+                    <div>
+                      <p className="font-medium text-gray-100">{deal.projectName}</p>
+                      <p className="text-sm text-gray-500">{deal.sponsorName} • {deal.city}, {deal.state}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${STAGE_CONFIG[deal.stage].bgColor} ${STAGE_CONFIG[deal.stage].color}`}>
+                      {STAGE_CONFIG[deal.stage].label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-gray-100">{formatCurrency(deal.allocationRequest)}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-lg font-bold ${getScoreColor(deal.matchScore)}`}>{deal.matchScore}</span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 text-sm">{deal.assignedTo || '—'}</td>
+                  <td className="px-4 py-3">
+                    <p className="text-sm text-gray-300">{deal.nextAction || '—'}</p>
+                    {deal.nextActionDate && (
+                      <p className="text-xs text-amber-400">{new Date(deal.nextActionDate).toLocaleDateString()}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 text-sm">{deal.daysInStage}</td>
+                  <td className="px-4 py-3">
+                    <Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm">
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Deal Detail Modal */}
+      {selectedDeal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setSelectedDeal(null)} />
+          <div className="relative bg-gray-900 rounded-xl p-6 w-full max-w-lg mx-4 border border-gray-800">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-semibold text-white">{selectedDeal.projectName}</h3>
+                <p className="text-gray-400">{selectedDeal.sponsorName}</p>
+              </div>
+              <button onClick={() => setSelectedDeal(null)} className="text-gray-500 hover:text-white">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 uppercase">Allocation</label>
+                  <p className="text-lg font-semibold text-indigo-400">{formatCurrency(selectedDeal.allocationRequest)}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase">Match Score</label>
+                  <p className={`text-lg font-semibold ${getScoreColor(selectedDeal.matchScore)}`}>{selectedDeal.matchScore}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 uppercase block mb-2">Stage</label>
+                <select className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100">
+                  {stages.map(stage => (
+                    <option key={stage} value={stage} selected={stage === selectedDeal.stage}>
+                      {STAGE_CONFIG[stage].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 uppercase block mb-2">Assigned To</label>
+                <select className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100">
+                  <option value="">Unassigned</option>
+                  <option value="sarah">Sarah Johnson</option>
+                  <option value="mike">Mike Thompson</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 uppercase block mb-2">Next Action</label>
+                <input
+                  type="text"
+                  defaultValue={selectedDeal.nextAction}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-500 uppercase block mb-2">Notes</label>
+                <textarea
+                  rows={3}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                  placeholder="Add notes..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Link
+                href={`/deals/${selectedDeal.id}`}
+                className="flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 text-center"
+              >
+                View Deal
+              </Link>
+              <button
+                onClick={() => setSelectedDeal(null)}
+                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 font-medium"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

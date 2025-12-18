@@ -65,25 +65,42 @@ export default function HomeMapWithTracts({
 
   // Load tracts for current viewport - direct function that doesn't depend on React state
   const loadTractsForViewportDirect = async () => {
-    if (!map.current) return;
+    if (!map.current) {
+      console.log('[Tracts] No map ref');
+      return;
+    }
     
     const zoom = map.current.getZoom();
-    if (zoom < MIN_TRACT_ZOOM) return;
+    console.log(`[Tracts] Current zoom: ${zoom}, MIN_TRACT_ZOOM: ${MIN_TRACT_ZOOM}`);
+    if (zoom < MIN_TRACT_ZOOM) {
+      console.log('[Tracts] Zoom too low, skipping tract load');
+      return;
+    }
 
     setLoadingTract(true);
     
     try {
       const bounds = map.current.getBounds();
-      if (!bounds) return;
+      if (!bounds) {
+        console.log('[Tracts] No bounds available');
+        return;
+      }
       
       const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
+      console.log(`[Tracts] Fetching tracts for bbox: ${bbox}`);
       
       // Fetch tract geometries
       const geoRes = await fetch(`/api/geo/tracts?bbox=${bbox}&limit=100`);
-      if (!geoRes.ok) throw new Error('Failed to fetch tracts');
+      if (!geoRes.ok) {
+        console.error(`[Tracts] API error: ${geoRes.status}`);
+        throw new Error('Failed to fetch tracts');
+      }
       
       const geojson = await geoRes.json();
+      console.log(`[Tracts] API returned ${geojson.features?.length || 0} features`);
+      
       if (!geojson.features?.length) {
+        console.log('[Tracts] No features returned, skipping');
         setLoadingTract(false);
         return;
       }
@@ -119,6 +136,7 @@ export default function HomeMapWithTracts({
       });
       
       const enrichedFeatures = await Promise.all(eligibilityPromises);
+      console.log(`[Tracts] Enriched ${enrichedFeatures.length} features with eligibility`);
       
       // Update the map source
       const source = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
@@ -127,9 +145,12 @@ export default function HomeMapWithTracts({
           type: 'FeatureCollection',
           features: enrichedFeatures,
         });
+        console.log('[Tracts] ✅ Updated map source with tract features');
+      } else {
+        console.error('[Tracts] ❌ No tracts source found on map!');
       }
     } catch (error) {
-      console.error('Error loading tracts for viewport:', error);
+      console.error('[Tracts] Error loading tracts:', error);
     } finally {
       setLoadingTract(false);
     }
@@ -358,7 +379,9 @@ export default function HomeMapWithTracts({
       });
 
       // Load tracts for initial viewport
+      console.log('[Map] Map loaded, scheduling initial tract load...');
       setTimeout(() => {
+        console.log('[Map] Triggering initial tract load');
         loadTractsForViewportDirect();
       }, 500);
     });
@@ -491,23 +514,35 @@ export default function HomeMapWithTracts({
     if (!map.current) return;
     setLoadingTract(true);
 
+    console.log(`[Map] Fetching tract data for GEOID: ${geoid}`);
+
     try {
       // Fetch eligibility data from our API
       const eligibilityRes = await fetch(`/api/eligibility?tract=${geoid}`);
       const eligibility = await eligibilityRes.json();
+      console.log(`[Map] Eligibility response:`, eligibility);
 
       // Fetch real tract geometry from Census TIGERweb if not provided
       let geometry = existingGeometry;
       if (!geometry) {
+        console.log(`[Map] Fetching geometry from TIGERweb for GEOID: ${geoid}`);
         const geoRes = await fetch(`/api/geo/tract-geometry?geoid=${geoid}`);
         const geoData = await geoRes.json();
-        if (geoData.found) {
+        console.log(`[Map] Geometry response:`, geoData);
+        
+        if (geoData.found && geoData.geometry) {
           geometry = geoData.geometry;
+          console.log(`[Map] Got real geometry, type: ${geoData.geometry.type}`);
+        } else {
+          console.warn(`[Map] TIGERweb returned no geometry:`, geoData.message || 'Unknown reason');
         }
+      } else {
+        console.log(`[Map] Using provided geometry, type: ${existingGeometry?.type}`);
       }
 
       // If we still don't have geometry, create a fallback bounding box
       if (!geometry) {
+        console.warn(`[Map] No geometry available, using fallback bounding box`);
         const offset = 0.012;
         geometry = {
           type: 'Polygon',

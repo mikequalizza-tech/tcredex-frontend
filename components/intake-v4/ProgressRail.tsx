@@ -16,24 +16,26 @@ interface Section {
 // =============================================================================
 
 const BASE_SECTIONS: Section[] = [
-  // TIER 1 - DealCard Ready (40%)
+  // TIER 1 - DealCard Ready (40%) - ONLY checks asterisk-marked fields
   { id: 'basics', label: 'Project Basics', required: true, tier: 1, isComplete: (data) => !!(data.projectName && data.sponsorName && data.projectType) },
   { id: 'sponsor', label: 'Sponsor Details', required: false, tier: 2, isComplete: (data) => !!(data.organizationType) },
-  { id: 'location', label: 'Location & Census Tract', required: true, tier: 1, isComplete: (data) => !!(data.address && data.city && data.state && data.censusTract) },
+  // Location: Only asterisk field is Address - census tract auto-fills
+  { id: 'location', label: 'Location & Census Tract', required: true, tier: 1, isComplete: (data) => !!(data.address) },
   { id: 'programs', label: 'Programs Selected', required: true, tier: 1, isComplete: (data) => !!(data.programs && data.programs.length > 0) },
-  { id: 'costs', label: 'Project Costs & Gap', required: true, tier: 1, isComplete: (data) => !!(data.totalProjectCost && data.financingGap !== undefined) },
+  // Costs: Only asterisk field is Total Project Cost
+  { id: 'costs', label: 'Project Costs & Gap', required: true, tier: 1, isComplete: (data) => !!(data.totalProjectCost) },
   
-  // TIER 2 - Project Profile Ready (70%)
-  { id: 'impact', label: 'Social Investment Criteria', required: true, tier: 2, isComplete: (data) => !!(data.communitySupport || data.communityImpact) },
-  { id: 'benefits', label: 'Economic & Social Benefits', required: true, tier: 2, isComplete: (data) => !!(data.permanentJobsFTE !== undefined && data.constructionJobsFTE !== undefined) },
+  // TIER 2 - Project Profile Ready (70%) - More lenient checks
+  { id: 'impact', label: 'Social Investment Criteria', required: false, tier: 2, isComplete: (data) => !!(data.communitySupport || data.communityImpact) },
+  { id: 'benefits', label: 'Economic & Social Benefits', required: false, tier: 2, isComplete: (data) => data.permanentJobsFTE !== undefined || data.constructionJobsFTE !== undefined },
   { id: 'team', label: 'Project Team', required: false, tier: 2, isComplete: (data) => !!(data.ownersRepresentative) },
-  { id: 'capital', label: 'Capital Stack', required: true, tier: 2, isComplete: (data) => data.committedCapitalPct !== undefined && data.committedCapitalPct > 0 },
-  { id: 'site', label: 'Site Control', required: true, tier: 2, isComplete: (data) => !!data.siteControl },
-  { id: 'timeline', label: 'Timeline', required: true, tier: 2, isComplete: (data) => !!data.constructionStartDate },
+  { id: 'capital', label: 'Capital Stack', required: false, tier: 2, isComplete: (data) => (data.financingSources?.length || 0) > 0 },
+  { id: 'site', label: 'Site Control', required: false, tier: 2, isComplete: (data) => !!data.siteControl },
+  { id: 'timeline', label: 'Timeline', required: false, tier: 2, isComplete: (data) => !!data.constructionStartDate || !!data.targetClosingDate },
   
-  // TIER 3 - Due Diligence Ready (100%)
-  { id: 'readiness', label: 'Due Diligence Status', required: true, tier: 3, isComplete: (data) => data.phaseIEnvironmental === 'Complete' && data.zoningApproval === 'Complete' },
-  { id: 'documents', label: 'Due Diligence Documents', required: true, tier: 3, isComplete: (data) => (data.docsUploaded || 0) >= 5 },
+  // TIER 3 - Due Diligence Ready (100%) - Optional for initial submission
+  { id: 'readiness', label: 'Due Diligence Status', required: false, tier: 3, isComplete: (data) => data.phaseIEnvironmental === 'Complete' || data.zoningApproval === 'Complete' },
+  { id: 'documents', label: 'Due Diligence Documents', required: false, tier: 3, isComplete: (data) => (data.documents?.length || 0) >= 1 },
 ];
 
 const PROGRAM_SECTIONS: Section[] = [

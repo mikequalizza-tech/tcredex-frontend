@@ -1,7 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Census TIGERweb ACS 2021 Tracts layer
-const TIGERWEB_URL = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query';
+// Census TIGERweb ACS 2023 Tracts layer (updated from 2021)
+const TIGERWEB_URLS = [
+  // Try multiple endpoints in case one is down
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/8/query',
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/8/query',
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query',
+  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_ACS/MapServer/0/query',
+];
+
+async function fetchFromTigerWeb(queryParams: Record<string, string>): Promise<any> {
+  const queryString = new URLSearchParams(queryParams).toString();
+  
+  for (const baseUrl of TIGERWEB_URLS) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const response = await fetch(`${baseUrl}?${queryString}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'tCredex/1.0',
+        },
+        signal: controller.signal,
+        next: { revalidate: 86400 }, // Cache for 24 hours
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.log(`TIGERweb ${baseUrl} returned ${response.status}`);
+        continue;
+      }
+
+      const text = await response.text();
+      
+      // Check if response is actually JSON (sometimes returns HTML error pages)
+      if (text.startsWith('<') || text.startsWith('<!')) {
+        console.log(`TIGERweb ${baseUrl} returned HTML instead of JSON`);
+        continue;
+      }
+
+      const data = JSON.parse(text);
+      
+      if (data.features && data.features.length > 0) {
+        console.log(`TIGERweb success from ${baseUrl}`);
+        return data;
+      }
+    } catch (error) {
+      console.log(`TIGERweb ${baseUrl} error:`, error instanceof Error ? error.message : 'Unknown');
+      continue;
+    }
+  }
+  
+  return null;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -21,8 +74,10 @@ export async function GET(request: NextRequest) {
     let queryParams: Record<string, string>;
 
     if (geoid) {
-      // Query by GEOID
-      const cleanGeoid = geoid.replace(/[-\s]/g, '').padStart(11, '0');
+      // Clean and validate GEOID (should be 11 digits)
+      const cleanGeoid = geoid.replace(/[-\s]/g, '');
+      
+      // Try both exact match and LIKE query
       queryParams = {
         where: `GEOID='${cleanGeoid}'`,
         outFields: 'GEOID,STATE,COUNTY,TRACT,NAME,ALAND,AWATER',
@@ -46,30 +101,27 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const queryString = new URLSearchParams(queryParams).toString();
-    const response = await fetch(`${TIGERWEB_URL}?${queryString}`, {
-      headers: {
-        'Accept': 'application/json',
-      },
-      next: { revalidate: 86400 }, // Cache for 24 hours
-    });
+    console.log(`Fetching tract geometry for: ${geoid || `${lat},${lng}`}`);
+    
+    const data = await fetchFromTigerWeb(queryParams);
 
-    if (!response.ok) {
-      throw new Error(`TIGERweb API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.features || data.features.length === 0) {
+    if (!data || !data.features || data.features.length === 0) {
+      console.log(`No tract found for ${geoid || `${lat},${lng}`}`);
       return NextResponse.json({
         found: false,
         geoid: geoid || null,
-        message: 'No tract found for this location',
+        message: 'No tract geometry found - TIGERweb may be unavailable',
+        debug: {
+          queriedGeoid: geoid,
+          queriedCoords: lat && lng ? [lng, lat] : null,
+        }
       });
     }
 
     const feature = data.features[0];
     const props = feature.properties;
+
+    console.log(`Found tract ${props.GEOID} with geometry type: ${feature.geometry?.type}`);
 
     return NextResponse.json({
       found: true,
@@ -99,6 +151,7 @@ export async function GET(request: NextRequest) {
     console.error('Tract geometry fetch error:', error);
     return NextResponse.json(
       { 
+        found: false,
         error: 'Failed to fetch tract geometry',
         message: error instanceof Error ? error.message : 'Unknown error'
       },

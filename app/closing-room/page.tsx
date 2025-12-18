@@ -124,7 +124,7 @@ export default function ClosingRoomIndexPage() {
             <p className="text-gray-400 mt-1">Manage all deals in the closing pipeline</p>
           </div>
           <Link 
-            href="/deals"
+            href="/deals/new"
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
           >
             + New Deal

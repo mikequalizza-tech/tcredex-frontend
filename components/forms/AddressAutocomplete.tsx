@@ -44,6 +44,9 @@ export default function AddressAutocomplete({
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Flag to prevent re-search after selection
+  const justSelectedRef = useRef(false);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -60,6 +63,12 @@ export default function AddressAutocomplete({
 
   // Debounced search
   useEffect(() => {
+    // Skip search if we just selected an address
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+
     if (!value || value.length < 3 || !mapboxToken) {
       setSuggestions([]);
       return;
@@ -106,6 +115,9 @@ export default function AddressAutocomplete({
   };
 
   const handleSelect = async (suggestion: AddressSuggestion) => {
+    // Set flag BEFORE changing value to prevent re-search
+    justSelectedRef.current = true;
+    
     onChange(suggestion.place_name);
     setIsOpen(false);
     setSuggestions([]);

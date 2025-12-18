@@ -93,10 +93,46 @@ const STATUS_COLORS = {
 };
 
 export default function TeamPage() {
-  const [members] = useState<TeamMember[]>(DEMO_TEAM);
+  const [members, setMembers] = useState<TeamMember[]>(DEMO_TEAM);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<MemberRole | 'all'>('all');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<MemberRole>('member');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteSending, setInviteSending] = useState(false);
+
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim()) {
+      alert('Please enter an email address');
+      return;
+    }
+    
+    setInviteSending(true);
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Add new pending member to list
+    const newMember: TeamMember = {
+      id: `user-${Date.now()}`,
+      name: inviteEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      email: inviteEmail,
+      title: 'Invited Member',
+      role: inviteRole,
+      lastActive: 'Pending',
+      status: 'pending',
+    };
+    
+    setMembers(prev => [...prev, newMember]);
+    setInviteSending(false);
+    setShowInviteModal(false);
+    setInviteEmail('');
+    setInviteRole('member');
+    setInviteMessage('');
+    
+    alert(`Invitation sent to ${inviteEmail}!`);
+  };
 
   const filteredMembers = members.filter((member) => {
     if (roleFilter !== 'all' && member.role !== roleFilter) return false;
@@ -301,6 +337,8 @@ export default function TeamPage() {
                 <label className="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
                 <input
                   type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="colleague@example.com"
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -308,7 +346,11 @@ export default function TeamPage() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
-                <select className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <select 
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as MemberRole)}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
                   <option value="viewer">Viewer</option>
@@ -318,6 +360,8 @@ export default function TeamPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">Personal Message (Optional)</label>
                 <textarea
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
                   placeholder="Add a personal note to your invitation..."
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -332,8 +376,12 @@ export default function TeamPage() {
               >
                 Cancel
               </button>
-              <button className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors">
-                Send Invite
+              <button 
+                onClick={handleSendInvite}
+                disabled={inviteSending}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-wait transition-colors"
+              >
+                {inviteSending ? 'Sending...' : 'Send Invite'}
               </button>
             </div>
           </div>

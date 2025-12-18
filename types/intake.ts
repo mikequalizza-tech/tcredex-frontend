@@ -72,10 +72,12 @@ export interface DocumentRequirement {
 // =============================================================================
 
 export interface ProjectImage {
+  id?: string;       // Stable unique identifier
   name: string;
-  url: string;
+  url: string;        // Base64 data URL or server URL
   size: number;
-  file?: File;
+  type?: string;      // MIME type
+  file?: File;        // Only used during upload, not persisted
 }
 
 // =============================================================================

@@ -120,7 +120,11 @@ function MapContent() {
   };
 
   const handleRequestMemo = (dealId: string) => {
-    console.log('Requesting memo for:', dealId);
+    const deal = filteredDeals.find(d => d.id === dealId);
+    if (deal) {
+      // TODO: Replace with proper modal/toast system
+      alert(`Allocation Memo Request Submitted!\n\nProject: ${deal.projectName}\nDeal ID: ${dealId}\n\nA CDE representative will contact you within 24-48 hours.`);
+    }
   };
 
   // Stats

@@ -6,12 +6,11 @@ export default function Timeline() {
           {/* Section header */}
           <div className="mx-auto max-w-3xl pb-12 text-center md:pb-20">
             <h2 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-4 font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
-              Bringing the world's ideas to life
+              Building the future of tax credit financing
             </h2>
             <p className="text-lg text-indigo-200/65">
-              We were frustrated because content tools hadn't innovated, so we
-              sat down and drew up what we thought a new product could look
-              like.
+              After years navigating the complexity of NMTC transactions, we saw 
+              an opportunity to transform how community development deals get done.
             </p>
           </div>
           {/* Items */}
@@ -27,11 +26,11 @@ export default function Timeline() {
             >
               <div className="pl-2">
                 <div className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text pb-2 text-transparent">
-                  The seed
+                  The insight
                 </div>
                 <div className="mb-2 flex items-center">
                   <div className="absolute left-0 inline-flex rounded-full bg-indigo-500/25 px-2.5 py-0.5 text-sm font-semibold text-indigo-500">
-                    2016
+                    2023
                   </div>
                   <div
                     className="absolute left-0 ml-20 h-full -translate-x-1/2 translate-y-3 transform self-start bg-gray-800 px-px"
@@ -42,13 +41,14 @@ export default function Timeline() {
                     aria-hidden="true"
                   />
                   <h4 className="font-nacelle text-xl font-semibold text-gray-200">
-                    Open PRO was founded in Milan, Italy
+                    American Impact Ventures identifies market gap
                   </h4>
                 </div>
                 <p className="text-[1rem] text-indigo-200/65">
-                  Pretium lectus quam id leo. Urna et pharetra pharetra massa
-                  massa. Adipiscing enim eu neque aliquam vestibulum morbi
-                  blandit cursus risus.
+                  With 20+ years in NMTC transactions, our founding team recognized 
+                  that community development projects were struggling to find the right 
+                  CDEs, while CDEs were spending months sourcing quality deals. The 
+                  matching process was broken.
                 </p>
               </div>
             </div>
@@ -61,11 +61,11 @@ export default function Timeline() {
             >
               <div className="pl-2">
                 <div className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text pb-2 text-transparent">
-                  New features
+                  Platform development
                 </div>
                 <div className="mb-2 flex items-center">
                   <div className="absolute left-0 inline-flex rounded-full bg-indigo-500/25 px-2.5 py-0.5 text-sm font-semibold text-indigo-500">
-                    2019
+                    2024
                   </div>
                   <div
                     className="absolute left-0 ml-20 h-full -translate-x-1/2 translate-y-3 transform self-start bg-gray-800 px-px"
@@ -76,13 +76,13 @@ export default function Timeline() {
                     aria-hidden="true"
                   />
                   <h4 className="font-nacelle text-xl font-semibold text-gray-200">
-                    Launched the first Open PRO Advanced plan
+                    tCredex v1.0 enters development
                   </h4>
                 </div>
                 <p className="text-[1rem] text-indigo-200/65">
-                  Pretium lectus quam id leo. Urna et pharetra pharetra massa
-                  massa. Adipiscing enim eu neque aliquam vestibulum morbi
-                  blandit cursus risus.
+                  We ingested 33,000+ pages of CDFI Fund data, CDE intake forms, and 
+                  historical allocation patterns. Our AI-powered matching engine was 
+                  trained to understand what makes a successful NMTC transaction.
                 </p>
               </div>
             </div>
@@ -95,11 +95,11 @@ export default function Timeline() {
             >
               <div className="pl-2">
                 <div className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text pb-2 text-transparent">
-                  Pivoting
+                  Market launch
                 </div>
                 <div className="mb-2 flex items-center">
                   <div className="absolute left-0 inline-flex rounded-full bg-indigo-500/25 px-2.5 py-0.5 text-sm font-semibold text-indigo-500">
-                    2022
+                    2025
                   </div>
                   <div
                     className="absolute left-0 ml-20 h-full -translate-x-1/2 translate-y-3 transform self-start bg-gray-800 px-px"
@@ -110,13 +110,13 @@ export default function Timeline() {
                     aria-hidden="true"
                   />
                   <h4 className="font-nacelle text-xl font-semibold text-gray-200">
-                    Transitioned to a SaaS business model
+                    tCredex marketplace goes live
                   </h4>
                 </div>
                 <p className="text-[1rem] text-indigo-200/65">
-                  Pretium lectus quam id leo. Urna et pharetra pharetra massa
-                  massa. Adipiscing enim eu neque aliquam vestibulum morbi
-                  blandit cursus risus.
+                  With census tract mapping covering 85,000+ tracts, eligibility 
+                  determination for NMTC, HTC, LIHTC, and Opportunity Zones, and 
+                  AI-powered CDE matching, tCredex opens to sponsors and CDEs nationwide.
                 </p>
               </div>
             </div>
@@ -129,7 +129,7 @@ export default function Timeline() {
             >
               <div className="pl-2">
                 <div className="inline-flex bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text pb-2 text-transparent">
-                  Huge milestone
+                  The vision
                 </div>
                 <div className="mb-2 flex items-center">
                   <div className="absolute left-0 inline-flex rounded-full bg-indigo-500/25 px-2.5 py-0.5 text-sm font-semibold text-indigo-500">
@@ -140,13 +140,13 @@ export default function Timeline() {
                     aria-hidden="true"
                   />
                   <h4 className="font-nacelle text-xl font-semibold text-gray-200">
-                    1 million happy customers
+                    $1 billion in community impact facilitated
                   </h4>
                 </div>
                 <p className="text-[1rem] text-indigo-200/65">
-                  Pretium lectus quam id leo. Urna et pharetra pharetra massa
-                  massa. Adipiscing enim eu neque aliquam vestibulum morbi
-                  blandit cursus risus.
+                  Our goal: facilitate $1B+ in tax credit transactions that create 
+                  jobs, build healthcare facilities, revitalize historic buildings, 
+                  and bring opportunity to the communities that need it most.
                 </p>
               </div>
             </div>

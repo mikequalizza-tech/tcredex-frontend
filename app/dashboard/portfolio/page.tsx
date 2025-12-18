@@ -2,216 +2,308 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { useCurrentUser } from '@/lib/auth';
 
 interface Investment {
   id: string;
   projectName: string;
-  cde: string;
-  location: string;
-  creditType: 'NMTC' | 'LIHTC' | 'HTC' | 'OZ';
+  cdeName: string;
+  city: string;
+  state: string;
+  programType: 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
   investmentAmount: number;
-  creditAmount: number;
+  qeiAmount: number;
+  creditsClaimed: number;
+  creditsRemaining: number;
+  closingDate: string;
+  complianceYear: number;
   status: 'active' | 'compliance' | 'exited';
-  closedDate: string;
-  craEligible: boolean;
-  irr: number;
-  yearsRemaining: number;
+  irr?: number;
 }
 
-const demoInvestments: Investment[] = [
+const DEMO_INVESTMENTS: Investment[] = [
   {
-    id: 'I001',
-    projectName: 'Eastside Grocery Co-Op',
-    cde: 'Midwest Community Development',
-    location: 'Springfield, IL',
-    creditType: 'NMTC',
-    investmentAmount: 5000000,
-    creditAmount: 1950000,
+    id: 'inv-1',
+    projectName: 'Detroit Tech Incubator',
+    cdeName: 'Great Lakes CDE',
+    city: 'Detroit',
+    state: 'MI',
+    programType: 'NMTC',
+    investmentAmount: 2500000,
+    qeiAmount: 10000000,
+    creditsClaimed: 780000,
+    creditsRemaining: 3120000,
+    closingDate: '2023-06-15',
+    complianceYear: 2,
     status: 'active',
-    closedDate: '2024-03-15',
-    craEligible: true,
-    irr: 8.2,
-    yearsRemaining: 6,
+    irr: 15.2,
   },
   {
-    id: 'I002',
-    projectName: 'Heritage Arts Center',
-    cde: 'National Trust CDE',
-    location: 'Baltimore, MD',
-    creditType: 'HTC',
-    investmentAmount: 3000000,
-    creditAmount: 600000,
+    id: 'inv-2',
+    projectName: 'Chicago Healthcare Campus',
+    cdeName: 'Midwest Impact Fund',
+    city: 'Chicago',
+    state: 'IL',
+    programType: 'NMTC',
+    investmentAmount: 4000000,
+    qeiAmount: 18000000,
+    creditsClaimed: 2106000,
+    creditsRemaining: 4914000,
+    closingDate: '2022-03-20',
+    complianceYear: 3,
     status: 'active',
-    closedDate: '2024-01-20',
-    craEligible: true,
-    irr: 7.5,
-    yearsRemaining: 4,
+    irr: 16.8,
   },
   {
-    id: 'I003',
-    projectName: 'Northgate Health Center',
-    cde: 'Healthcare Finance CDE',
-    location: 'Detroit, MI',
-    creditType: 'NMTC',
-    investmentAmount: 8000000,
-    creditAmount: 3120000,
+    id: 'inv-3',
+    projectName: 'Milwaukee Workforce Center',
+    cdeName: 'Wisconsin Community Fund',
+    city: 'Milwaukee',
+    state: 'WI',
+    programType: 'NMTC',
+    investmentAmount: 1800000,
+    qeiAmount: 8000000,
+    creditsClaimed: 1248000,
+    creditsRemaining: 1872000,
+    closingDate: '2021-09-10',
+    complianceYear: 4,
     status: 'compliance',
-    closedDate: '2023-06-10',
-    craEligible: true,
-    irr: 9.1,
-    yearsRemaining: 5,
+    irr: 14.5,
   },
   {
-    id: 'I004',
-    projectName: 'Riverfront Apartments',
-    cde: 'Affordable Housing Partners',
-    location: 'Memphis, TN',
-    creditType: 'LIHTC',
-    investmentAmount: 12000000,
-    creditAmount: 10800000,
-    status: 'active',
-    closedDate: '2024-08-01',
-    craEligible: true,
-    irr: 6.8,
-    yearsRemaining: 9,
+    id: 'inv-4',
+    projectName: 'St. Louis Historic Renovation',
+    cdeName: 'Gateway CDE',
+    city: 'St. Louis',
+    state: 'MO',
+    programType: 'HTC',
+    investmentAmount: 3200000,
+    qeiAmount: 0,
+    creditsClaimed: 2560000,
+    creditsRemaining: 640000,
+    closingDate: '2020-11-05',
+    complianceYear: 5,
+    status: 'compliance',
+    irr: 18.2,
+  },
+  {
+    id: 'inv-5',
+    projectName: 'Indianapolis Community Center',
+    cdeName: 'Heartland Development',
+    city: 'Indianapolis',
+    state: 'IN',
+    programType: 'NMTC',
+    investmentAmount: 2000000,
+    qeiAmount: 9000000,
+    creditsClaimed: 3510000,
+    creditsRemaining: 0,
+    closingDate: '2017-04-22',
+    complianceYear: 7,
+    status: 'exited',
+    irr: 17.1,
   },
 ];
 
-const creditTypeColors: Record<string, string> = {
-  NMTC: 'bg-green-900/50 text-green-300 border-green-500/30',
-  LIHTC: 'bg-blue-900/50 text-blue-300 border-blue-500/30',
-  HTC: 'bg-amber-900/50 text-amber-300 border-amber-500/30',
-  OZ: 'bg-purple-900/50 text-purple-300 border-purple-500/30',
-};
-
 export default function PortfolioPage() {
-  const [investments] = useState<Investment[]>(demoInvestments);
-  const [filterType, setFilterType] = useState<string>('all');
+  return (
+    <ProtectedRoute>
+      <PortfolioContent />
+    </ProtectedRoute>
+  );
+}
 
-  const filteredInvestments = filterType === 'all'
-    ? investments
-    : investments.filter(i => i.creditType === filterType);
+function PortfolioContent() {
+  const { orgName } = useCurrentUser();
+  const [investments] = useState<Investment[]>(DEMO_INVESTMENTS);
+  const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'compliance' | 'exited'>('all');
 
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-    return `$${(amount / 1000).toFixed(0)}K`;
+  const formatCurrency = (num: number) => 
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
+
+  // Portfolio calculations
+  const filteredInvestments = filterStatus === 'all' 
+    ? investments 
+    : investments.filter(i => i.status === filterStatus);
+
+  const totalInvested = investments.reduce((sum, i) => sum + i.investmentAmount, 0);
+  const totalCredits = investments.reduce((sum, i) => sum + i.creditsClaimed + i.creditsRemaining, 0);
+  const creditsClaimed = investments.reduce((sum, i) => sum + i.creditsClaimed, 0);
+  const creditsRemaining = investments.reduce((sum, i) => sum + i.creditsRemaining, 0);
+  const avgIRR = investments.filter(i => i.irr).reduce((sum, i) => sum + (i.irr || 0), 0) / investments.filter(i => i.irr).length;
+
+  const activeCount = investments.filter(i => i.status === 'active').length;
+  const complianceCount = investments.filter(i => i.status === 'compliance').length;
+  const exitedCount = investments.filter(i => i.status === 'exited').length;
+
+  const getStatusBadge = (status: Investment['status']) => {
+    const styles = {
+      active: 'bg-green-900/50 text-green-400',
+      compliance: 'bg-yellow-900/50 text-yellow-400',
+      exited: 'bg-gray-800 text-gray-400',
+    };
+    const labels = {
+      active: 'Active',
+      compliance: 'In Compliance',
+      exited: 'Exited',
+    };
+    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>{labels[status]}</span>;
   };
 
-  // Portfolio stats
-  const totalInvested = investments.reduce((sum, i) => sum + i.investmentAmount, 0);
-  const totalCredits = investments.reduce((sum, i) => sum + i.creditAmount, 0);
-  const avgIRR = investments.reduce((sum, i) => sum + i.irr, 0) / investments.length;
-  const craCount = investments.filter(i => i.craEligible).length;
-
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-100">Portfolio</h1>
-          <p className="text-gray-400 mt-1">Track your tax credit investments and performance.</p>
+          <h1 className="text-2xl font-bold text-gray-100">Investment Portfolio</h1>
+          <p className="text-gray-400 mt-1">{orgName || 'Demo Investment Fund'}</p>
         </div>
         <Link
-          href="/investor"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          href="/deals"
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Find New Deals
+          Browse New Opportunities
         </Link>
       </div>
 
-      {/* Portfolio Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">Total Invested</p>
-          <p className="text-2xl font-bold text-indigo-400">{formatCurrency(totalInvested)}</p>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-5 gap-4">
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Total Invested</div>
+          <div className="text-2xl font-bold text-white">{formatCurrency(totalInvested)}</div>
         </div>
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">Total Credits</p>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(totalCredits)}</p>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Total Credits</div>
+          <div className="text-2xl font-bold text-indigo-400">{formatCurrency(totalCredits)}</div>
         </div>
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">Avg IRR</p>
-          <p className="text-2xl font-bold text-amber-400">{avgIRR.toFixed(1)}%</p>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Credits Claimed</div>
+          <div className="text-2xl font-bold text-emerald-400">{formatCurrency(creditsClaimed)}</div>
         </div>
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-500">CRA Eligible</p>
-          <p className="text-2xl font-bold text-purple-400">{craCount} of {investments.length}</p>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Credits Remaining</div>
+          <div className="text-2xl font-bold text-amber-400">{formatCurrency(creditsRemaining)}</div>
+        </div>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <div className="text-sm text-gray-400 mb-1">Avg. IRR</div>
+          <div className="text-2xl font-bold text-purple-400">{avgIRR.toFixed(1)}%</div>
         </div>
       </div>
 
-      {/* Credit Type Filter */}
-      <div className="flex gap-2 mb-6">
-        {['all', 'NMTC', 'LIHTC', 'HTC', 'OZ'].map((type) => (
-          <button
-            key={type}
-            onClick={() => setFilterType(type)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterType === type
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            }`}
-          >
-            {type === 'all' ? 'All Credits' : type}
-          </button>
-        ))}
+      {/* Credit Progress */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-100">Credit Utilization</h2>
+          <span className="text-sm text-gray-400">
+            {((creditsClaimed / totalCredits) * 100).toFixed(0)}% claimed
+          </span>
+        </div>
+        <div className="h-4 bg-gray-800 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-500"
+            style={{ width: `${(creditsClaimed / totalCredits) * 100}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-2 text-sm">
+          <span className="text-emerald-400">Claimed: {formatCurrency(creditsClaimed)}</span>
+          <span className="text-amber-400">Remaining: {formatCurrency(creditsRemaining)}</span>
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setFilterStatus('all')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          All ({investments.length})
+        </button>
+        <button
+          onClick={() => setFilterStatus('active')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'active' ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Active ({activeCount})
+        </button>
+        <button
+          onClick={() => setFilterStatus('compliance')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'compliance' ? 'bg-yellow-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          In Compliance ({complianceCount})
+        </button>
+        <button
+          onClick={() => setFilterStatus('exited')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filterStatus === 'exited' ? 'bg-gray-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Exited ({exitedCount})
+        </button>
       </div>
 
       {/* Investments Table */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-800">
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Investment</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Credit Type</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Amount</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Credits</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">IRR</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">Status</th>
-              <th className="text-right px-6 py-4 text-sm font-medium text-gray-400">Actions</th>
+          <thead className="bg-gray-800/50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Project</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">CDE</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Program</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Investment</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Credits</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Year</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">IRR</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
-          <tbody>
-            {filteredInvestments.map((investment) => (
-              <tr key={investment.id} className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50">
-                <td className="px-6 py-4">
+          <tbody className="divide-y divide-gray-800">
+            {filteredInvestments.map(inv => (
+              <tr key={inv.id} className="hover:bg-gray-800/50">
+                <td className="px-4 py-4">
                   <div>
-                    <p className="font-medium text-gray-200">{investment.projectName}</p>
-                    <p className="text-xs text-gray-500">{investment.cde} • {investment.location}</p>
+                    <p className="font-medium text-gray-100">{inv.projectName}</p>
+                    <p className="text-sm text-gray-500">{inv.city}, {inv.state}</p>
                   </div>
                 </td>
-                <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${creditTypeColors[investment.creditType]}`}>
-                    {investment.creditType}
+                <td className="px-4 py-4 text-gray-300 text-sm">{inv.cdeName}</td>
+                <td className="px-4 py-4">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    inv.programType === 'NMTC' ? 'bg-indigo-900/50 text-indigo-400' :
+                    inv.programType === 'HTC' ? 'bg-amber-900/50 text-amber-400' :
+                    inv.programType === 'LIHTC' ? 'bg-green-900/50 text-green-400' :
+                    'bg-purple-900/50 text-purple-400'
+                  }`}>
+                    {inv.programType}
                   </span>
                 </td>
-                <td className="px-6 py-4">
-                  <span className="text-gray-200 font-medium">{formatCurrency(investment.investmentAmount)}</span>
+                <td className="px-4 py-4">
+                  <span className="font-medium text-gray-100">{formatCurrency(inv.investmentAmount)}</span>
                 </td>
-                <td className="px-6 py-4">
-                  <span className="text-green-400 font-medium">{formatCurrency(investment.creditAmount)}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-amber-400 font-medium">{investment.irr}%</span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${
-                      investment.status === 'active' ? 'bg-green-500' :
-                      investment.status === 'compliance' ? 'bg-amber-500' : 'bg-gray-500'
-                    }`} />
-                    <span className="text-sm text-gray-400 capitalize">{investment.status}</span>
+                <td className="px-4 py-4">
+                  <div>
+                    <div className="text-sm text-emerald-400">{formatCurrency(inv.creditsClaimed)} claimed</div>
+                    <div className="text-xs text-gray-500">{formatCurrency(inv.creditsRemaining)} remaining</div>
                   </div>
-                  <p className="text-xs text-gray-500">{investment.yearsRemaining} years remaining</p>
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <Link
-                    href={`/dashboard/portfolio/${investment.id}`}
-                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition-colors"
+                <td className="px-4 py-4 text-gray-300">Year {inv.complianceYear}</td>
+                <td className="px-4 py-4">
+                  <span className="font-medium text-purple-400">{inv.irr?.toFixed(1)}%</span>
+                </td>
+                <td className="px-4 py-4">{getStatusBadge(inv.status)}</td>
+                <td className="px-4 py-4">
+                  <button 
+                    onClick={() => setSelectedInvestment(inv)}
+                    className="text-indigo-400 hover:text-indigo-300 text-sm"
                   >
-                    View
-                  </Link>
+                    Details →
+                  </button>
                 </td>
               </tr>
             ))}
@@ -219,26 +311,100 @@ export default function PortfolioPage() {
         </table>
       </div>
 
-      {/* CRA Summary */}
-      <div className="mt-8 bg-indigo-900/20 rounded-xl border border-indigo-500/30 p-6">
-        <h2 className="text-lg font-semibold text-gray-100 mb-4">CRA Summary</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div>
-            <p className="text-sm text-gray-400">CRA-Eligible Investments</p>
-            <p className="text-xl font-bold text-indigo-400">{formatCurrency(
-              investments.filter(i => i.craEligible).reduce((sum, i) => sum + i.investmentAmount, 0)
-            )}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400">Assessment Areas Covered</p>
-            <p className="text-xl font-bold text-indigo-400">4 MSAs</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400">Community Impact</p>
-            <p className="text-xl font-bold text-indigo-400">High</p>
+      {/* Investment Detail Modal */}
+      {selectedInvestment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setSelectedInvestment(null)} />
+          <div className="relative bg-gray-900 rounded-xl p-6 w-full max-w-2xl mx-4 border border-gray-800 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-white">{selectedInvestment.projectName}</h3>
+                <p className="text-gray-400">{selectedInvestment.cdeName} • {selectedInvestment.city}, {selectedInvestment.state}</p>
+              </div>
+              <button onClick={() => setSelectedInvestment(null)} className="text-gray-500 hover:text-white">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Investment</div>
+                <div className="text-xl font-bold text-white">{formatCurrency(selectedInvestment.investmentAmount)}</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Total Credits</div>
+                <div className="text-xl font-bold text-indigo-400">
+                  {formatCurrency(selectedInvestment.creditsClaimed + selectedInvestment.creditsRemaining)}
+                </div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">IRR</div>
+                <div className="text-xl font-bold text-purple-400">{selectedInvestment.irr?.toFixed(1)}%</div>
+              </div>
+            </div>
+
+            {/* Credit Schedule */}
+            <div className="mb-6">
+              <h4 className="text-sm font-medium text-gray-300 mb-3">Credit Claim Schedule</h4>
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5, 6, 7].map(year => {
+                  const yearCredits = (selectedInvestment.creditsClaimed + selectedInvestment.creditsRemaining) / 7;
+                  const isClaimed = year <= selectedInvestment.complianceYear;
+                  return (
+                    <div key={year} className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                        isClaimed ? 'bg-emerald-900/50 text-emerald-400' : 'bg-gray-800 text-gray-500'
+                      }`}>
+                        {year}
+                      </div>
+                      <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${isClaimed ? 'bg-emerald-500' : 'bg-gray-700'}`}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div className={`text-sm ${isClaimed ? 'text-emerald-400' : 'text-gray-500'}`}>
+                        {formatCurrency(yearCredits)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Details */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">Closing Date</span>
+                <p className="text-gray-200">{new Date(selectedInvestment.closingDate).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Compliance Year</span>
+                <p className="text-gray-200">Year {selectedInvestment.complianceYear} of 7</p>
+              </div>
+              <div>
+                <span className="text-gray-500">QEI Amount</span>
+                <p className="text-gray-200">{formatCurrency(selectedInvestment.qeiAmount)}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Status</span>
+                <p className="mt-1">{getStatusBadge(selectedInvestment.status)}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button className="flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800">
+                View Documents
+              </button>
+              <button className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 font-medium">
+                Generate Report
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

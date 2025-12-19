@@ -3,6 +3,7 @@ import AOSProvider from "@/components/aosprovider";
 import { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://tcredex.com'),
   title: "tCredex - AI-Powered Tax Credit Marketplace",
   description: "AI-Powered 5-Tax Credit Marketplace including State and Federal Tax Credits for NMTC, LIHTC, HTC, OZ, Brownfield.",
   manifest: "/manifest.json",

@@ -10,11 +10,6 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // IMPORTANT: Disable Turbopack - causes issues with Mapbox workers
-  experimental: {
-    turbo: false,
-  },
-
   // Webpack config for Mapbox compatibility
   webpack: (config) => {
     // Prevent Mapbox from being bundled server-side

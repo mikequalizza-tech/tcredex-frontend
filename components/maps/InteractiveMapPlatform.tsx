@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import mapboxgl from 'mapbox-gl';
+import type mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // =============================================================================
@@ -75,16 +75,10 @@ const KNOWN_COORDINATES: Record<string, [number, number]> = {
   'New Orleans, LA': [-90.0715, 29.9511],
 };
 
-// Tract colors
-const TRACT_COLORS = {
-  eligible: '#10b981',           // Emerald
-  severelyDistressed: '#f97316', // Orange
-  opportunityZone: '#8b5cf6',    // Purple
-  nonEligible: '#374151',        // Gray
-  hover: '#6366f1',              // Indigo
-  default: '#f97316',            // Orange (default visible)
-};
-
+const TRACT_FILL_COLOR = '#f97316';
+const TRACT_FILL_OPACITY = 0.25;
+const TRACT_LINE_COLOR = '#f97316';
+const TRACT_LINE_WIDTH = 1.5;
 const MIN_TRACT_ZOOM = 8;
 
 // =============================================================================
@@ -101,14 +95,6 @@ function getCoordinatesForDeal(deal: MapDeal): [number, number] | null {
   return null;
 }
 
-function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
-  let timeoutId: NodeJS.Timeout;
-  return ((...args: unknown[]) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), ms);
-  }) as T;
-}
-
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -123,278 +109,252 @@ export default function InteractiveMapPlatform({
   showTracts = true,
 }: InteractiveMapPlatformProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapboxModule = useRef<any>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const isLoadingTracts = useRef(false);
+  const initStarted = useRef(false);
   
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(4);
   const [tractsLoading, setTractsLoading] = useState(false);
-  const [tractEligibility, setTractEligibility] = useState<Map<string, TractInfo>>(new Map());
+  const [tractCount, setTractCount] = useState(0);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-  // Fetch eligibility for a tract
-  const fetchTractEligibility = useCallback(async (geoid: string): Promise<TractInfo | null> => {
-    if (tractEligibility.has(geoid)) {
-      return tractEligibility.get(geoid)!;
-    }
-    try {
-      const response = await fetch(`/api/eligibility?tract=${geoid}`);
-      if (!response.ok) return null;
-      const data = await response.json();
-      const info: TractInfo = {
-        geoid,
-        eligible: data.eligible || false,
-        severelyDistressed: data.federal?.severely_distressed || false,
-        povertyRate: data.federal?.poverty_rate,
-        medianIncome: data.federal?.median_income_pct,
-        unemploymentRate: data.federal?.unemployment_rate,
-        programs: data.programs || [],
-      };
-      setTractEligibility(prev => new Map(prev).set(geoid, info));
-      return info;
-    } catch {
-      return null;
-    }
-  }, [tractEligibility]);
-
-  // Load tracts for current viewport
+  // ==========================================================================
+  // LOAD TRACTS FOR VIEWPORT
+  // ==========================================================================
   const loadTractsForViewport = useCallback(async () => {
-    if (!map.current || !mapLoaded || !showTracts) return;
+    const map = mapInstanceRef.current;
+    const mapboxgl = mapboxModule.current;
+    if (!map || !mapboxgl || !showTracts) return;
+    if (isLoadingTracts.current) return;
     
-    const zoom = map.current.getZoom();
+    const zoom = map.getZoom();
     if (zoom < MIN_TRACT_ZOOM) {
-      // Remove tract layer if zoomed out
-      if (map.current.getSource('tracts')) {
-        map.current.removeLayer('tract-fills');
-        map.current.removeLayer('tract-outlines');
-        map.current.removeSource('tracts');
-      }
+      setTractCount(0);
       return;
     }
 
+    isLoadingTracts.current = true;
     setTractsLoading(true);
     
     try {
-      const bounds = map.current.getBounds();
+      const bounds = map.getBounds();
       if (!bounds) return;
+      
       const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
+      console.log('[Map] Loading tracts for bbox:', bbox);
       
       const response = await fetch(`/api/geo/tracts?bbox=${bbox}&limit=300`);
       if (!response.ok) throw new Error('Failed to fetch tracts');
       
       const geojson = await response.json();
       
-      if (!map.current) return;
+      // Verify map still exists
+      if (!mapInstanceRef.current) return;
 
-      // Update or add source
-      const source = map.current.getSource('tracts') as mapboxgl.GeoJSONSource;
+      if (!geojson || geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
+        console.warn('[Map] Invalid GeoJSON');
+        return;
+      }
+
+      console.log('[Map] Got', geojson.features.length, 'tracts');
+      setTractCount(geojson.features.length);
+
+      // Update the source data
+      const source = map.getSource('tracts') as mapboxgl.GeoJSONSource;
       if (source) {
         source.setData(geojson);
-      } else {
-        map.current.addSource('tracts', {
-          type: 'geojson',
-          data: geojson,
-        });
-
-        // Add fill layer
-        map.current.addLayer({
-          id: 'tract-fills',
-          type: 'fill',
-          source: 'tracts',
-          paint: {
-            'fill-color': TRACT_COLORS.default,
-            'fill-opacity': 0.35,
-          }
-        }, 'state-borders');
-
-        // Add outline layer
-        map.current.addLayer({
-          id: 'tract-outlines',
-          type: 'line',
-          source: 'tracts',
-          paint: {
-            'line-color': TRACT_COLORS.default,
-            'line-width': 1,
-            'line-opacity': 0.7,
-          }
-        }, 'state-borders');
       }
 
     } catch (error) {
-      console.error('Error loading tracts:', error);
+      console.error('[Map] Error loading tracts:', error);
     } finally {
+      isLoadingTracts.current = false;
       setTractsLoading(false);
     }
-  }, [mapLoaded, showTracts]);
+  }, [showTracts]);
 
-  // Debounced version for map move
-  const debouncedLoadTracts = useCallback(
-    debounce(loadTractsForViewport, 500),
-    [loadTractsForViewport]
-  );
-
-  // Initialize map
+  // ==========================================================================
+  // INITIALIZE MAP (runs once)
+  // ==========================================================================
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
-    if (!mapboxToken) return;
+    if (!mapContainer.current || !mapboxToken) return;
+    if (initStarted.current) return;
+    initStarted.current = true;
 
-    mapboxgl.accessToken = mapboxToken;
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-95.7129, 37.0902],
-      zoom: 4,
-      minZoom: 3,
-      maxZoom: 18,
-    });
+    let mounted = true;
+    let map: mapboxgl.Map | null = null;
 
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-left');
-    map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
+    const initMap = async () => {
+      try {
+        const mapboxgl = (await import('mapbox-gl')).default;
+        if (!mounted) return;
+        
+        mapboxModule.current = mapboxgl;
+        mapboxgl.accessToken = mapboxToken;
+        
+        map = new mapboxgl.Map({
+          container: mapContainer.current!,
+          style: 'mapbox://styles/mapbox/dark-v11',
+          center: [-95.7129, 37.0902],
+          zoom: 4,
+          minZoom: 3,
+          maxZoom: 18,
+        });
 
-    map.current.on('load', () => {
-      if (!map.current) return;
-      
-      // State boundaries
-      map.current.addSource('states', {
-        type: 'geojson',
-        data: 'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
-      });
-      
-      map.current.addLayer({
-        id: 'state-fills',
-        type: 'fill',
-        source: 'states',
-        paint: {
-          'fill-color': '#1e3a5f',
-          'fill-opacity': 0.1
-        }
-      });
-      
-      map.current.addLayer({
-        id: 'state-borders',
-        type: 'line',
-        source: 'states',
-        paint: {
-          'line-color': '#4a5568',
-          'line-width': 1
-        }
-      });
+        mapInstanceRef.current = map;
 
-      setMapLoaded(true);
-    });
+        map.addControl(new mapboxgl.NavigationControl(), 'top-left');
+        map.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
-    // Track zoom level
-    map.current.on('zoom', () => {
-      if (map.current) {
-        setCurrentZoom(map.current.getZoom());
-      }
-    });
+        map.on('load', () => {
+          if (!mounted || !map) return;
+          console.log('[Map] ✓ Mapbox loaded');
+          
+          // Add tract source (empty initially)
+          map.addSource('tracts', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          });
 
-    // Load tracts on move
-    map.current.on('moveend', () => {
-      debouncedLoadTracts();
-    });
+          // Add tract fill layer
+          map.addLayer({
+            id: 'tract-fills',
+            type: 'fill',
+            source: 'tracts',
+            paint: {
+              'fill-color': TRACT_FILL_COLOR,
+              'fill-opacity': TRACT_FILL_OPACITY,
+            },
+          });
 
-    // Tract click handler
-    map.current.on('click', 'tract-fills', async (e) => {
-      if (!e.features?.[0]) return;
-      const geoid = e.features[0].properties?.GEOID;
-      if (geoid && onTractClick) {
-        const info = await fetchTractEligibility(geoid);
-        if (info) onTractClick(info);
-      }
-    });
+          // Add tract outline layer
+          map.addLayer({
+            id: 'tract-outlines',
+            type: 'line',
+            source: 'tracts',
+            paint: {
+              'line-color': TRACT_LINE_COLOR,
+              'line-width': TRACT_LINE_WIDTH,
+              'line-opacity': 0.8,
+            },
+          });
 
-    // Tract hover
-    map.current.on('mouseenter', 'tract-fills', () => {
-      if (map.current) map.current.getCanvas().style.cursor = 'pointer';
-    });
+          setMapReady(true);
+        });
 
-    map.current.on('mouseleave', 'tract-fills', () => {
-      if (map.current) map.current.getCanvas().style.cursor = '';
-      if (popupRef.current) {
-        popupRef.current.remove();
-        popupRef.current = null;
-      }
-    });
+        // Track zoom
+        map.on('zoom', () => {
+          if (mounted && map) {
+            setCurrentZoom(map.getZoom());
+          }
+        });
 
-    map.current.on('mousemove', 'tract-fills', async (e) => {
-      if (!e.features?.[0] || !map.current) return;
-      const geoid = e.features[0].properties?.GEOID;
-      if (!geoid) return;
+        // Load tracts on move end (debounced naturally by mapbox)
+        let moveTimeout: NodeJS.Timeout | null = null;
+        map.on('moveend', () => {
+          if (moveTimeout) clearTimeout(moveTimeout);
+          moveTimeout = setTimeout(() => {
+            if (mounted && mapInstanceRef.current) {
+              loadTractsForViewport();
+            }
+          }, 300);
+        });
 
-      const info = await fetchTractEligibility(geoid);
-      
-      if (popupRef.current) popupRef.current.remove();
-      
-      popupRef.current = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        offset: 15,
-      })
-        .setLngLat(e.lngLat)
-        .setHTML(`
-          <div style="background: #1f2937; color: white; padding: 12px; border-radius: 8px; min-width: 180px;">
-            <div style="font-size: 11px; color: #9ca3af; margin-bottom: 4px;">Census Tract</div>
-            <div style="font-size: 14px; font-weight: 600; font-family: monospace; margin-bottom: 8px;">${geoid}</div>
-            ${info ? `
-              <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px;">
-                ${info.eligible ? `
-                  <span style="background: #10b98133; color: #10b981; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 500;">
-                    ✓ NMTC Eligible
-                  </span>
-                ` : `
-                  <span style="background: #6b728033; color: #9ca3af; padding: 2px 6px; border-radius: 4px; font-size: 10px;">
-                    Not Eligible
-                  </span>
-                `}
-                ${info.severelyDistressed ? `
-                  <span style="background: #f9731633; color: #f97316; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 500;">
-                    Severely Distressed
-                  </span>
-                ` : ''}
+        // Tract hover
+        map.on('mouseenter', 'tract-fills', () => {
+          if (map) map.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.on('mouseleave', 'tract-fills', () => {
+          if (map) map.getCanvas().style.cursor = '';
+          if (popupRef.current) {
+            popupRef.current.remove();
+            popupRef.current = null;
+          }
+        });
+
+        // Tract hover popup
+        map.on('mousemove', 'tract-fills', async (e) => {
+          if (!e.features?.[0] || !map || !mapboxgl) return;
+          const geoid = e.features[0].properties?.GEOID;
+          if (!geoid) return;
+
+          if (popupRef.current) popupRef.current.remove();
+          
+          popupRef.current = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 15,
+          })
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div style="background: #1f2937; color: white; padding: 12px; border-radius: 8px; min-width: 160px;">
+                <div style="font-size: 11px; color: #9ca3af; margin-bottom: 4px;">Census Tract</div>
+                <div style="font-size: 14px; font-weight: 600; font-family: monospace;">${geoid}</div>
               </div>
-              ${info.povertyRate !== undefined ? `
-                <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 2px;">
-                  <span style="color: #9ca3af;">Poverty:</span>
-                  <span>${info.povertyRate.toFixed(1)}%</span>
-                </div>
-              ` : ''}
-              ${info.medianIncome !== undefined ? `
-                <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 2px;">
-                  <span style="color: #9ca3af;">MFI:</span>
-                  <span>${info.medianIncome.toFixed(1)}%</span>
-                </div>
-              ` : ''}
-            ` : `
-              <div style="font-size: 11px; color: #6b7280;">Loading eligibility...</div>
-            `}
-          </div>
-        `)
-        .addTo(map.current);
-    });
+            `)
+            .addTo(map);
+        });
+
+        // Tract click
+        map.on('click', 'tract-fills', (e) => {
+          if (!e.features?.[0]) return;
+          const geoid = e.features[0].properties?.GEOID;
+          if (geoid && onTractClick) {
+            onTractClick({
+              geoid,
+              eligible: true,
+              severelyDistressed: false,
+              programs: ['NMTC'],
+            });
+          }
+        });
+
+      } catch (error) {
+        console.error('[Map] Init error:', error);
+      }
+    };
+
+    initMap();
 
     return () => {
-      map.current?.remove();
-      map.current = null;
+      mounted = false;
+      if (map) {
+        map.remove();
+        mapInstanceRef.current = null;
+      }
     };
-  }, [mapboxToken, debouncedLoadTracts, fetchTractEligibility, onTractClick]);
+  }, [mapboxToken, onTractClick, loadTractsForViewport]);
 
-  // Load tracts when map is ready
+  // ==========================================================================
+  // LOAD TRACTS WHEN MAP IS READY
+  // ==========================================================================
   useEffect(() => {
-    if (mapLoaded && showTracts) {
-      loadTractsForViewport();
+    if (mapReady && showTracts) {
+      // Small delay to ensure everything is settled
+      const timer = setTimeout(() => {
+        loadTractsForViewport();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [mapLoaded, showTracts, loadTractsForViewport]);
+  }, [mapReady, showTracts, loadTractsForViewport]);
 
-  // Deal markers
+  // ==========================================================================
+  // DEAL MARKERS
+  // ==========================================================================
   useEffect(() => {
-    if (!map.current || !mapLoaded) return;
+    const map = mapInstanceRef.current;
+    const mapboxgl = mapboxModule.current;
+    if (!map || !mapboxgl || !mapReady) return;
 
+    // Clear existing markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current.clear();
 
@@ -429,13 +389,14 @@ export default function InteractiveMapPlatform({
       
       const marker = new mapboxgl.Marker(el)
         .setLngLat(coords)
-        .addTo(map.current!);
+        .addTo(map);
 
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         onSelectDeal(deal.id);
       });
 
+      // Popup on hover
       const popup = new mapboxgl.Popup({
         offset: 25,
         closeButton: false,
@@ -464,56 +425,64 @@ export default function InteractiveMapPlatform({
 
       el.addEventListener('mouseenter', () => {
         marker.setPopup(popup);
-        popup.addTo(map.current!);
+        popup.addTo(map);
       });
       el.addEventListener('mouseleave', () => popup.remove());
 
       markersRef.current.set(deal.id, marker);
     });
-  }, [deals, selectedDealId, mapLoaded, onSelectDeal]);
+  }, [deals, selectedDealId, mapReady, onSelectDeal]);
 
-  // Fly to selected deal
+  // ==========================================================================
+  // FLY TO SELECTED DEAL
+  // ==========================================================================
   useEffect(() => {
-    if (!map.current || !mapLoaded || !selectedDealId) return;
+    const map = mapInstanceRef.current;
+    if (!map || !mapReady || !selectedDealId) return;
+    
     const deal = deals.find(d => d.id === selectedDealId);
     if (!deal) return;
+    
     const coords = getCoordinatesForDeal(deal);
     if (!coords) return;
-    map.current.flyTo({ center: coords, zoom: 12, duration: 1500 });
-  }, [selectedDealId, deals, mapLoaded]);
+    
+    map.flyTo({ center: coords, zoom: 12, duration: 1500 });
+  }, [selectedDealId, deals, mapReady]);
 
-  // Fly to searched location
+  // ==========================================================================
+  // FLY TO SEARCH LOCATION
+  // ==========================================================================
   useEffect(() => {
-    if (!map.current || !mapLoaded || !centerLocation) return;
+    const map = mapInstanceRef.current;
+    const mapboxgl = mapboxModule.current;
+    if (!map || !mapboxgl || !mapReady || !centerLocation) return;
 
+    // Remove old search marker
     if (searchMarkerRef.current) {
       searchMarkerRef.current.remove();
       searchMarkerRef.current = null;
     }
 
+    // Create pulsing marker
     const el = document.createElement('div');
     el.innerHTML = `
-      <div style="
+      <div class="search-pulse" style="
         width: 24px; height: 24px;
         background: #ef4444; border: 3px solid white; border-radius: 50%;
         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        animation: pulse 2s infinite;
       "></div>
-      <style>
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-          70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-      </style>
     `;
 
     searchMarkerRef.current = new mapboxgl.Marker(el)
       .setLngLat(centerLocation)
-      .addTo(map.current);
+      .addTo(map);
 
-    map.current.flyTo({ center: centerLocation, zoom: 12, duration: 1500 });
-  }, [centerLocation, mapLoaded]);
+    map.flyTo({ center: centerLocation, zoom: 12, duration: 1500 });
+  }, [centerLocation, mapReady]);
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
 
   if (!mapboxToken) {
     return (
@@ -547,6 +516,13 @@ export default function InteractiveMapPlatform({
         </div>
       )}
 
+      {/* Tract count indicator */}
+      {showTracts && currentZoom >= MIN_TRACT_ZOOM && tractCount > 0 && !tractsLoading && (
+        <div className="absolute top-4 right-4 bg-gray-900/90 rounded-lg px-3 py-2 border border-gray-700 z-10">
+          <span className="text-xs text-orange-400">{tractCount} tracts</span>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="absolute bottom-20 left-4 bg-gray-900/95 rounded-lg p-3 border border-gray-700 z-10">
         <p className="text-xs font-semibold text-gray-300 mb-2">Legend</p>
@@ -570,7 +546,7 @@ export default function InteractiveMapPlatform({
             <>
               <div className="w-full h-px bg-gray-700 my-2" />
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded" style={{ backgroundColor: TRACT_COLORS.default, opacity: 0.5 }}></div>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: TRACT_FILL_COLOR, opacity: 0.5 }}></div>
                 <span className="text-xs text-gray-400">Census Tract</span>
               </div>
             </>
@@ -582,7 +558,7 @@ export default function InteractiveMapPlatform({
       </div>
 
       {/* Loading overlay */}
-      {!mapLoaded && (
+      {!mapReady && (
         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>

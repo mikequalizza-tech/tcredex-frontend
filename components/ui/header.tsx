@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Logo from "./logo";
 import MobileMenu from "./mobile-menu";
+import HeaderSearch from "./header-search";
 
 interface DropdownItem {
   name: string;
@@ -33,6 +34,7 @@ const resourcesDropdown: NavDropdown = {
     { name: "How It Works", href: "/how-it-works", description: "Step-by-step process" },
     { name: "Who We Serve", href: "/who-we-serve", description: "Sponsors, CDEs, and Investors" },
     { name: "About", href: "/about", description: "Our mission and team" },
+    { name: "Help", href: "/help", description: "Support and documentation" },
   ],
 };
 
@@ -254,8 +256,16 @@ export default function Header() {
               <li>
                 <NavDropdownMenu dropdown={resourcesDropdown} isLoggedIn={isLoggedIn} />
               </li>
+              <li>
+                <Link href="/blog" className="flex items-center text-gray-300 transition hover:text-white">Blog</Link>
+              </li>
             </ul>
           </nav>
+
+          {/* Search */}
+          <div className="hidden md:block">
+            <HeaderSearch />
+          </div>
 
           {/* Desktop auth */}
           <ul className="flex flex-1 items-center justify-end gap-3">

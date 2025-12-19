@@ -138,16 +138,20 @@ export default function HomeMapWithTracts({
       const enrichedFeatures = await Promise.all(eligibilityPromises);
       console.log(`[Tracts] Enriched ${enrichedFeatures.length} features with eligibility`);
       
-      // Update the map source
-      const source = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
-      if (source) {
-        source.setData({
-          type: 'FeatureCollection',
-          features: enrichedFeatures,
-        });
-        console.log('[Tracts] ✅ Updated map source with tract features');
-      } else {
-        console.error('[Tracts] ❌ No tracts source found on map!');
+      // Update the map source - wrap in try-catch to prevent Mapbox errors from bubbling
+      try {
+        const source = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
+        if (source) {
+          source.setData({
+            type: 'FeatureCollection',
+            features: enrichedFeatures,
+          });
+          console.log('[Tracts] ✅ Updated map source with tract features');
+        } else {
+          console.error('[Tracts] ❌ No tracts source found on map!');
+        }
+      } catch (mapError) {
+        console.warn('[Tracts] Error updating tract source:', mapError);
       }
     } catch (error) {
       console.error('[Tracts] Error loading tracts:', error);
@@ -530,19 +534,25 @@ export default function HomeMapWithTracts({
         const geoData = await geoRes.json();
         console.log(`[Map] Geometry response:`, geoData);
         
-        if (geoData.found && geoData.geometry) {
+        if (geoData.found && geoData.geometry && geoData.geometry.type && geoData.geometry.coordinates) {
           geometry = geoData.geometry;
           console.log(`[Map] Got real geometry, type: ${geoData.geometry.type}`);
         } else {
-          console.warn(`[Map] TIGERweb returned no geometry:`, geoData.message || 'Unknown reason');
+          console.warn(`[Map] TIGERweb returned no valid geometry:`, geoData.message || 'Unknown reason');
         }
       } else {
-        console.log(`[Map] Using provided geometry, type: ${existingGeometry?.type}`);
+        // Validate existing geometry (check with 'in' operator for TypeScript compatibility)
+        if (!existingGeometry?.type || !('coordinates' in existingGeometry)) {
+          console.warn('[Map] Provided geometry is invalid, will use fallback');
+          geometry = undefined;
+        } else {
+          console.log(`[Map] Using provided geometry, type: ${existingGeometry?.type}`);
+        }
       }
 
-      // If we still don't have geometry, create a fallback bounding box
-      if (!geometry) {
-        console.warn(`[Map] No geometry available, using fallback bounding box`);
+      // If we still don't have valid geometry, create a fallback bounding box
+      if (!geometry || !geometry.type || !('coordinates' in geometry)) {
+        console.warn('[Map] No valid geometry available, using fallback bounding box');
         const offset = 0.012;
         geometry = {
           type: 'Polygon',
@@ -574,23 +584,33 @@ export default function HomeMapWithTracts({
         geometry: geometry as GeoJSON.Geometry,
       };
 
-      // Update the tracts source
-      const source = map.current.getSource('tracts') as mapboxgl.GeoJSONSource;
-      if (source) {
-        source.setData({
-          type: 'FeatureCollection',
-          features: [tractFeature]
-        });
+      // Update the tracts source - wrap in try-catch to prevent Mapbox errors from bubbling
+      try {
+        const source = map.current.getSource('tracts') as mapboxgl.GeoJSONSource;
+        if (source) {
+          source.setData({
+            type: 'FeatureCollection',
+            features: [tractFeature]
+          });
+        }
+      } catch (mapError) {
+        console.warn('[Map] Error updating tract source:', mapError);
       }
 
       // Fit map to tract bounds if we have real geometry
       if (geometry && geometry.type === 'Polygon' && map.current) {
-        const coords = (geometry as GeoJSON.Polygon).coordinates[0];
-        const bounds = coords.reduce(
-          (b, coord) => b.extend(coord as [number, number]),
-          new mapboxgl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number])
-        );
-        map.current.fitBounds(bounds, { padding: 80, duration: 1000 });
+        try {
+          const coords = (geometry as GeoJSON.Polygon).coordinates[0];
+          if (coords && coords.length > 0) {
+            const bounds = coords.reduce(
+              (b, coord) => b.extend(coord as [number, number]),
+              new mapboxgl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number])
+            );
+            map.current.fitBounds(bounds, { padding: 80, duration: 1000 });
+          }
+        } catch (boundsError) {
+          console.warn('[Map] Error fitting bounds:', boundsError);
+        }
       }
 
     } catch (error) {

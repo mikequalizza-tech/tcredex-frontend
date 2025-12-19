@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ProgressRail } from './ProgressRail';
 import { SectionRenderer } from './SectionRenderer';
 import { ReadinessMeter } from './ReadinessMeter';
 
-// Re-export types from the central type definition
 export type { 
   ProgramType, 
   IntakeData, 
@@ -26,7 +25,6 @@ interface IntakeShellProps {
 }
 
 export function IntakeShell({ initialData, onSave, onSubmit, projectId }: IntakeShellProps) {
-  // Form state
   const [data, setData] = useState<IntakeData>(() => ({
     programs: [],
     documents: [],
@@ -39,19 +37,12 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId }: Intake
   const [programs, setPrograms] = useState<ProgramType[]>(initialData?.programs || []);
   const [activeSection, setActiveSection] = useState('basics');
   const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [readinessScore, setReadinessScore] = useState(0);
 
-  // Auto-save timer ref
-  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
-
   // Handle data changes
   const handleDataChange = useCallback((updates: Partial<IntakeData>) => {
-    setData(prev => {
-      const updated = { ...prev, ...updates, updatedAt: new Date().toISOString() };
-      return updated;
-    });
+    setData(prev => ({ ...prev, ...updates, updatedAt: new Date().toISOString() }));
     setHasChanges(true);
   }, []);
 
@@ -65,42 +56,25 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId }: Intake
   // Handle section navigation
   const handleSectionClick = useCallback((sectionId: string) => {
     setActiveSection(sectionId);
-    
-    // Scroll to section
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, []);
 
-  // Auto-save effect
+  // NO AUTO-SAVE. Only save when user clicks button or leaves page.
+  
+  // Save on page leave (beforeunload)
   useEffect(() => {
-    if (hasChanges && onSave) {
-      // Clear existing timer
-      if (autoSaveTimer.current) {
-        clearTimeout(autoSaveTimer.current);
-      }
-      
-      // Set new timer for auto-save (5 seconds after last change)
-      autoSaveTimer.current = setTimeout(async () => {
-        setIsSaving(true);
-        try {
-          await onSave(data, readinessScore);
-          setLastSaved(new Date());
-          setHasChanges(false);
-        } catch (error) {
-          console.error('Auto-save failed:', error);
-        } finally {
-          setIsSaving(false);
-        }
-      }, 5000);
-    }
-
-    return () => {
-      if (autoSaveTimer.current) {
-        clearTimeout(autoSaveTimer.current);
+    const handleBeforeUnload = () => {
+      if (hasChanges && onSave) {
+        // Fire and forget - can't await in beforeunload
+        onSave(data, readinessScore);
       }
     };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [data, hasChanges, onSave, readinessScore]);
 
   // Manual save
@@ -110,7 +84,6 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId }: Intake
     setIsSaving(true);
     try {
       await onSave(data, readinessScore);
-      setLastSaved(new Date());
       setHasChanges(false);
     } catch (error) {
       console.error('Save failed:', error);
@@ -147,7 +120,6 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId }: Intake
       { threshold: [0.3], rootMargin: '-100px 0px -50% 0px' }
     );
 
-    // Observe all sections
     const sections = document.querySelectorAll('section[id]');
     sections.forEach((section) => observer.observe(section));
 
@@ -169,21 +141,10 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId }: Intake
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Save Status */}
-            <div className="text-xs text-gray-500">
-              {isSaving ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span>
-                  Saving...
-                </span>
-              ) : hasChanges ? (
-                <span className="text-yellow-400">Unsaved changes</span>
-              ) : lastSaved ? (
-                <span className="text-green-400">
-                  Saved {lastSaved.toLocaleTimeString()}
-                </span>
-              ) : null}
-            </div>
+            {/* Save indicator - minimal */}
+            {hasChanges && (
+              <span className="text-xs text-yellow-400">●</span>
+            )}
             
             {/* Manual Save Button */}
             {onSave && (
@@ -210,7 +171,7 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId }: Intake
                   : 'bg-gray-800 text-gray-500 cursor-not-allowed'
               }`}
             >
-              Generate DealCard →
+              Submit Deal →
             </button>
           </div>
         </div>
@@ -258,16 +219,13 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId }: Intake
             <div className="text-sm font-medium text-gray-300">
               {data.projectName || 'Untitled Project'}
             </div>
-            <div className="text-xs text-gray-500">
-              {hasChanges ? 'Unsaved changes' : 'All changes saved'}
-            </div>
           </div>
           <button
             onClick={handleSubmit}
             disabled={!data.projectName || !data.censusTract}
             className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-medium disabled:bg-gray-700 disabled:text-gray-500"
           >
-            Generate DealCard
+            Submit Deal
           </button>
         </div>
       </div>

@@ -1,7 +1,38 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Public routes that don't require authentication
+// ============================================================================
+// QR/Referral Campaign Destinations
+// ============================================================================
+const CAMPAIGN_DESTINATIONS: Record<string, string> = {
+  // Conference/Event QR codes
+  'conf-2025': '/founders?utm_source=conference&utm_campaign=2025',
+  'nmtc-conf': '/founders?utm_source=nmtc-conference',
+  'htc-conf': '/founders?utm_source=htc-conference',
+  
+  // Marketing materials
+  'pitch-deck': '/founders?utm_source=pitch-deck',
+  'business-card': '/founders?utm_source=business-card',
+  'one-pager': '/founders?utm_source=one-pager',
+  'brochure': '/founders?utm_source=brochure',
+  
+  // Social/Digital
+  'linkedin': '/founders?utm_source=linkedin',
+  'twitter': '/founders?utm_source=twitter',
+  'email-sig': '/founders?utm_source=email-signature',
+  
+  // Partner codes
+  'cde-partner': '/founders?utm_source=cde-partner',
+  'investor-intro': '/founders?utm_source=investor-intro',
+  
+  // Demo/testing
+  'demo': '/map',
+  'test': '/founders?utm_source=test',
+};
+
+// ============================================================================
+// Public Routes Configuration
+// ============================================================================
 const PUBLIC_ROUTES = [
   '/',
   '/signin',
@@ -18,47 +49,82 @@ const PUBLIC_ROUTES = [
   '/how-it-works',
   '/privacy',
   '/terms',
-  '/deals',  // Marketplace browsing is public
+  '/deals',
+  '/founders', // Pre-launch signup page
+  '/blog',
+  '/help',
+  '/map', // Map is public for demos
+  '/intake', // Intake is public for deal submission
+  '/who-we-serve',
 ];
 
-// Routes that start with these prefixes are public
 const PUBLIC_PREFIXES = [
-  '/api/auth',      // Auth API endpoints
-  '/api/geo',       // Geo lookup endpoints
-  '/api/eligibility', // Eligibility checks
-  '/_next',         // Next.js internals
+  '/api/',
+  '/_next',
   '/favicon',
   '/images',
   '/fonts',
   '/icons',
-  '/deals/',        // Individual deal pages are public
+  '/deals/',
+  '/blog/',
+  '/r/', // QR/referral redirects
 ];
 
-// Role-based route protection
-const ROLE_PROTECTED_ROUTES: Record<string, string[]> = {
-  // Admin only routes
-  '/admin': ['ORG_ADMIN'],
-  '/settings/team': ['ORG_ADMIN'],
-  '/settings/billing': ['ORG_ADMIN'],
-  
-  // Project admin and above
-  '/projects/new': ['ORG_ADMIN', 'PROJECT_ADMIN'],
-  '/deals/new': ['ORG_ADMIN', 'PROJECT_ADMIN'],
-  
-  // Member and above (most app routes)
-  '/dashboard': ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'],
-  '/projects': ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'],
-  '/deals': ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'],
-  '/documents': ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'],
-  '/map': ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'],
-  '/intake': ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER'],
-  '/closing': ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'],
-  '/settings': ['ORG_ADMIN', 'PROJECT_ADMIN'],
-};
-
-export function middleware(request: NextRequest) {
+// ============================================================================
+// Middleware Handler
+// ============================================================================
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // -------------------------------------------------------------------------
+  // QR Code / Referral Link Handler
+  // Intercepts /r/[code] paths and redirects with tracking
+  // -------------------------------------------------------------------------
+  if (pathname.startsWith('/r/')) {
+    const code = pathname.replace('/r/', '').split('/')[0];
+    
+    if (code) {
+      // Determine destination
+      let destination: string;
+      const codeUpper = code.toUpperCase();
+      const codeLower = code.toLowerCase();
+      
+      if (codeUpper.startsWith('FM-')) {
+        // Referral code - go to founders page with referral param
+        destination = `/founders?ref=${codeUpper}`;
+      } else if (CAMPAIGN_DESTINATIONS[codeLower]) {
+        // Known campaign code
+        destination = CAMPAIGN_DESTINATIONS[codeLower];
+      } else {
+        // Unknown code - default to founders page with code as UTM
+        destination = `/founders?utm_source=qr&utm_campaign=${code}`;
+      }
+
+      // Create redirect response
+      const redirectUrl = new URL(destination, request.url);
+      const response = NextResponse.redirect(redirectUrl);
+      
+      // Set tracking cookie for conversion attribution
+      response.cookies.set('tcredex_track', JSON.stringify({
+        code: codeUpper,
+        type: codeUpper.startsWith('FM-') ? 'referral' : 'campaign',
+        timestamp: Date.now(),
+        device: /mobile|android|iphone|ipad/i.test(request.headers.get('user-agent') || '') ? 'mobile' : 'desktop'
+      }), {
+        httpOnly: false, // Allow JS to read for conversion tracking
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30 // 30 days attribution window
+      });
+
+      return response;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Standard Auth Middleware
+  // -------------------------------------------------------------------------
+  
   // Allow public routes
   if (PUBLIC_ROUTES.includes(pathname)) {
     return NextResponse.next();
@@ -69,11 +135,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow API routes (they handle their own auth)
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
-  }
-
   // Allow static files
   if (pathname.includes('.')) {
     return NextResponse.next();
@@ -81,12 +142,8 @@ export function middleware(request: NextRequest) {
 
   // Check for session cookie/token
   const session = request.cookies.get('tcredex_session')?.value;
-  
-  // Also check localStorage via a custom header (set by client)
   const authHeader = request.headers.get('x-tcredex-auth');
 
-  // For now, we check if there's ANY session indicator
-  // In production, you'd verify the JWT/session token
   if (!session && !authHeader) {
     // No session - redirect to signin
     const signinUrl = new URL('/signin', request.url);
@@ -94,21 +151,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(signinUrl);
   }
 
-  // Session exists - allow through
-  // Role checking happens at the component level via useCurrentUser
   return NextResponse.next();
 }
 
 // Configure which routes the middleware runs on
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

@@ -154,6 +154,7 @@ export default function MapFilterRail({
   
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<AutocompleteInstance | null>(null);
+  const currentRequestId = useRef<number>(0); // Track current request to cancel stale ones
 
   // Handle hydration - only run client-side code after mount
   useEffect(() => {
@@ -235,14 +236,23 @@ export default function MapFilterRail({
 
   // Lookup tract by coordinates - routes through our API to avoid CORS
   const handleCoordinateLookup = useCallback(async (lng: number, lat: number) => {
+    // Increment request ID to cancel any in-flight requests
+    const requestId = ++currentRequestId.current;
+    
     setIsSearching(true);
     setSearchError(null);
-    setTractResult(null);
+    // Don't clear tractResult immediately - wait for new result to avoid jiggle
 
     try {
       // Call our API with coordinates
       const tractResponse = await fetch(`/api/geo/tract-lookup?lat=${lat}&lng=${lng}`);
       const tractData = await tractResponse.json();
+
+      // Check if this request is still current (not superseded by another)
+      if (requestId !== currentRequestId.current) {
+        console.log('[MapFilterRail] Coordinate lookup superseded, ignoring result');
+        return;
+      }
 
       if (!tractResponse.ok || !tractData.geoid) {
         throw new Error(tractData.error || 'Could not determine census tract');
@@ -250,6 +260,13 @@ export default function MapFilterRail({
 
       // Get eligibility data
       const eligibilityResponse = await fetch(`/api/eligibility?tract=${tractData.geoid}`);
+      
+      // Check again after second API call
+      if (requestId !== currentRequestId.current) {
+        console.log('[MapFilterRail] Coordinate lookup superseded, ignoring eligibility');
+        return;
+      }
+      
       if (!eligibilityResponse.ok) throw new Error('Eligibility lookup failed');
       const eligibilityData = await eligibilityResponse.json();
 
@@ -282,10 +299,17 @@ export default function MapFilterRail({
         onTractFound(tract, [lng, lat]);
       }
     } catch (error) {
-      console.error('Coordinate lookup error:', error);
-      setSearchError(error instanceof Error ? error.message : 'Lookup failed');
+      // Only set error if this request is still current
+      if (requestId === currentRequestId.current) {
+        console.error('Coordinate lookup error:', error);
+        setSearchError(error instanceof Error ? error.message : 'Lookup failed');
+        setTractResult(null);
+      }
     } finally {
-      setIsSearching(false);
+      // Only update loading state if this request is still current
+      if (requestId === currentRequestId.current) {
+        setIsSearching(false);
+      }
     }
   }, [onTractFound]);
 
@@ -294,24 +318,41 @@ export default function MapFilterRail({
     const addrToSearch = searchAddress || address;
     if (!addrToSearch.trim()) return;
     
+    // Increment request ID to cancel any in-flight requests
+    const requestId = ++currentRequestId.current;
+    
     setIsSearching(true);
     setSearchError(null);
-    setTractResult(null);
+    // Don't clear tractResult immediately - wait for new result to avoid jiggle
 
     try {
       // Call our API with address parameter
       const geoResponse = await fetch(`/api/geo/tract-lookup?address=${encodeURIComponent(addrToSearch)}`);
       const geoData = await geoResponse.json();
 
+      // Check if this request is still current
+      if (requestId !== currentRequestId.current) {
+        console.log('[MapFilterRail] Address search superseded, ignoring result');
+        return;
+      }
+
       if (!geoResponse.ok || !geoData.geoid) {
         // Don't throw - just set error message and return
         setSearchError(geoData.error || 'Could not determine census tract for this address. Try a more specific address.');
+        setTractResult(null); // Only clear on actual error, not during loading
         setIsSearching(false);
         return;
       }
 
       // Get eligibility data
       const eligibilityResponse = await fetch(`/api/eligibility?tract=${geoData.geoid}`);
+      
+      // Check again after second API call
+      if (requestId !== currentRequestId.current) {
+        console.log('[MapFilterRail] Address search superseded, ignoring eligibility');
+        return;
+      }
+      
       if (!eligibilityResponse.ok) throw new Error('Eligibility lookup failed');
       const eligibilityData = await eligibilityResponse.json();
 
@@ -466,7 +507,7 @@ export default function MapFilterRail({
                 : 'Enter full address and press Enter'}
             </p>
 
-            {searchError && !tractResult && (
+            {searchError && !tractResult && !isSearching && (
               <div className="p-2 bg-red-900/30 border border-red-800 rounded-lg">
                 <p className="text-xs text-red-400">{searchError}</p>
               </div>

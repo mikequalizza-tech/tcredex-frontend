@@ -13,12 +13,15 @@ import { NextRequest, NextResponse } from 'next/server';
 const tractCache = new Map<string, { data: unknown; timestamp: number }>();
 const CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
+// TigerWeb ACS 2021 - Layer 8 = Tracts
+const TIGERWEB_TRACTS_URL = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const bbox = searchParams.get('bbox');
   const state = searchParams.get('state');
   const geoid = searchParams.get('geoid');
-  const limit = parseInt(searchParams.get('limit') || '500');
+  const limit = parseInt(searchParams.get('limit') || '200');
 
   try {
     // Option 1: Get by bounding box
@@ -38,37 +41,61 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(cached.data);
       }
 
-      // Query Census Bureau TigerWeb
-      const geometry = JSON.stringify({
-        xmin: minLng,
-        ymin: minLat,
-        xmax: maxLng,
-        ymax: maxLat,
-        spatialReference: { wkid: 4326 }
+      // Use URL-encoded envelope format that ArcGIS expects
+      const params = new URLSearchParams({
+        geometry: `${minLng},${minLat},${maxLng},${maxLat}`,
+        geometryType: 'esriGeometryEnvelope',
+        inSR: '4326',
+        spatialRel: 'esriSpatialRelIntersects',
+        outFields: 'GEOID,NAME,STATE,COUNTY,TRACT',
+        returnGeometry: 'true',
+        outSR: '4326',
+        f: 'geojson',
+        resultRecordCount: String(limit)
       });
 
-      const tigerUrl = new URL('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query');
-      tigerUrl.searchParams.set('geometry', geometry);
-      tigerUrl.searchParams.set('geometryType', 'esriGeometryEnvelope');
-      tigerUrl.searchParams.set('spatialRel', 'esriSpatialRelIntersects');
-      tigerUrl.searchParams.set('outFields', 'GEOID,NAME,STATE,COUNTY,TRACT,ALAND,AWATER');
-      tigerUrl.searchParams.set('returnGeometry', 'true');
-      tigerUrl.searchParams.set('outSR', '4326');
-      tigerUrl.searchParams.set('f', 'geojson');
-      tigerUrl.searchParams.set('resultRecordCount', String(limit));
+      const fullUrl = `${TIGERWEB_TRACTS_URL}?${params.toString()}`;
+      console.log('[GeoTracts] Fetching:', fullUrl);
 
-      const response = await fetch(tigerUrl.toString(), {
-        headers: { 'Accept': 'application/json' },
-        next: { revalidate: 3600 } // Cache for 1 hour
+      const response = await fetch(fullUrl, {
+        headers: { 
+          'Accept': 'application/json',
+        },
       });
 
-      if (!response.ok) {
-        throw new Error(`TigerWeb API error: ${response.status}`);
+      const text = await response.text();
+      let geojson;
+      
+      try {
+        geojson = JSON.parse(text);
+      } catch {
+        console.error('[GeoTracts] Failed to parse:', text.substring(0, 500));
+        return NextResponse.json({ type: 'FeatureCollection', features: [] });
       }
 
-      const geojson = await response.json();
+      // Check for API error
+      if (geojson.error) {
+        console.error('[GeoTracts] TigerWeb error:', geojson.error);
+        return NextResponse.json({ 
+          type: 'FeatureCollection', 
+          features: [],
+          _error: geojson.error 
+        });
+      }
       
-      // Cache the result
+      // Validate GeoJSON structure
+      if (!geojson || geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
+        console.warn('[GeoTracts] Invalid response');
+        return NextResponse.json({ type: 'FeatureCollection', features: [] });
+      }
+      
+      // Filter invalid geometries
+      geojson.features = geojson.features.filter((f: { geometry?: { type?: string; coordinates?: unknown } }) => 
+        f && f.geometry && f.geometry.type && f.geometry.coordinates
+      );
+
+      console.log('[GeoTracts] Returned', geojson.features.length, 'tracts');
+      
       tractCache.set(cacheKey, { data: geojson, timestamp: Date.now() });
       
       return NextResponse.json(geojson);
@@ -83,24 +110,29 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(cached.data);
       }
 
-      const tigerUrl = new URL('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query');
-      tigerUrl.searchParams.set('where', `STATE='${stateFips}'`);
-      tigerUrl.searchParams.set('outFields', 'GEOID,NAME,STATE,COUNTY,TRACT,ALAND,AWATER');
-      tigerUrl.searchParams.set('returnGeometry', 'true');
-      tigerUrl.searchParams.set('outSR', '4326');
-      tigerUrl.searchParams.set('f', 'geojson');
-      tigerUrl.searchParams.set('resultRecordCount', String(limit));
-
-      const response = await fetch(tigerUrl.toString(), {
-        headers: { 'Accept': 'application/json' },
-        next: { revalidate: 3600 }
+      const params = new URLSearchParams({
+        where: `STATE='${stateFips}'`,
+        outFields: 'GEOID,NAME,STATE,COUNTY,TRACT',
+        returnGeometry: 'true',
+        outSR: '4326',
+        f: 'geojson',
+        resultRecordCount: String(limit)
       });
 
-      if (!response.ok) {
-        throw new Error(`TigerWeb API error: ${response.status}`);
-      }
+      const response = await fetch(`${TIGERWEB_TRACTS_URL}?${params.toString()}`, {
+        headers: { 'Accept': 'application/json' },
+      });
 
       const geojson = await response.json();
+      
+      if (!geojson || geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
+        return NextResponse.json({ type: 'FeatureCollection', features: [] });
+      }
+      
+      geojson.features = geojson.features.filter((f: { geometry?: { type?: string; coordinates?: unknown } }) => 
+        f && f.geometry && f.geometry.type && f.geometry.coordinates
+      );
+      
       tractCache.set(cacheKey, { data: geojson, timestamp: Date.now() });
       
       return NextResponse.json(geojson);
@@ -115,26 +147,31 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(cached.data);
       }
 
-      const tigerUrl = new URL('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query');
-      tigerUrl.searchParams.set('where', `GEOID='${cleanGeoid}'`);
-      tigerUrl.searchParams.set('outFields', 'GEOID,NAME,STATE,COUNTY,TRACT,ALAND,AWATER');
-      tigerUrl.searchParams.set('returnGeometry', 'true');
-      tigerUrl.searchParams.set('outSR', '4326');
-      tigerUrl.searchParams.set('f', 'geojson');
-
-      const response = await fetch(tigerUrl.toString(), {
-        headers: { 'Accept': 'application/json' },
-        next: { revalidate: 3600 }
+      const params = new URLSearchParams({
+        where: `GEOID='${cleanGeoid}'`,
+        outFields: 'GEOID,NAME,STATE,COUNTY,TRACT',
+        returnGeometry: 'true',
+        outSR: '4326',
+        f: 'geojson'
       });
 
-      if (!response.ok) {
-        throw new Error(`TigerWeb API error: ${response.status}`);
-      }
+      const response = await fetch(`${TIGERWEB_TRACTS_URL}?${params.toString()}`, {
+        headers: { 'Accept': 'application/json' },
+      });
 
-      const geojson = await response.json();
-      tractCache.set(cacheKey, { data: geojson, timestamp: Date.now() });
+      const geojsonResult = await response.json();
       
-      return NextResponse.json(geojson);
+      if (!geojsonResult || geojsonResult.type !== 'FeatureCollection' || !Array.isArray(geojsonResult.features)) {
+        return NextResponse.json({ type: 'FeatureCollection', features: [] });
+      }
+      
+      geojsonResult.features = geojsonResult.features.filter((f: { geometry?: { type?: string; coordinates?: unknown } }) => 
+        f && f.geometry && f.geometry.type && f.geometry.coordinates
+      );
+      
+      tractCache.set(cacheKey, { data: geojsonResult, timestamp: Date.now() });
+      
+      return NextResponse.json(geojsonResult);
     }
 
     // No valid params

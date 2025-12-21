@@ -118,10 +118,10 @@ const AllocationsIcon = () => (
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: <HomeIcon /> },
-  { name: 'Submit Deal', href: '/deals/new', icon: <SubmitDealIcon />, orgTypes: ['sponsor', 'cde'] },
+  { name: 'Submit Deal', href: '/deals/new', icon: <SubmitDealIcon />, orgTypes: ['sponsor'] },  // Only sponsors submit deals
   { name: 'Map', href: '/map', icon: <MapIcon /> },
   { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, orgTypes: ['sponsor'] },
-  { name: 'Pipeline', href: '/dashboard/pipeline', icon: <PipelineIcon />, orgTypes: ['cde'] },
+  { name: 'Pipeline', href: '/dashboard/pipeline', icon: <PipelineIcon /> },  // All roles see pipeline (scoped to their deals)
   { name: 'Allocations', href: '/dashboard/allocations', icon: <AllocationsIcon />, orgTypes: ['cde'] },
   { name: 'AutoMatch AI', href: '/dashboard/automatch', icon: <AutoMatchIcon />, orgTypes: ['cde', 'investor'] },
   { name: 'Marketplace', href: '/deals', icon: <DealsIcon /> },

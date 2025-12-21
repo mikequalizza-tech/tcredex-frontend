@@ -5,7 +5,7 @@ import { KnowledgeCategory } from '@/lib/knowledge/types';
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    
+
     const file = formData.get('file') as File;
     const category = formData.get('category') as KnowledgeCategory;
     const program = formData.get('program') as string | null;
@@ -27,10 +27,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate file type
-    const validTypes = ['application/pdf', 'text/plain', 'text/markdown'];
+    const validTypes = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/vnd.ms-excel'];
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: `Invalid file type: ${file.type}. Supported: PDF, TXT, MD` },
+        { error: `Invalid file type: ${file.type}. Supported: PDF, TXT, MD, CSV` },
         { status: 400 }
       );
     }

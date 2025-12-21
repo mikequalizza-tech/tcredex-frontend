@@ -14,6 +14,7 @@ import { generateEmbeddings } from './embeddings';
 import { storeDocument, storeChunks, deleteDocument } from './vectorStore';
 import { chunkText, createDocumentChunks, getOptimalChunkSize, estimateTokens } from './chunker';
 import crypto from 'crypto';
+import Papa from 'papaparse';
 
 // Batch size for embedding generation (OpenAI limit is ~2048 per request)
 const EMBEDDING_BATCH_SIZE = 20;
@@ -37,7 +38,7 @@ export async function extractPDFText(buffer: Buffer): Promise<{
   try {
     // Dynamic import for server-side only
     const pdfParse = (await import('pdf-parse')).default;
-    
+
     const data = await pdfParse(buffer, {
       // Return page-by-page text
       pagerender: async (pageData: any) => {
@@ -67,6 +68,70 @@ export async function extractPDFText(buffer: Buffer): Promise<{
 }
 
 /**
+ * Extract text from CSV/Excel using PapaParse
+ * Groups rows into logical chunks (pages)
+ */
+export async function extractCSVText(buffer: Buffer): Promise<{
+  text: string;
+  pages: { pageNumber: number; text: string }[];
+  pageCount: number;
+}> {
+  return new Promise((resolve, reject) => {
+    try {
+      const csvContent = buffer.toString('utf-8');
+
+      Papa.parse(csvContent, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.errors.length > 0) {
+            console.warn('CSV parsing warnings:', results.errors);
+          }
+
+          const rows = results.data as Record<string, any>[];
+          // Group rows to maintain context (e.g. 10 rows per "page")
+          // This creates natural breakpoints for the chunker later
+          const ROW_GROUP_SIZE = 10;
+
+          const pages: { pageNumber: number; text: string }[] = [];
+
+          // Process rows into formatted text blocks
+          for (let i = 0; i < rows.length; i += ROW_GROUP_SIZE) {
+            const chunkRows = rows.slice(i, i + ROW_GROUP_SIZE);
+            const chunkText = chunkRows.map(row => {
+              // Format each row as "Key: Value" lines
+              return Object.entries(row)
+                .filter(([_, value]) => value !== null && value !== '') // Skip empty values
+                .map(([key, value]) => `${key}: ${value}`)
+                .join('\n');
+            }).join('\n\n---\n\n'); // Separator between rows
+
+            pages.push({
+              pageNumber: Math.floor(i / ROW_GROUP_SIZE) + 1,
+              text: chunkText,
+            });
+          }
+
+          // Combine all pages for the full text (used for checksum/search fallback)
+          const text = pages.map(p => p.text).join('\n\n=== SECTION ===\n\n');
+
+          resolve({
+            text,
+            pages,
+            pageCount: pages.length,
+          });
+        },
+        error: (error: any) => {
+          reject(new Error(`Failed to parse CSV: ${error.message}`));
+        }
+      });
+    } catch (error) {
+      reject(new Error(`Failed to process CSV buffer: ${error}`));
+    }
+  });
+}
+
+/**
  * Main ingestion function
  */
 export async function ingestDocument(
@@ -84,7 +149,7 @@ export async function ingestDocument(
   }
 ): Promise<IngestResult> {
   const documentId = uuidv4();
-  
+
   try {
     // 1. Extract text based on file type
     let text: string;
@@ -93,6 +158,11 @@ export async function ingestDocument(
 
     if (file.mimeType === 'application/pdf') {
       const extracted = await extractPDFText(file.buffer);
+      text = extracted.text;
+      pages = extracted.pages;
+      pageCount = extracted.pageCount;
+    } else if (file.mimeType === 'text/csv' || file.mimeType === 'application/vnd.ms-excel') {
+      const extracted = await extractCSVText(file.buffer);
       text = extracted.text;
       pages = extracted.pages;
       pageCount = extracted.pageCount;
@@ -126,7 +196,7 @@ export async function ingestDocument(
     // 5. Chunk the document
     const chunkOptions = getOptimalChunkSize(options.category);
     const textChunks = chunkText(text, chunkOptions);
-    
+
     const chunks = createDocumentChunks(documentId, textChunks, {
       category: options.category,
       program: options.program,
@@ -137,15 +207,15 @@ export async function ingestDocument(
 
     // 6. Generate embeddings in batches
     const chunksWithEmbeddings: DocumentChunk[] = [];
-    
+
     for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH_SIZE) {
       const batch = chunks.slice(i, i + EMBEDDING_BATCH_SIZE);
       const texts = batch.map(c => c.content);
-      
+
       console.log(`Generating embeddings for batch ${Math.floor(i / EMBEDDING_BATCH_SIZE) + 1}/${Math.ceil(chunks.length / EMBEDDING_BATCH_SIZE)}`);
-      
+
       const embeddings = await generateEmbeddings(texts);
-      
+
       for (let j = 0; j < batch.length; j++) {
         chunksWithEmbeddings.push({
           ...batch[j],
@@ -168,7 +238,7 @@ export async function ingestDocument(
 
   } catch (error: any) {
     console.error(`Ingestion error for ${file.filename}:`, error);
-    
+
     // Clean up partial ingestion
     try {
       await deleteDocument(documentId);
@@ -240,7 +310,7 @@ export async function reingestDocument(
 ): Promise<IngestResult> {
   // Delete existing
   await deleteDocument(documentId);
-  
+
   // Re-ingest
   return ingestDocument(file, options);
 }
@@ -255,7 +325,7 @@ export function estimateIngestionCost(text: string): {
 } {
   const chunks = chunkText(text);
   const totalTokens = chunks.reduce((sum, chunk) => sum + estimateTokens(chunk), 0);
-  
+
   // OpenAI text-embedding-3-small: $0.00002 per 1K tokens
   const estimatedCost = (totalTokens / 1000) * 0.00002;
 

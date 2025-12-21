@@ -69,6 +69,13 @@ export default function HomeMapWithTracts({
       console.log('[Tracts] No map ref');
       return;
     }
+
+    // Check if source exists before making API calls
+    const source = map.current.getSource('tracts');
+    if (!source) {
+      console.log('[Tracts] Source not ready, skipping load');
+      return;
+    }
     
     const zoom = map.current.getZoom();
     console.log(`[Tracts] Current zoom: ${zoom}, MIN_TRACT_ZOOM: ${MIN_TRACT_ZOOM}`);
@@ -140,16 +147,13 @@ export default function HomeMapWithTracts({
       
       // Update the map source - wrap in try-catch to prevent Mapbox errors from bubbling
       try {
-        const source = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
-        if (source) {
-          source.setData({
-            type: 'FeatureCollection',
-            features: enrichedFeatures,
-          });
-          console.log('[Tracts] ✅ Updated map source with tract features');
-        } else {
-          console.error('[Tracts] ❌ No tracts source found on map!');
-        }
+        // We already confirmed source exists at top of function, just cast and use it
+        const tractsSource = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
+        tractsSource.setData({
+          type: 'FeatureCollection',
+          features: enrichedFeatures,
+        });
+        console.log('[Tracts] ✅ Updated map source with tract features');
       } catch (mapError) {
         console.warn('[Tracts] Error updating tract source:', mapError);
       }

@@ -6,12 +6,55 @@ import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useCurrentUser } from '@/lib/auth';
 
-type PipelineStage = 'draft' | 'new' | 'reviewing' | 'due_diligence' | 'approved' | 'closing' | 'closed' | 'declined';
+// ============================================
+// ROLE-SPECIFIC STAGE CONFIGURATIONS
+// ============================================
+
+type SponsorStage = 'draft' | 'submitted' | 'loi_received' | 'committed' | 'closing';
+type CDEStage = 'new' | 'reviewing' | 'loi_issued' | 'committed' | 'closing';
+type InvestorStage = 'reviewing' | 'loi_issued' | 'committed' | 'closing';
+type PipelineStage = SponsorStage | CDEStage | InvestorStage;
+
+interface StageConfig {
+  label: string;
+  color: string;
+  bgColor: string;
+  description?: string;
+}
+
+const SPONSOR_STAGES: Record<SponsorStage, StageConfig> = {
+  draft: { label: 'Drafts', color: 'text-gray-400', bgColor: 'bg-gray-800/50', description: 'In progress' },
+  submitted: { label: 'Submitted', color: 'text-blue-400', bgColor: 'bg-blue-900/50', description: 'Awaiting CDE review' },
+  loi_received: { label: 'LOI Received', color: 'text-purple-400', bgColor: 'bg-purple-900/50', description: 'Letter of Intent from CDE' },
+  committed: { label: 'Committed', color: 'text-green-400', bgColor: 'bg-green-900/50', description: 'Commitment letter signed' },
+  closing: { label: 'Closing', color: 'text-indigo-400', bgColor: 'bg-indigo-900/50', description: 'In closing process' },
+};
+
+const CDE_STAGES: Record<CDEStage, StageConfig> = {
+  new: { label: 'New Submissions', color: 'text-blue-400', bgColor: 'bg-blue-900/50', description: '3-day review period' },
+  reviewing: { label: 'Under Review', color: 'text-yellow-400', bgColor: 'bg-yellow-900/50', description: 'Active due diligence' },
+  loi_issued: { label: 'LOI Issued', color: 'text-purple-400', bgColor: 'bg-purple-900/50', description: 'Awaiting sponsor response' },
+  committed: { label: 'Committed', color: 'text-green-400', bgColor: 'bg-green-900/50', description: 'Commitment letter signed' },
+  closing: { label: 'Closing', color: 'text-indigo-400', bgColor: 'bg-indigo-900/50', description: 'In closing process' },
+};
+
+const INVESTOR_STAGES: Record<InvestorStage, StageConfig> = {
+  reviewing: { label: 'Under Review', color: 'text-yellow-400', bgColor: 'bg-yellow-900/50', description: 'Evaluating opportunity' },
+  loi_issued: { label: 'LOI Issued', color: 'text-purple-400', bgColor: 'bg-purple-900/50', description: 'Intent to invest' },
+  committed: { label: 'Committed', color: 'text-green-400', bgColor: 'bg-green-900/50', description: 'Investment committed' },
+  closing: { label: 'Closing', color: 'text-indigo-400', bgColor: 'bg-indigo-900/50', description: 'Finalizing investment' },
+};
+
+// ============================================
+// PIPELINE DEAL INTERFACE
+// ============================================
 
 interface PipelineDeal {
   id: string;
   projectName: string;
   sponsorName: string;
+  cdeName?: string;
+  investorName?: string;
   city: string;
   state: string;
   programType: 'NMTC' | 'HTC' | 'LIHTC' | 'OZ' | 'DRAFT';
@@ -27,22 +70,70 @@ interface PipelineDeal {
   nextActionDate?: string;
   isDraft?: boolean;
   readinessScore?: number;
+  holdExpires?: string; // 3-day hold for CDEs
 }
 
-const STAGE_CONFIG: Record<PipelineStage, { label: string; color: string; bgColor: string }> = {
-  draft: { label: 'Drafts', color: 'text-gray-400', bgColor: 'bg-gray-800/50' },
-  new: { label: 'New', color: 'text-blue-400', bgColor: 'bg-blue-900/50' },
-  reviewing: { label: 'Under Review', color: 'text-yellow-400', bgColor: 'bg-yellow-900/50' },
-  due_diligence: { label: 'Due Diligence', color: 'text-purple-400', bgColor: 'bg-purple-900/50' },
-  approved: { label: 'Approved', color: 'text-green-400', bgColor: 'bg-green-900/50' },
-  closing: { label: 'Closing', color: 'text-indigo-400', bgColor: 'bg-indigo-900/50' },
-  closed: { label: 'Closed', color: 'text-emerald-400', bgColor: 'bg-emerald-900/50' },
-  declined: { label: 'Declined', color: 'text-red-400', bgColor: 'bg-red-900/50' },
-};
+// ============================================
+// DEMO DATA BY ROLE
+// ============================================
 
-const DEMO_PIPELINE: PipelineDeal[] = [
+// Sponsor sees THEIR deals
+const SPONSOR_DEMO_DEALS: PipelineDeal[] = [
   {
-    id: 'pipe-1',
+    id: 'sp-1',
+    projectName: 'XS Tennis Village Phase 1',
+    sponsorName: 'XS Tennis Foundation',
+    cdeName: 'Midwest Community CDE',
+    city: 'Chicago',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 8500000,
+    stage: 'closing',
+    matchScore: 94,
+    tractType: ['SD', 'QCT'],
+    daysInStage: 15,
+    submittedDate: '2024-10-01',
+    nextAction: 'Final closing documents review',
+    nextActionDate: '2024-12-22',
+  },
+  {
+    id: 'sp-2',
+    projectName: 'XS Tennis Academy Expansion',
+    sponsorName: 'XS Tennis Foundation',
+    cdeName: 'Enterprise Community CDE',
+    city: 'Chicago',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 12000000,
+    stage: 'loi_received',
+    matchScore: 91,
+    tractType: ['SD'],
+    daysInStage: 8,
+    submittedDate: '2024-11-15',
+    nextAction: 'Review LOI terms with counsel',
+    nextActionDate: '2024-12-20',
+  },
+  {
+    id: 'sp-3',
+    projectName: 'XS Community Center',
+    sponsorName: 'XS Tennis Foundation',
+    city: 'Chicago',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 6000000,
+    stage: 'submitted',
+    matchScore: 88,
+    tractType: ['QCT'],
+    daysInStage: 3,
+    submittedDate: '2024-12-18',
+    nextAction: 'Awaiting CDE response',
+  },
+];
+
+// CDE sees deals submitted TO them
+const CDE_DEMO_DEALS: PipelineDeal[] = [
+  {
+    id: 'cde-1',
     projectName: 'Chicago South Side Community Center',
     sponsorName: 'Metro Development Corp',
     city: 'Chicago',
@@ -52,13 +143,13 @@ const DEMO_PIPELINE: PipelineDeal[] = [
     stage: 'new',
     matchScore: 94,
     tractType: ['SD', 'QCT'],
-    daysInStage: 2,
-    submittedDate: '2024-12-15',
-    nextAction: 'Initial call with sponsor',
-    nextActionDate: '2024-12-20',
+    daysInStage: 1,
+    submittedDate: '2024-12-20',
+    holdExpires: '2024-12-23',
+    nextAction: 'Initial review - 3 day hold',
   },
   {
-    id: 'pipe-2',
+    id: 'cde-2',
     projectName: 'Milwaukee Workforce Training Hub',
     sponsorName: 'Badger Community Partners',
     city: 'Milwaukee',
@@ -71,45 +162,45 @@ const DEMO_PIPELINE: PipelineDeal[] = [
     daysInStage: 5,
     submittedDate: '2024-12-10',
     assignedTo: 'Sarah Johnson',
-    nextAction: 'Review financial projections',
-    nextActionDate: '2024-12-18',
+    nextAction: 'Site visit scheduled',
+    nextActionDate: '2024-12-22',
   },
   {
-    id: 'pipe-3',
+    id: 'cde-3',
     projectName: 'Springfield Healthcare Clinic',
     sponsorName: 'Central IL Health Corp',
     city: 'Springfield',
     state: 'IL',
     programType: 'NMTC',
     allocationRequest: 4000000,
-    stage: 'due_diligence',
+    stage: 'loi_issued',
     matchScore: 82,
     tractType: ['LIC'],
-    daysInStage: 12,
+    daysInStage: 3,
     submittedDate: '2024-12-01',
     assignedTo: 'Mike Thompson',
-    nextAction: 'Site visit scheduled',
-    nextActionDate: '2024-12-22',
+    nextAction: 'Awaiting sponsor acceptance',
+    nextActionDate: '2024-12-25',
   },
   {
-    id: 'pipe-4',
+    id: 'cde-4',
     projectName: 'St. Louis Manufacturing Expansion',
     sponsorName: 'Gateway Industrial LLC',
     city: 'St. Louis',
     state: 'MO',
     programType: 'NMTC',
     allocationRequest: 12000000,
-    stage: 'approved',
+    stage: 'committed',
     matchScore: 79,
     tractType: ['SD'],
-    daysInStage: 3,
+    daysInStage: 5,
     submittedDate: '2024-11-15',
     assignedTo: 'Sarah Johnson',
-    nextAction: 'Draft commitment letter',
-    nextActionDate: '2024-12-19',
+    nextAction: 'Schedule closing call',
+    nextActionDate: '2024-12-23',
   },
   {
-    id: 'pipe-5',
+    id: 'cde-5',
     projectName: 'Indianapolis Charter School',
     sponsorName: 'Crossroads Education Foundation',
     city: 'Indianapolis',
@@ -122,25 +213,86 @@ const DEMO_PIPELINE: PipelineDeal[] = [
     daysInStage: 8,
     submittedDate: '2024-10-28',
     assignedTo: 'Mike Thompson',
-    nextAction: 'Closing call with counsel',
+    nextAction: 'Final document review',
     nextActionDate: '2024-12-21',
   },
+];
+
+// Investor sees deals they're considering/committed to
+const INVESTOR_DEMO_DEALS: PipelineDeal[] = [
   {
-    id: 'pipe-6',
-    projectName: 'Detroit Tech Incubator',
-    sponsorName: 'Motor City Ventures',
+    id: 'inv-1',
+    projectName: 'Downtown Community Center',
+    sponsorName: 'Metro Development Corp',
+    cdeName: 'Enterprise Community CDE',
+    city: 'Chicago',
+    state: 'IL',
+    programType: 'NMTC',
+    allocationRequest: 15000000,
+    stage: 'reviewing',
+    matchScore: 94,
+    tractType: ['SD', 'QCT'],
+    daysInStage: 4,
+    submittedDate: '2024-12-15',
+    nextAction: 'Review CRA eligibility',
+    nextActionDate: '2024-12-22',
+  },
+  {
+    id: 'inv-2',
+    projectName: 'Heritage Theater Restoration',
+    sponsorName: 'Arts District Foundation',
+    cdeName: 'US Bancorp CDE',
+    city: 'Pittsburgh',
+    state: 'PA',
+    programType: 'HTC',
+    allocationRequest: 8500000,
+    stage: 'loi_issued',
+    matchScore: 89,
+    tractType: ['QCT'],
+    daysInStage: 6,
+    submittedDate: '2024-12-08',
+    nextAction: 'Finalize investment terms',
+    nextActionDate: '2024-12-23',
+  },
+  {
+    id: 'inv-3',
+    projectName: 'Rural Health Network',
+    sponsorName: 'HealthFirst Foundation',
+    cdeName: 'Capital One CDE',
+    city: 'Des Moines',
+    state: 'IA',
+    programType: 'NMTC',
+    allocationRequest: 12000000,
+    stage: 'committed',
+    matchScore: 92,
+    tractType: ['SD'],
+    daysInStage: 10,
+    submittedDate: '2024-11-20',
+    nextAction: 'Wire transfer scheduled',
+    nextActionDate: '2024-12-24',
+  },
+  {
+    id: 'inv-4',
+    projectName: 'Workforce Training Center',
+    sponsorName: 'Skills Development Corp',
+    cdeName: 'JPMorgan Chase CDE',
     city: 'Detroit',
     state: 'MI',
     programType: 'NMTC',
-    allocationRequest: 10000000,
-    stage: 'closed',
-    matchScore: 88,
+    allocationRequest: 9000000,
+    stage: 'closing',
+    matchScore: 87,
     tractType: ['SD', 'QCT'],
-    daysInStage: 0,
-    submittedDate: '2024-09-15',
-    assignedTo: 'Sarah Johnson',
+    daysInStage: 5,
+    submittedDate: '2024-11-01',
+    nextAction: 'Final closing call',
+    nextActionDate: '2024-12-21',
   },
 ];
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
 export default function PipelinePage() {
   return (
@@ -152,15 +304,71 @@ export default function PipelinePage() {
 
 function PipelineContent() {
   const router = useRouter();
-  const { orgName } = useCurrentUser();
-  const [pipeline, setPipeline] = useState<PipelineDeal[]>(DEMO_PIPELINE);
-  const [drafts, setDrafts] = useState<PipelineDeal[]>([]);
+  const { orgType, orgName, currentDemoRole } = useCurrentUser();
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [selectedDeal, setSelectedDeal] = useState<PipelineDeal | null>(null);
+  const [drafts, setDrafts] = useState<PipelineDeal[]>([]);
   const [isLoadingDrafts, setIsLoadingDrafts] = useState(true);
 
-  // Load drafts from database
+  // Get role-specific configuration
+  const effectiveRole = currentDemoRole === 'admin' ? 'cde' : orgType;
+  
+  const getStageConfig = (): Record<string, StageConfig> => {
+    switch (effectiveRole) {
+      case 'sponsor': return SPONSOR_STAGES;
+      case 'cde': return CDE_STAGES;
+      case 'investor': return INVESTOR_STAGES;
+      default: return SPONSOR_STAGES;
+    }
+  };
+
+  const getStages = (): PipelineStage[] => {
+    switch (effectiveRole) {
+      case 'sponsor': return ['draft', 'submitted', 'loi_received', 'committed', 'closing'];
+      case 'cde': return ['new', 'reviewing', 'loi_issued', 'committed', 'closing'];
+      case 'investor': return ['reviewing', 'loi_issued', 'committed', 'closing'];
+      default: return ['draft', 'submitted', 'loi_received', 'committed', 'closing'];
+    }
+  };
+
+  const getDemoDeals = (): PipelineDeal[] => {
+    switch (effectiveRole) {
+      case 'sponsor': return SPONSOR_DEMO_DEALS;
+      case 'cde': return CDE_DEMO_DEALS;
+      case 'investor': return INVESTOR_DEMO_DEALS;
+      default: return SPONSOR_DEMO_DEALS;
+    }
+  };
+
+  const getPageTitle = (): string => {
+    switch (effectiveRole) {
+      case 'sponsor': return 'My Deal Pipeline';
+      case 'cde': return 'CDE Deal Pipeline';
+      case 'investor': return 'Investment Pipeline';
+      default: return 'Deal Pipeline';
+    }
+  };
+
+  const getPageSubtitle = (): string => {
+    switch (effectiveRole) {
+      case 'sponsor': return 'Track your submitted deals through the financing process';
+      case 'cde': return 'Manage deals submitted to your organization';
+      case 'investor': return 'Track investment opportunities and commitments';
+      default: return '';
+    }
+  };
+
+  const stageConfig = getStageConfig();
+  const stages = getStages();
+  const pipeline = getDemoDeals();
+
+  // Load drafts for sponsors only
   useEffect(() => {
+    if (effectiveRole !== 'sponsor') {
+      setIsLoadingDrafts(false);
+      return;
+    }
+
     const loadDrafts = async () => {
       const userEmail = localStorage.getItem('tcredex_user_email');
       if (!userEmail) {
@@ -173,7 +381,6 @@ function PipelineContent() {
         const result = await response.json();
         
         if (result.draft) {
-          // Convert draft to pipeline format
           const draftDeal: PipelineDeal = {
             id: result.draft.id,
             projectName: result.draft.project_name || 'Untitled Draft',
@@ -200,7 +407,7 @@ function PipelineContent() {
     };
 
     loadDrafts();
-  }, []);
+  }, [effectiveRole]);
 
   const formatCurrency = (num: number) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
@@ -210,11 +417,7 @@ function PipelineContent() {
     return pipeline.filter(d => d.stage === stage);
   };
 
-  const totalPipeline = pipeline
-    .filter(d => !['closed', 'declined'].includes(d.stage))
-    .reduce((sum, d) => sum + d.allocationRequest, 0);
-
-  const stages: PipelineStage[] = ['draft', 'new', 'reviewing', 'due_diligence', 'approved', 'closing'];
+  const totalPipeline = pipeline.reduce((sum, d) => sum + d.allocationRequest, 0);
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'text-green-400';
@@ -223,7 +426,7 @@ function PipelineContent() {
     return 'text-red-400';
   };
 
-  const handleDraftClick = (deal: PipelineDeal) => {
+  const handleDealClick = (deal: PipelineDeal) => {
     if (deal.isDraft) {
       router.push('/intake');
     } else {
@@ -243,17 +446,30 @@ function PipelineContent() {
     }
   };
 
+  // Calculate days until hold expires (for CDE new submissions)
+  const getHoldStatus = (deal: PipelineDeal) => {
+    if (!deal.holdExpires) return null;
+    const expires = new Date(deal.holdExpires);
+    const now = new Date();
+    const hoursLeft = Math.max(0, Math.floor((expires.getTime() - now.getTime()) / (1000 * 60 * 60)));
+    if (hoursLeft <= 0) return { text: 'Hold expired', color: 'text-red-400' };
+    if (hoursLeft <= 24) return { text: `${hoursLeft}h left`, color: 'text-amber-400' };
+    return { text: `${Math.ceil(hoursLeft / 24)}d left`, color: 'text-blue-400' };
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">Deal Pipeline</h1>
-          <p className="text-gray-400 mt-1">{orgName || 'Midwest Community Development Entity'}</p>
+          <h1 className="text-2xl font-bold text-gray-100">{getPageTitle()}</h1>
+          <p className="text-gray-400 mt-1">{getPageSubtitle()}</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="text-sm text-gray-400">Active Pipeline Value</div>
+            <div className="text-sm text-gray-400">
+              {effectiveRole === 'investor' ? 'Investment Pipeline' : 'Active Pipeline'}
+            </div>
             <div className="text-2xl font-bold text-indigo-400">{formatCurrency(totalPipeline)}</div>
           </div>
           <div className="flex bg-gray-800 rounded-lg p-1">
@@ -274,19 +490,39 @@ function PipelineContent() {
               List
             </button>
           </div>
-          <Link
-            href="/intake"
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
-          >
-            + New Deal
-          </Link>
+          {effectiveRole === 'sponsor' && (
+            <Link
+              href="/intake"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Deal
+            </Link>
+          )}
         </div>
       </div>
+
+      {/* Stage Legend for CDEs */}
+      {effectiveRole === 'cde' && (
+        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-800/50 rounded-lg">
+          <div className="flex items-center gap-2 text-sm text-blue-300">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span><strong>3-Day Hold Rule:</strong> New submissions have a 3-day review period before CDE can pass or commit.</span>
+          </div>
+        </div>
+      )}
 
       {/* Kanban View */}
       {viewMode === 'kanban' && (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {stages.map(stage => {
+            const config = stageConfig[stage];
+            if (!config) return null;
+            
             const stageDeals = getStageDeals(stage);
             const stageTotal = stageDeals.reduce((sum, d) => sum + d.allocationRequest, 0);
             const isDraftColumn = stage === 'draft';
@@ -296,16 +532,19 @@ function PipelineContent() {
                 {/* Column Header */}
                 <div className={`rounded-t-lg p-3 border border-gray-800 border-b-0 ${isDraftColumn ? 'bg-gray-800/30' : 'bg-gray-900'}`}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`text-sm font-semibold ${STAGE_CONFIG[stage].color}`}>
-                      {STAGE_CONFIG[stage].label}
+                    <span className={`text-sm font-semibold ${config.color}`}>
+                      {config.label}
                       {isDraftColumn && isLoadingDrafts && (
                         <span className="ml-2 w-3 h-3 border border-gray-500 border-t-transparent rounded-full animate-spin inline-block"></span>
                       )}
                     </span>
                     <span className="text-xs text-gray-500">{stageDeals.length}</span>
                   </div>
-                  {!isDraftColumn && (
-                    <div className="text-xs text-gray-500">{formatCurrency(stageTotal)}</div>
+                  {config.description && (
+                    <div className="text-xs text-gray-500">{config.description}</div>
+                  )}
+                  {!isDraftColumn && stageTotal > 0 && (
+                    <div className="text-xs text-gray-400 mt-1">{formatCurrency(stageTotal)}</div>
                   )}
                 </div>
                 
@@ -332,10 +571,17 @@ function PipelineContent() {
                     </div>
                   )}
 
+                  {/* Empty non-draft state */}
+                  {!isDraftColumn && stageDeals.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-gray-500">No deals in this stage</p>
+                    </div>
+                  )}
+
                   {stageDeals.map(deal => (
                     <div
                       key={deal.id}
-                      onClick={() => handleDraftClick(deal)}
+                      onClick={() => handleDealClick(deal)}
                       className={`rounded-lg p-3 border cursor-pointer transition-colors ${
                         deal.isDraft 
                           ? 'bg-gray-800/50 border-dashed border-gray-600 hover:border-indigo-500' 
@@ -391,7 +637,28 @@ function PipelineContent() {
                               {deal.matchScore}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-500 mb-2">{deal.sponsorName}</p>
+                          
+                          {/* Show different info based on role */}
+                          <p className="text-xs text-gray-500 mb-2">
+                            {effectiveRole === 'sponsor' && deal.cdeName && `CDE: ${deal.cdeName}`}
+                            {effectiveRole === 'cde' && `Sponsor: ${deal.sponsorName}`}
+                            {effectiveRole === 'investor' && deal.cdeName && `via ${deal.cdeName}`}
+                          </p>
+                          
+                          {/* 3-day hold indicator for CDE */}
+                          {effectiveRole === 'cde' && deal.stage === 'new' && deal.holdExpires && (
+                            <div className="mb-2">
+                              {(() => {
+                                const holdStatus = getHoldStatus(deal);
+                                return holdStatus && (
+                                  <span className={`text-xs px-2 py-0.5 rounded-full bg-gray-800 ${holdStatus.color}`}>
+                                    ⏱ {holdStatus.text}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          )}
+                          
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-indigo-400">
                               {formatCurrency(deal.allocationRequest)}
@@ -409,6 +676,7 @@ function PipelineContent() {
                               ))}
                             </div>
                           </div>
+                          
                           {deal.nextAction && (
                             <div className="mt-2 pt-2 border-t border-gray-800">
                               <p className="text-xs text-gray-400 line-clamp-1">{deal.nextAction}</p>
@@ -419,9 +687,10 @@ function PipelineContent() {
                               )}
                             </div>
                           )}
+                          
                           <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800">
                             <span className="text-xs text-gray-500">{deal.city}, {deal.state}</span>
-                            <span className="text-xs text-gray-500">{deal.daysInStage}d</span>
+                            <span className="text-xs text-gray-500">{deal.daysInStage}d in stage</span>
                           </div>
                         </>
                       )}
@@ -441,18 +710,20 @@ function PipelineContent() {
             <thead className="bg-gray-800/50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Project</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                  {effectiveRole === 'sponsor' ? 'CDE' : effectiveRole === 'investor' ? 'CDE' : 'Sponsor'}
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Stage</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Allocation</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Amount</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Score</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Assigned</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Next Action</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Days</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {/* Drafts first */}
-              {drafts.map(draft => (
+              {/* Drafts first (sponsors only) */}
+              {effectiveRole === 'sponsor' && drafts.map(draft => (
                 <tr 
                   key={draft.id} 
                   className="hover:bg-gray-800/50 cursor-pointer bg-gray-800/20"
@@ -461,12 +732,10 @@ function PipelineContent() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="px-1.5 py-0.5 bg-gray-700 text-gray-400 text-xs rounded">DRAFT</span>
-                      <div>
-                        <p className="font-medium text-gray-100">{draft.projectName}</p>
-                        <p className="text-sm text-gray-500">{draft.sponsorName}</p>
-                      </div>
+                      <span className="font-medium text-gray-100">{draft.projectName}</span>
                     </div>
                   </td>
+                  <td className="px-4 py-3 text-gray-500">—</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
@@ -481,50 +750,53 @@ function PipelineContent() {
                   <td className="px-4 py-3 text-gray-500">—</td>
                   <td className="px-4 py-3 text-gray-500">—</td>
                   <td className="px-4 py-3 text-gray-500">—</td>
-                  <td className="px-4 py-3 text-gray-500">—</td>
                   <td className="px-4 py-3 text-gray-400 text-sm">{draft.daysInStage}d</td>
                   <td className="px-4 py-3">
-                    <span className="text-indigo-400 hover:text-indigo-300 text-sm">
-                      Continue →
-                    </span>
+                    <span className="text-indigo-400 hover:text-indigo-300 text-sm">Continue →</span>
                   </td>
                 </tr>
               ))}
+              
               {/* Active deals */}
-              {pipeline.filter(d => !['closed', 'declined'].includes(d.stage)).map(deal => (
-                <tr key={deal.id} className="hover:bg-gray-800/50">
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="font-medium text-gray-100">{deal.projectName}</p>
-                      <p className="text-sm text-gray-500">{deal.sponsorName} • {deal.city}, {deal.state}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${STAGE_CONFIG[deal.stage].bgColor} ${STAGE_CONFIG[deal.stage].color}`}>
-                      {STAGE_CONFIG[deal.stage].label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-gray-100">{formatCurrency(deal.allocationRequest)}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-lg font-bold ${getScoreColor(deal.matchScore)}`}>{deal.matchScore}</span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-sm">{deal.assignedTo || '—'}</td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm text-gray-300">{deal.nextAction || '—'}</p>
-                    {deal.nextActionDate && (
-                      <p className="text-xs text-amber-400">{new Date(deal.nextActionDate).toLocaleDateString()}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-sm">{deal.daysInStage}</td>
-                  <td className="px-4 py-3">
-                    <Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm">
-                      View →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {pipeline.map(deal => {
+                const config = stageConfig[deal.stage];
+                return (
+                  <tr key={deal.id} className="hover:bg-gray-800/50 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
+                    <td className="px-4 py-3">
+                      <div>
+                        <p className="font-medium text-gray-100">{deal.projectName}</p>
+                        <p className="text-sm text-gray-500">{deal.city}, {deal.state}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-sm">
+                      {effectiveRole === 'sponsor' && (deal.cdeName || '—')}
+                      {effectiveRole === 'cde' && deal.sponsorName}
+                      {effectiveRole === 'investor' && (deal.cdeName || '—')}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config?.bgColor} ${config?.color}`}>
+                        {config?.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-gray-100">{formatCurrency(deal.allocationRequest)}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-lg font-bold ${getScoreColor(deal.matchScore)}`}>{deal.matchScore}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-gray-300">{deal.nextAction || '—'}</p>
+                      {deal.nextActionDate && (
+                        <p className="text-xs text-amber-400">{new Date(deal.nextActionDate).toLocaleDateString()}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-sm">{deal.daysInStage}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-indigo-400 hover:text-indigo-300 text-sm">View →</span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -538,7 +810,11 @@ function PipelineContent() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-xl font-semibold text-white">{selectedDeal.projectName}</h3>
-                <p className="text-gray-400">{selectedDeal.sponsorName}</p>
+                <p className="text-gray-400">
+                  {effectiveRole === 'sponsor' && selectedDeal.cdeName}
+                  {effectiveRole === 'cde' && selectedDeal.sponsorName}
+                  {effectiveRole === 'investor' && selectedDeal.cdeName}
+                </p>
               </div>
               <button onClick={() => setSelectedDeal(null)} className="text-gray-500 hover:text-white">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -550,7 +826,9 @@ function PipelineContent() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-gray-500 uppercase">Allocation</label>
+                  <label className="text-xs text-gray-500 uppercase">
+                    {effectiveRole === 'investor' ? 'Investment Amount' : 'Allocation'}
+                  </label>
                   <p className="text-lg font-semibold text-indigo-400">{formatCurrency(selectedDeal.allocationRequest)}</p>
                 </div>
                 <div>
@@ -560,42 +838,26 @@ function PipelineContent() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-500 uppercase block mb-2">Stage</label>
-                <select className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100">
-                  {stages.filter(s => s !== 'draft').map(stage => (
-                    <option key={stage} value={stage} selected={stage === selectedDeal.stage}>
-                      {STAGE_CONFIG[stage].label}
-                    </option>
-                  ))}
-                </select>
+                <label className="text-xs text-gray-500 uppercase block mb-2">Location</label>
+                <p className="text-gray-100">{selectedDeal.city}, {selectedDeal.state}</p>
               </div>
 
               <div>
-                <label className="text-xs text-gray-500 uppercase block mb-2">Assigned To</label>
-                <select className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100">
-                  <option value="">Unassigned</option>
-                  <option value="sarah">Sarah Johnson</option>
-                  <option value="mike">Mike Thompson</option>
-                </select>
+                <label className="text-xs text-gray-500 uppercase block mb-2">Current Stage</label>
+                <p className="text-gray-100">{stageConfig[selectedDeal.stage]?.label}</p>
               </div>
 
-              <div>
-                <label className="text-xs text-gray-500 uppercase block mb-2">Next Action</label>
-                <input
-                  type="text"
-                  defaultValue={selectedDeal.nextAction}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-500 uppercase block mb-2">Notes</label>
-                <textarea
-                  rows={3}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
-                  placeholder="Add notes..."
-                />
-              </div>
+              {selectedDeal.nextAction && (
+                <div>
+                  <label className="text-xs text-gray-500 uppercase block mb-2">Next Action</label>
+                  <p className="text-gray-100">{selectedDeal.nextAction}</p>
+                  {selectedDeal.nextActionDate && (
+                    <p className="text-sm text-amber-400 mt-1">
+                      Due: {new Date(selectedDeal.nextActionDate).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -603,13 +865,13 @@ function PipelineContent() {
                 href={`/deals/${selectedDeal.id}`}
                 className="flex-1 px-4 py-2.5 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 text-center"
               >
-                View Deal
+                View Full Deal
               </Link>
               <button
                 onClick={() => setSelectedDeal(null)}
                 className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 font-medium"
               >
-                Save Changes
+                Close
               </button>
             </div>
           </div>

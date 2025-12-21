@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useCurrentUser } from '@/lib/auth';
 import { IntakeShell, IntakeData } from '@/components/intake-v4';
 import { DealCardPreview } from '@/components/deals';
 import { generateDealFromIntake, validateForDealCard, DealCardGeneratorResult } from '@/lib/deals';
@@ -30,7 +32,7 @@ function EmailStep({ onSubmit, savedEmail }: { onSubmit: (email: string) => void
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full">
-        <h2 className="text-xl font-bold text-white mb-2">Let's save your work</h2>
+        <h2 className="text-xl font-bold text-white mb-2">Let&apos;s save your work</h2>
         <p className="text-gray-400 text-sm mb-6">
           Enter your email so you can continue from any device.
         </p>
@@ -139,9 +141,45 @@ function getTimeAgo(date: Date): string {
   return date.toLocaleDateString();
 }
 
+// Access Denied Component
+function AccessDenied({ orgType }: { orgType: string | undefined }) {
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="text-center max-w-md p-8 bg-gray-900 rounded-xl border border-gray-800">
+        <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-100 mb-2">Sponsor Access Only</h1>
+        <p className="text-gray-400 mb-6">
+          Only Project Sponsors can submit deals to the marketplace. 
+          {orgType === 'cde' && ' As a CDE, you can review and match with submitted deals in your Pipeline.'}
+          {orgType === 'investor' && ' As an Investor, you can browse and invest in deals from the Marketplace.'}
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Link 
+            href="/deals" 
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+          >
+            Browse Marketplace
+          </Link>
+          <Link 
+            href="/dashboard" 
+            className="px-6 py-3 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            Go to Dashboard
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Main Page
 export default function IntakePage() {
   const router = useRouter();
+  const { orgType, isLoading: authLoading, isAuthenticated } = useCurrentUser();
   const [step, setStep] = useState<'loading' | 'email' | 'draft-prompt' | 'form'>('loading');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [existingDraft, setExistingDraft] = useState<DraftInfo | null>(null);
@@ -198,7 +236,7 @@ export default function IntakePage() {
       } else {
         setStep('form');
       }
-    } catch (error) {
+    } catch {
       setStep('form');
     }
   };
@@ -302,7 +340,29 @@ export default function IntakePage() {
     }
   };
 
-  // Render based on step
+  // ========================================
+  // ROLE-BASED ACCESS CONTROL
+  // ========================================
+  
+  // Show loading while auth is checking
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // If authenticated but NOT a sponsor, block access
+  // Note: We allow non-authenticated users to start the form (they'll login/register later)
+  if (isAuthenticated && orgType !== 'sponsor') {
+    return <AccessDenied orgType={orgType} />;
+  }
+
+  // ========================================
+  // RENDER BASED ON STEP
+  // ========================================
+
   if (step === 'loading') {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">

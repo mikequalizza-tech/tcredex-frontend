@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export default function AdminDashboard() {
   // Sample stats
   const stats = [
@@ -70,18 +72,18 @@ export default function AdminDashboard() {
               <h2 className="text-lg font-semibold text-gray-100">Quick Actions</h2>
             </div>
             <div className="p-6 space-y-3">
-              <a href="/admin/deals" className="block w-full px-4 py-3 bg-indigo-600 text-white text-center rounded-lg hover:bg-indigo-500 transition-colors">
+              <Link href="/admin/deals" className="block w-full px-4 py-3 bg-indigo-600 text-white text-center rounded-lg hover:bg-indigo-500 transition-colors">
                 Review Pending Deals
-              </a>
-              <a href="/deals/new" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
+              </Link>
+              <Link href="/deals/new" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
                 Submit New Deal
-              </a>
-              <a href="/matching" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
+              </Link>
+              <Link href="/matching" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
                 View CDE Matches
-              </a>
-              <a href="/admin/reports" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
+              </Link>
+              <Link href="/admin/reports" className="block w-full px-4 py-3 bg-gray-800 text-gray-200 text-center rounded-lg hover:bg-gray-700 transition-colors">
                 Generate Reports
-              </a>
+              </Link>
             </div>
           </div>
         </div>

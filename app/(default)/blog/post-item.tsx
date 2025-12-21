@@ -3,14 +3,27 @@
 import Link from "next/link";
 import { useCategoryProvider } from "./category-provider";
 
-export default function PostItem({ ...props }) {
+interface PostMetadata {
+  title: string;
+  summary?: string;
+  publishedAt?: string;
+  category?: string;
+  author?: string;
+  authorRole?: string;
+}
+
+interface PostItemProps {
+  metadata: PostMetadata;
+  slug: string;
+}
+
+export default function PostItem({ metadata, slug }: PostItemProps) {
   const { category } = useCategoryProvider();
-  const postCategory = props.metadata.category || "Insights";
+  const postCategory = metadata.category || "Insights";
   const isHidden = category !== "All" && category !== postCategory;
 
-  const authorName = props.metadata.author || "tCredex Team";
-  const authorRole = props.metadata.authorRole || "Editorial";
-  const publishDate = props.metadata.publishedAt || "";
+  const authorName = metadata.author || "tCredex Team";
+  const publishDate = metadata.publishedAt || "";
 
   return (
     <article
@@ -20,7 +33,7 @@ export default function PostItem({ ...props }) {
         {/* Placeholder for future images - shows gradient background */}
         <Link
           className="group relative mb-6 block overflow-hidden rounded-2xl border border-gray-800/80 before:absolute before:inset-0 before:-z-10 before:bg-linear-to-br before:from-gray-900 before:via-indigo-500/50 before:to-indigo-500 before:opacity-50"
-          href={`/blog/${props.slug}`}
+          href={`/blog/${slug}`}
           tabIndex={-1}
         >
           <div className="aspect-[16/10] w-full bg-gradient-to-br from-gray-800 via-indigo-900/30 to-gray-900 flex items-center justify-center transition ease-out group-hover:scale-[1.02]">
@@ -46,13 +59,13 @@ export default function PostItem({ ...props }) {
         <h3 className="mb-2 font-nacelle text-lg font-semibold">
           <Link
             className="text-gray-200 transition hover:text-white"
-            href={`/blog/${props.slug}`}
+            href={`/blog/${slug}`}
           >
-            {props.metadata.title}
+            {metadata.title}
           </Link>
         </h3>
-        {props.metadata.summary && (
-          <p className="text-sm text-gray-400 line-clamp-2 mb-3">{props.metadata.summary}</p>
+        {metadata.summary && (
+          <p className="text-sm text-gray-400 line-clamp-2 mb-3">{metadata.summary}</p>
         )}
       </header>
       <footer className="flex items-center gap-3 mt-auto pt-2">

@@ -49,7 +49,7 @@ export default function Blog() {
                 {/* Articles */}
                 <div className="mx-auto grid max-w-sm items-start gap-8 sm:max-w-none sm:grid-cols-2 lg:grid-cols-3">
                   {allBlogs.map((post, postIndex) => (
-                    <PostItem key={postIndex} {...post} />
+                    <PostItem key={postIndex} metadata={post.metadata} slug={post.slug} />
                   ))}
                 </div>
               </CategoryProvider>

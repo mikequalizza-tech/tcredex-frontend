@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 
 export interface Deal {
   id: string;
@@ -29,6 +30,7 @@ export interface Deal {
 interface DealCardProps {
   deal: Deal;
   onRequestMemo?: (dealId: string) => void;
+  memoRequested?: boolean;
 }
 
 const formatCurrency = (amount: number | undefined) => {
@@ -39,13 +41,15 @@ const formatCurrency = (amount: number | undefined) => {
   return `$${(amount / 1000).toFixed(0)}K`;
 };
 
-export default function DealCard({ deal, onRequestMemo }: DealCardProps) {
+export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCardProps) {
   return (
     <div className="max-w-sm bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-700/50 hover:border-indigo-500/50 transition-colors">
       {/* Header row */}
       <div className="p-4 flex justify-between items-start">
         <div>
-          <h2 className="text-lg font-bold text-gray-100 leading-snug">{deal.projectName}</h2>
+          <Link href={`/deals/${deal.id}`} className="hover:text-indigo-400 transition-colors">
+            <h2 className="text-lg font-bold text-gray-100 leading-snug">{deal.projectName}</h2>
+          </Link>
           <p className="text-sm text-gray-400">{deal.location}</p>
         </div>
         <Image 
@@ -89,12 +93,21 @@ export default function DealCard({ deal, onRequestMemo }: DealCardProps) {
 
       {/* CTA */}
       <div className="p-4 pt-0">
-        <button 
-          onClick={() => onRequestMemo?.(deal.id)}
-          className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-500 transition-colors"
-        >
-          Request Allocation Memo
-        </button>
+        {memoRequested ? (
+          <button 
+            disabled
+            className="w-full bg-green-600 text-white font-semibold py-2.5 rounded-lg cursor-default"
+          >
+            ✓ Memo Requested
+          </button>
+        ) : (
+          <button 
+            onClick={() => onRequestMemo?.(deal.id)}
+            className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-500 transition-colors"
+          >
+            Request Allocation Memo
+          </button>
+        )}
       </div>
     </div>
   );

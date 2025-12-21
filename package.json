@@ -29,6 +29,7 @@
     "react-dom": "19.0.0",
     "react-map-gl": "^8.1.0",
     "rehype-pretty-code": "^0.14.0",
+    "stripe": "^20.1.0",
     "typescript": "^5.7.3",
     "uuid": "^9.0.1"
   },

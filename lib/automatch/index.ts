@@ -3,11 +3,15 @@
  * 
  * Usage:
  * 
+ * // Section C Scoring Engine (NEW - Primary)
+ * import { calculateDealScore, assignTier } from '@/lib/automatch';
+ * const score = calculateDealScore(input);
+ * 
  * // CDE Matching Engine (database-backed)
  * import { findMatches, runAutoMatchBatch } from '@/lib/automatch';
  * const result = await findMatches(dealId);
  * 
- * // Simple Match Scoring (client-side demo)
+ * // Legacy Match Scoring (backwards compatible)
  * import { calculateMatchScore, getMatchTier } from '@/lib/automatch';
  * const score = calculateMatchScore(project, cdeProfile);
  * 
@@ -16,10 +20,26 @@
  * const eligible = isQALICBEligible(qalicbInput);
  */
 
+// Section C Scoring Engine (NEW - use this)
+export {
+  calculateDealScore,
+  calculateBatchScores,
+  assignTier,
+  calculateEconomicDistress,
+  calculateImpactPotential,
+  calculateProjectReadiness,
+  calculateMissionFit,
+  generateReasonCodes,
+  generateExplanation,
+  compareDealScores,
+  rankDealsByScore,
+  MODEL_VERSION,
+} from '@/lib/scoring';
+
 // CDE Matching Engine (full database-backed system)
 export * from './engine';
 
-// Simple Match Scoring (for client-side demos)
+// Legacy Match Scoring (backwards compatible)
 export * from './matchScore';
 
 // QALICB Eligibility Engine

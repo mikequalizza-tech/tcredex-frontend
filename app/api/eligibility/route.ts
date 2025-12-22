@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
+/**
+ * NMTC Eligibility Check API
+ * 
+ * GET /api/eligibility?tract=01001020100
+ * GET /api/eligibility?tract=01001020100&debug=true
+ * 
+ * Handles both padded (11-char) and unpadded (10-char) GEOIDs
+ * because Census TigerWeb uses leading zeros, Excel/imports often don't.
+ */
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const tract = searchParams.get('tract');
@@ -10,118 +20,156 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Census tract required' }, { status: 400 });
   }
 
-  const cleanTract = tract.replace(/[-\s]/g, '').padStart(11, '0');
-  const unpadded = tract.replace(/[-\s]/g, '').replace(/^0+/, '');
+  // Clean the tract - remove dashes/spaces
+  const inputTract = tract.replace(/[-\s]/g, '');
+  
+  // Create multiple search variants to handle GEOID format mismatches
+  const variants = [
+    inputTract,                                    // As-is
+    inputTract.padStart(11, '0'),                  // Pad to 11 chars
+    inputTract.replace(/^0+/, ''),                 // Strip leading zeros
+    parseInt(inputTract, 10).toString(),           // Parse as int then back to string
+  ];
+  
+  // Remove duplicates
+  const uniqueVariants = [...new Set(variants)];
   
   const debugInfo: Record<string, unknown> = {
     input: tract,
-    cleanTract,
-    unpadded,
+    variants: uniqueVariants,
   };
 
   try {
-    // Check table row count
+    // Check table exists and get sample
     const { count, error: countError } = await supabaseAdmin
       .from('census_tracts')
       .select('*', { count: 'exact', head: true });
-    debugInfo.tableRowCount = count;
-    debugInfo.countError = countError?.message;
-
-    // Get sample GEOIDs to see format
-    const { data: sampleData, error: sampleError } = await supabaseAdmin
-      .from('census_tracts')
-      .select('GEOID')
-      .limit(5);
-    debugInfo.sampleGeoids = sampleData?.map(d => d.GEOID);
-    debugInfo.sampleError = sampleError?.message;
-
-    // Try padded query
-    let { data: tractData, error: tractError } = await supabaseAdmin
-      .from('census_tracts')
-      .select('*')
-      .eq('GEOID', cleanTract)
-      .single();
     
-    debugInfo.paddedQueryFound = !!tractData;
-    debugInfo.paddedQueryError = tractError?.code;
-
-    // If not found, try unpadded
-    if (!tractData && tractError?.code === 'PGRST116') {
-      const result = await supabaseAdmin
-        .from('census_tracts')
-        .select('*')
-        .eq('GEOID', unpadded)
-        .single();
-      tractData = result.data;
-      tractError = result.error;
-      debugInfo.unpaddedQueryFound = !!tractData;
-      debugInfo.unpaddedQueryError = tractError?.code;
+    debugInfo.tableRowCount = count;
+    
+    if (countError) {
+      debugInfo.tableError = countError.message;
+      if (debug) {
+        return NextResponse.json({ debug: true, ...debugInfo, error: 'Table access error' });
+      }
     }
 
-    // If debug mode, return diagnostic info
+    // Get sample to see actual GEOID format in DB
+    const { data: sampleData } = await supabaseAdmin
+      .from('census_tracts')
+      .select('GEOID')
+      .limit(3);
+    
+    debugInfo.sampleGeoids = sampleData?.map(d => ({
+      value: d.GEOID,
+      type: typeof d.GEOID,
+      length: String(d.GEOID).length,
+    }));
+
+    // Try each variant until we find a match
+    let tractData: Record<string, unknown> | null = null;
+    let matchedVariant: string | null = null;
+
+    for (const variant of uniqueVariants) {
+      // Try as string
+      const { data: stringResult, error: stringError } = await supabaseAdmin
+        .from('census_tracts')
+        .select('*')
+        .eq('GEOID', variant)
+        .maybeSingle();
+      
+      if (stringResult) {
+        tractData = stringResult;
+        matchedVariant = `string:${variant}`;
+        break;
+      }
+
+      // Try as number (if it's a numeric GEOID stored as integer)
+      const numericVariant = parseInt(variant, 10);
+      if (!isNaN(numericVariant)) {
+        const { data: numResult } = await supabaseAdmin
+          .from('census_tracts')
+          .select('*')
+          .eq('GEOID', numericVariant)
+          .maybeSingle();
+        
+        if (numResult) {
+          tractData = numResult;
+          matchedVariant = `number:${numericVariant}`;
+          break;
+        }
+      }
+    }
+
+    debugInfo.matchedVariant = matchedVariant;
+    debugInfo.tractFound = !!tractData;
+
+    // Debug mode - return diagnostic info
     if (debug) {
       return NextResponse.json({
         debug: true,
         ...debugInfo,
-        tractDataFound: !!tractData,
         tractData: tractData ? {
           GEOID: tractData.GEOID,
+          GEOID_type: typeof tractData.GEOID,
           state_name: tractData.state_name,
-          county_fips: tractData.county_fips,
           is_nmtc_lic: tractData.is_nmtc_lic,
+          is_nmtc_lic_type: typeof tractData.is_nmtc_lic,
           poverty_rate_pct: tractData.poverty_rate_pct,
           poverty_qualifies: tractData.poverty_qualifies,
           mfi_pct: tractData.mfi_pct,
           mfi_qualifies: tractData.mfi_qualifies,
-          unemployment_rate_pct: tractData.unemployment_rate_pct,
-          unemployment_ratio_qualifies: tractData.unemployment_ratio_qualifies,
-          omb_metro_non_metro: tractData.omb_metro_non_metro,
+          // Show all columns for diagnosis
+          all_columns: Object.keys(tractData),
         } : null,
       });
-    }
-
-    if (tractError && tractError.code !== 'PGRST116') {
-      console.error('Census tract query error:', tractError);
-      throw tractError;
     }
 
     // If no tract found
     if (!tractData) {
       return NextResponse.json({
         eligible: false,
-        tract: cleanTract,
+        tract: inputTract,
         programs: [],
         federal: null,
         state: null,
         reason: 'Census tract not found in database',
-        note: 'Verify at https://www.cdfifund.gov/research-data/nmtc-mapping-tool'
+        note: 'Verify at https://www.cdfifund.gov/research-data/nmtc-mapping-tool',
+        _debug: { variantsTried: uniqueVariants },
       });
     }
 
     // Query state_credit_matrix for state-level credits
-    const stateName = (tractData.state_name || '').trim();
-    const { data: stateData, error: stateError } = await supabaseAdmin
+    const stateName = String(tractData.state_name || '').trim();
+    const { data: stateData } = await supabaseAdmin
       .from('state_credit_matrix')
       .select('*')
       .eq('state_name', stateName)
-      .single();
+      .maybeSingle();
 
-    if (stateError && stateError.code !== 'PGRST116') {
-      console.error('State credit query error:', stateError);
+    // ========================================================================
+    // ROBUST BOOLEAN PARSING
+    // Handle: 'YES', 'Yes', 'yes', 'Y', 1, true, 'TRUE', 'true', etc.
+    // ========================================================================
+    function isYes(val: unknown): boolean {
+      if (val === true || val === 1) return true;
+      if (typeof val === 'string') {
+        const upper = val.toUpperCase().trim();
+        return upper === 'YES' || upper === 'Y' || upper === 'TRUE' || upper === '1';
+      }
+      return false;
     }
 
-    // Map actual column names (is_nmtc_lic is text 'YES'/'NO')
-    const isNmtcEligible = tractData.is_nmtc_lic === 'YES';
-    const povertyRate = parseFloat(tractData.poverty_rate_pct) || 0;
-    const medianIncomePct = parseFloat(tractData.mfi_pct) || 0;
-    const unemploymentRate = parseFloat(tractData.unemployment_rate_pct) || 0;
+    const isNmtcEligible = isYes(tractData.is_nmtc_lic);
+    const povertyRate = parseFloat(String(tractData.poverty_rate_pct)) || 0;
+    const medianIncomePct = parseFloat(String(tractData.mfi_pct)) || 0;
+    const unemploymentRate = parseFloat(String(tractData.unemployment_rate_pct)) || 0;
     
-    // Use database qualifies columns directly (text 'YES'/'NO')
-    const povertyQualifies = tractData.poverty_qualifies === 'YES';
-    const incomeQualifies = tractData.mfi_qualifies === 'YES';
-    const unemploymentQualifies = tractData.unemployment_ratio_qualifies === 'YES';
+    const povertyQualifies = isYes(tractData.poverty_qualifies);
+    const incomeQualifies = isYes(tractData.mfi_qualifies);
+    const unemploymentQualifies = isYes(tractData.unemployment_ratio_qualifies);
     const isSeverelyDistressed = povertyQualifies || incomeQualifies || unemploymentQualifies;
-    const isOzDesignated = tractData.oz_designated === true;
+    const isOzDesignated = isYes(tractData.oz_designated);
 
     // Build programs list
     const programs: string[] = [];
@@ -140,7 +188,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       eligible: isNmtcEligible,
-      tract: cleanTract,
+      tract: inputTract,
       programs,
       federal: {
         nmtc_eligible: isNmtcEligible,
@@ -157,19 +205,19 @@ export async function GET(request: NextRequest) {
       state: stateData ? {
         state_name: stateData.state_name,
         nmtc: {
-          available: stateData.is_state_nmtc || false,
+          available: isYes(stateData.is_state_nmtc),
           transferable: stateData.is_state_nmtc_transferable,
           refundable: stateData.is_state_nmtc_refundable,
           notes: stateData.state_nmtc_notes_url
         },
         htc: {
-          available: stateData.is_state_htc || false,
+          available: isYes(stateData.is_state_htc),
           transferable: stateData.is_state_htc_transferable,
           refundable: stateData.is_state_htc_refundable,
           notes: stateData.state_htc_notes_url
         },
         brownfield: {
-          available: stateData.is_state_brownfield || false,
+          available: isYes(stateData.is_state_brownfield),
           transferable: stateData.is_state_brownfield_transferable,
           refundable: stateData.is_state_brownfield_refundable,
           notes: stateData.state_brownfield_notes_url
@@ -190,13 +238,13 @@ export async function GET(request: NextRequest) {
     console.error('Eligibility check error:', error);
     return NextResponse.json({
       eligible: false,
-      tract: cleanTract,
+      tract: inputTract,
       programs: [],
       federal: null,
       state: null,
       reason: 'Error checking eligibility',
       note: 'Please try again or verify at cdfifund.gov',
-      ...(debug ? { debug: debugInfo, error: String(error) } : {})
+      _debug: debug ? { error: String(error), ...debugInfo } : undefined,
     }, { status: 500 });
   }
 }

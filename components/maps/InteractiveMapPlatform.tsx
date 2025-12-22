@@ -192,6 +192,13 @@ export default function InteractiveMapPlatform({
           const eligRes = await fetch(`/api/eligibility?tract=${geoid}`);
           const eligData = await eligRes.json();
           
+          // 🔍 DEBUG: Log eligibility response
+          if (eligData.eligible) {
+            console.log(`[Map] ✓ Tract ${geoid} is ELIGIBLE:`, eligData.programs);
+          } else if (eligData.reason?.includes('not found')) {
+            console.warn(`[Map] ⚠ Tract ${geoid} NOT FOUND in DB`);
+          }
+          
           return {
             ...feature,
             id: geoid,
@@ -477,16 +484,38 @@ export default function InteractiveMapPlatform({
             .addTo(map);
         });
 
-        // Tract click
+        // Tract click - with debug logging (Gemini's suggestion)
         map.on('click', 'tract-fills', (e) => {
           if (!e.features?.[0]) return;
-          const geoid = e.features[0].properties?.GEOID;
+          
+          // 🔍 DEBUG: Log all properties to console (open F12 to see)
+          console.log('=== CLICKED TRACT DEBUG ===');
+          console.log('Raw properties:', e.features[0].properties);
+          console.log('GEOID:', e.features[0].properties?.GEOID);
+          console.log('geoid:', e.features[0].properties?.geoid);
+          console.log('eligible:', e.features[0].properties?.eligible, 'type:', typeof e.features[0].properties?.eligible);
+          console.log('severelyDistressed:', e.features[0].properties?.severelyDistressed);
+          console.log('programs:', e.features[0].properties?.programs);
+          console.log('===========================');
+
+          const geoid = e.features[0].properties?.GEOID || e.features[0].properties?.geoid;
+          const eligible = e.features[0].properties?.eligible === true || e.features[0].properties?.eligible === 'true';
+          const severelyDistressed = e.features[0].properties?.severelyDistressed === true || e.features[0].properties?.severelyDistressed === 'true';
+          
+          let programs: string[] = [];
+          try {
+            const progStr = e.features[0].properties?.programs;
+            programs = progStr ? JSON.parse(progStr) : [];
+          } catch {
+            programs = [];
+          }
+          
           if (geoid && onTractClick) {
             onTractClick({
               geoid,
-              eligible: true,
-              severelyDistressed: false,
-              programs: ['NMTC'],
+              eligible,
+              severelyDistressed,
+              programs,
             });
           }
         });

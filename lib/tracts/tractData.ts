@@ -1,3 +1,5 @@
+import logger from '@/lib/utils/logger';
+
 /**
  * NMTC Census Tract Eligibility Data
  * 
@@ -110,7 +112,7 @@ async function loadTractData(): Promise<Map<string, RawTractData>> {
       const response = await fetch(`${baseUrl}/data/tract_eligible.json`);
       
       if (!response.ok) {
-        console.warn(`[TractData] Failed to load tract data: ${response.status}`);
+        logger.warn(`Failed to load tract data: ${response.status}`, null, 'TractData');
         tractDataCache = new Map();
         return;
       }
@@ -118,9 +120,9 @@ async function loadTractData(): Promise<Map<string, RawTractData>> {
       const parsed = await response.json() as Record<string, RawTractData>;
       tractDataCache = new Map(Object.entries(parsed));
       
-      console.log(`[TractData] Loaded ${tractDataCache.size} eligible tracts`);
+      logger.info(`Loaded ${tractDataCache.size} eligible tracts`, null, 'TractData');
     } catch (error) {
-      console.error('[TractData] Error loading tract data:', error);
+      logger.error('Error loading tract data', error, 'TractData');
       tractDataCache = new Map();
     }
   })();

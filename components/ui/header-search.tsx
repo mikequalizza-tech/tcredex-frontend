@@ -132,7 +132,7 @@ export default function HeaderSearch() {
 
       {/* Search modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[20vh] bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-lg mx-4 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
             {/* Search input */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800">
@@ -146,13 +146,15 @@ export default function HeaderSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="flex-1 bg-transparent text-gray-200 placeholder-gray-500 outline-none"
+                autoComplete="off"
+                autoFocus
               />
               <button
                 onClick={() => {
                   setIsOpen(false);
                   setQuery('');
                 }}
-                className="text-xs text-gray-500 hover:text-gray-400"
+                className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1 rounded border border-gray-700"
               >
                 ESC
               </button>

@@ -1,3 +1,5 @@
+import logger from '@/lib/utils/logger';
+
 // Stripe checkout - STUBBED for development
 // TODO: Install 'stripe' package and uncomment real implementation
 
@@ -10,7 +12,7 @@ export interface CheckoutSessionParams {
 }
 
 export async function createCheckoutSession(params: CheckoutSessionParams) {
-  console.warn('[STUB] createCheckoutSession called - Stripe not configured');
+  logger.warn('createCheckoutSession called - Stripe not configured', null, 'Stripe');
   return {
     id: 'stub_session_' + Date.now(),
     url: params.successUrl || '/closing-room/success',
@@ -18,7 +20,7 @@ export async function createCheckoutSession(params: CheckoutSessionParams) {
 }
 
 export async function retrieveSession(sessionId: string) {
-  console.warn('[STUB] retrieveSession called - Stripe not configured');
+  logger.warn('retrieveSession called - Stripe not configured', null, 'Stripe');
   return {
     id: sessionId,
     payment_status: 'unpaid',
@@ -31,7 +33,7 @@ export function constructWebhookEvent(
   signature: string,
   webhookSecret: string
 ) {
-  console.warn('[STUB] constructWebhookEvent called - Stripe not configured');
+  logger.warn('constructWebhookEvent called - Stripe not configured', null, 'Stripe');
   // Return a mock event structure
   return {
     type: 'checkout.session.completed',

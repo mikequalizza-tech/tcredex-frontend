@@ -185,7 +185,7 @@ export default function SignIn() {
               </button>
             </div>
             <p className="text-center text-xs text-gray-500 mt-3">
-              Demo password: <code className="bg-gray-800 px-1.5 py-0.5 rounded">demo123</code>
+              Demo password: <code className="bg-gray-800 px-1.5 py-0.5 rounded">{process.env.NODE_ENV === 'development' ? 'demo123' : 'Contact support'}</code>
             </p>
           </div>
 

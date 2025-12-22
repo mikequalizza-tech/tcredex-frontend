@@ -28,20 +28,17 @@ interface HomeMapWithTractsProps {
   searchedLocation?: { lat: number; lng: number; tract?: string } | null;
 }
 
-// Demo deal pins for initial display
-const DEMO_DEALS: DealPin[] = [
-  { id: 'demo-1', name: 'Community Health Center', coordinates: [-90.1994, 38.6270], type: 'nmtc', projectCost: 12500000 },
-  { id: 'demo-2', name: 'Historic Mill Renovation', coordinates: [-90.2194, 38.6170], type: 'htc', projectCost: 8200000 },
-  { id: 'demo-3', name: 'Affordable Housing Dev', coordinates: [-90.1794, 38.6370], type: 'lihtc', projectCost: 15000000 },
-  { id: 'demo-4', name: 'Innovation Hub', coordinates: [-90.2094, 38.6470], type: 'oz', projectCost: 22000000 },
-];
+// Demo deal pins - empty for now, will be populated from real data
+const DEMO_DEALS: DealPin[] = [];
 
 const PIN_COLORS: Record<string, string> = {
   nmtc: '#22c55e',    // green
   htc: '#f59e0b',     // amber
   lihtc: '#3b82f6',   // blue
   oz: '#a855f7',      // purple
-  search: '#ef4444',  // red
+  search: '#ef4444',  // red (default)
+  searchEligible: '#22c55e',    // green for eligible tract
+  searchNotEligible: '#ef4444', // red for not eligible
 };
 
 export default function HomeMapWithTracts({
@@ -59,6 +56,7 @@ export default function HomeMapWithTracts({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [loadingTract, setLoadingTract] = useState(false);
+  const [searchEligible, setSearchEligible] = useState<boolean | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const MIN_TRACT_ZOOM = 10;
@@ -112,11 +110,20 @@ export default function HomeMapWithTracts({
         return;
       }
       
-      // Enrich with eligibility data (fetch in parallel for up to 20 tracts)
-      const tractsToFetch = geojson.features.slice(0, 20);
+      // Enrich with eligibility data (fetch in parallel for up to 50 tracts)
+      const tractsToFetch = geojson.features.slice(0, 50);
       const eligibilityPromises = tractsToFetch.map(async (feature: GeoJSON.Feature) => {
         const geoid = feature.properties?.GEOID;
-        if (!geoid) return feature;
+        if (!geoid) return {
+          ...feature,
+          id: geoid || `tract-${Math.random()}`,
+          properties: {
+            ...feature.properties,
+            eligible: false, // Default to not eligible if no GEOID
+            programs: JSON.stringify([]),
+            severelyDistressed: false,
+          }
+        };
         
         try {
           const res = await fetch(`/api/eligibility?tract=${geoid}`);
@@ -138,12 +145,38 @@ export default function HomeMapWithTracts({
             }
           };
         } catch {
-          return feature;
+          // If eligibility fetch fails, mark as unknown (neutral styling)
+          return {
+            ...feature,
+            id: geoid,
+            properties: {
+              ...feature.properties,
+              geoid,
+              eligible: false,
+              programs: JSON.stringify([]),
+              severelyDistressed: false,
+            }
+          };
         }
       });
       
       const enrichedFeatures = await Promise.all(eligibilityPromises);
       console.log(`[Tracts] Enriched ${enrichedFeatures.length} features with eligibility`);
+      
+      // Preserve the searched tract if it exists (don't let viewport load overwrite it)
+      const searchedTractFeature = (window as unknown as { __searchedTractFeature?: GeoJSON.Feature }).__searchedTractFeature;
+      let finalFeatures = enrichedFeatures;
+      
+      if (searchedTractFeature && searchedTractFeature.properties?.geoid) {
+        const searchedGeoid = searchedTractFeature.properties.geoid;
+        // Remove any duplicate of the searched tract from viewport results
+        finalFeatures = enrichedFeatures.filter((f: GeoJSON.Feature) => 
+          f.properties?.geoid !== searchedGeoid && f.properties?.GEOID !== searchedGeoid
+        );
+        // Add the searched tract with its special styling
+        finalFeatures.unshift(searchedTractFeature);
+        console.log(`[Tracts] Preserved searched tract ${searchedGeoid}`);
+      }
       
       // Update the map source - wrap in try-catch to prevent Mapbox errors from bubbling
       try {
@@ -151,7 +184,7 @@ export default function HomeMapWithTracts({
         const tractsSource = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
         tractsSource.setData({
           type: 'FeatureCollection',
-          features: enrichedFeatures,
+          features: finalFeatures,
         });
         console.log('[Tracts] ✅ Updated map source with tract features');
       } catch (mapError) {
@@ -183,8 +216,8 @@ export default function HomeMapWithTracts({
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: [-90.1994, 38.6270], // St. Louis
-      zoom: 11,
+      center: [-98.5795, 39.8283], // Center of continental US
+      zoom: 3.5,  // Show entire US
       minZoom: 3,
       maxZoom: 18,
     });
@@ -204,7 +237,7 @@ export default function HomeMapWithTracts({
         }
       });
 
-      // Tract fill layer - colored by eligibility
+      // Tract fill layer - colored by eligibility type like CDFI Fund map
       map.current.addLayer({
         id: 'tract-fills',
         type: 'fill',
@@ -212,18 +245,40 @@ export default function HomeMapWithTracts({
         paint: {
           'fill-color': [
             'case',
-            ['==', ['get', 'eligible'], true], 'rgba(34, 197, 94, 0.35)',  // green for eligible
-            'rgba(239, 68, 68, 0.25)'  // red for not eligible
+            // Searched tract - bright highlight based on eligibility
+            ['==', ['get', 'searched'], true],
+            [
+              'case',
+              ['==', ['get', 'eligible'], true], '#22c55e', // Bright green for searched eligible
+              '#ef4444' // Bright red for searched not eligible
+            ],
+            // Regular tracts - use CDFI Fund color scheme
+            ['==', ['get', 'eligible'], true],
+            [
+              'case',
+              // Severely distressed = red (like CDFI map)
+              ['==', ['get', 'severelyDistressed'], true], '#dc2626',
+              // Regular eligible = purple/blue (like CDFI map) 
+              '#7c3aed'
+            ],
+            // Not eligible = light gray/cream (subtle, not red)
+            '#e5e7eb'
           ],
           'fill-opacity': [
             'case',
-            ['boolean', ['feature-state', 'hover'], false], 0.6,
-            0.35
+            // Searched tracts are very visible
+            ['==', ['get', 'searched'], true], 0.8,
+            // Eligible tracts are visible
+            ['==', ['get', 'eligible'], true], 0.6,
+            // Hover makes tracts more visible
+            ['boolean', ['feature-state', 'hover'], false], 0.4,
+            // Non-eligible are very subtle
+            0.2
           ]
         }
       });
 
-      // Tract outline layer
+      // Tract outline layer - match the fill colors
       map.current.addLayer({
         id: 'tract-outlines',
         type: 'line',
@@ -231,13 +286,28 @@ export default function HomeMapWithTracts({
         paint: {
           'line-color': [
             'case',
-            ['==', ['get', 'eligible'], true], '#22c55e',
-            '#ef4444'
+            // Searched tract outline
+            ['==', ['get', 'searched'], true],
+            [
+              'case',
+              ['==', ['get', 'eligible'], true], '#16a34a', // Dark green outline for searched eligible
+              '#dc2626' // Dark red outline for searched not eligible
+            ],
+            // Regular tract outlines
+            ['==', ['get', 'eligible'], true],
+            [
+              'case',
+              ['==', ['get', 'severelyDistressed'], true], '#991b1b', // Dark red outline
+              '#5b21b6' // Dark purple outline
+            ],
+            // Not eligible = subtle gray outline
+            '#d1d5db'
           ],
           'line-width': [
             'case',
-            ['boolean', ['feature-state', 'hover'], false], 3,
-            2
+            ['==', ['get', 'searched'], true], 3, // Thicker for searched
+            ['boolean', ['feature-state', 'hover'], false], 2,
+            1
           ]
         }
       });
@@ -452,29 +522,33 @@ export default function HomeMapWithTracts({
 
     const { lat, lng, tract } = searchedLocation;
 
+    // Reset eligibility state for new search
+    setSearchEligible(null);
+
     // Remove existing search marker
     if (searchMarkerRef.current) {
       searchMarkerRef.current.remove();
       searchMarkerRef.current = null;
     }
 
-    // Add search location marker with pulsing effect
+    // Add search location marker with pulsing effect (starts indigo while loading)
     const el = document.createElement('div');
     el.innerHTML = `
       <div class="search-marker" style="
         width: 24px;
         height: 24px;
-        background: ${PIN_COLORS.search};
+        background: #6366f1;
         border: 3px solid white;
         border-radius: 50%;
-        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.3), 0 2px 8px rgba(0,0,0,0.4);
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.3), 0 2px 8px rgba(0,0,0,0.4);
         animation: pulse 2s infinite;
+        transition: background 0.3s ease, box-shadow 0.3s ease;
       "></div>
       <style>
         @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5), 0 2px 8px rgba(0,0,0,0.4); }
-          70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0), 0 2px 8px rgba(0,0,0,0.4); }
-          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0), 0 2px 8px rgba(0,0,0,0.4); }
+          0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5), 0 2px 8px rgba(0,0,0,0.4); }
+          70% { box-shadow: 0 0 0 12px rgba(99, 102, 241, 0), 0 2px 8px rgba(0,0,0,0.4); }
+          100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0), 0 2px 8px rgba(0,0,0,0.4); }
         }
       </style>
     `;
@@ -498,6 +572,21 @@ export default function HomeMapWithTracts({
       fetchTractByCoordinates(lng, lat);
     }
   }, [searchedLocation, mapLoaded]);
+
+  // Update search marker color when eligibility changes
+  useEffect(() => {
+    if (searchMarkerRef.current && searchEligible !== null) {
+      const color = searchEligible ? PIN_COLORS.searchEligible : PIN_COLORS.searchNotEligible;
+      const el = searchMarkerRef.current.getElement();
+      if (el) {
+        const innerDiv = el.querySelector('.search-marker') as HTMLElement;
+        if (innerDiv) {
+          innerDiv.style.background = color;
+          innerDiv.style.boxShadow = `0 0 0 4px ${searchEligible ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}, 0 2px 8px rgba(0,0,0,0.4)`;
+        }
+      }
+    }
+  }, [searchEligible]);
 
   // Fetch tract by coordinates (when no GEOID provided)
   const fetchTractByCoordinates = async (lng: number, lat: number) => {
@@ -529,6 +618,9 @@ export default function HomeMapWithTracts({
       const eligibilityRes = await fetch(`/api/eligibility?tract=${geoid}`);
       const eligibility = await eligibilityRes.json();
       console.log(`[Map] Eligibility response:`, eligibility);
+      
+      // Update search marker color based on eligibility
+      setSearchEligible(eligibility.eligible);
 
       // Fetch real tract geometry from Census TIGERweb if not provided
       let geometry = existingGeometry;
@@ -578,6 +670,7 @@ export default function HomeMapWithTracts({
           geoid,
           name: `Tract ${geoid.slice(-6)}`,
           eligible: eligibility.eligible,
+          searched: true,  // Mark as the searched tract for special styling
           programs: JSON.stringify(eligibility.programs || []),
           povertyRate: eligibility.federal?.poverty_rate?.toFixed(1) || null,
           medianIncomePct: eligibility.federal?.median_income_pct?.toFixed(0) || null,
@@ -587,6 +680,10 @@ export default function HomeMapWithTracts({
         },
         geometry: geometry as GeoJSON.Geometry,
       };
+      
+      // Store the searched tract geoid so we can preserve it during viewport loads
+      (window as unknown as { __searchedTractGeoid?: string }).__searchedTractGeoid = geoid;
+      (window as unknown as { __searchedTractFeature?: GeoJSON.Feature }).__searchedTractFeature = tractFeature;
 
       // Update the tracts source - wrap in try-catch to prevent Mapbox errors from bubbling
       try {
@@ -666,14 +763,18 @@ export default function HomeMapWithTracts({
       
       {/* Legend */}
       <div className="absolute bottom-4 left-4 bg-gray-900/95 rounded-lg p-3 border border-gray-700 z-10">
-        <p className="text-xs font-semibold text-gray-300 mb-2">Legend</p>
+        <p className="text-xs font-semibold text-gray-300 mb-2">NMTC Eligibility</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(34, 197, 94, 0.4)', border: '2px solid #22c55e' }} />
-            <span className="text-xs text-gray-400">Eligible Tract</span>
+            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(124, 58, 237, 0.6)', border: '1px solid #7c3aed' }} />
+            <span className="text-xs text-gray-400">Eligible (Distressed)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(239, 68, 68, 0.3)', border: '2px solid #ef4444' }} />
+            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(220, 38, 38, 0.6)', border: '1px solid #dc2626' }} />
+            <span className="text-xs text-gray-400">Eligible (Severe Distress)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(229, 231, 235, 0.2)', border: '1px solid #d1d5db' }} />
             <span className="text-xs text-gray-400">Not Eligible</span>
           </div>
           <div className="w-full h-px bg-gray-700 my-1.5" />
@@ -690,8 +791,10 @@ export default function HomeMapWithTracts({
             <span className="text-xs text-gray-400">OZ Deal</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ background: PIN_COLORS.search, border: '2px solid white' }} />
-            <span className="text-xs text-gray-400">Your Search</span>
+            <div className="w-3 h-3 rounded-full" style={{ background: searchEligible === true ? PIN_COLORS.searchEligible : searchEligible === false ? PIN_COLORS.searchNotEligible : PIN_COLORS.search, border: '2px solid white' }} />
+            <span className="text-xs text-gray-400">
+              Your Search {searchEligible === true ? '(Eligible)' : searchEligible === false ? '(Not Eligible)' : ''}
+            </span>
           </div>
         </div>
       </div>

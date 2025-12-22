@@ -48,13 +48,27 @@ const DEMO_USERS: Record<string, User> = {
   },
 };
 
-// Demo credentials
-const DEMO_CREDENTIALS: Record<string, { password: string; role: string }> = {
-  'sarah@midwestcde.com': { password: 'demo123', role: 'cde' },
-  'john@eastsidefood.org': { password: 'demo123', role: 'sponsor' },
-  'michael@greatlakes.bank': { password: 'demo123', role: 'investor' },
-  'admin@tcredex.com': { password: 'admin123', role: 'admin' },
-};
+// Demo credentials - REMOVED FOR SECURITY
+// Use environment variables for demo accounts in development
+const DEMO_CREDENTIALS: Record<string, { password: string; role: string }> = 
+  process.env.NODE_ENV === 'development' ? {
+    [process.env.DEMO_CDE_EMAIL || 'sarah@midwestcde.com']: { 
+      password: process.env.DEMO_PASSWORD || 'demo123', 
+      role: 'cde' 
+    },
+    [process.env.DEMO_SPONSOR_EMAIL || 'john@eastsidefood.org']: { 
+      password: process.env.DEMO_PASSWORD || 'demo123', 
+      role: 'sponsor' 
+    },
+    [process.env.DEMO_INVESTOR_EMAIL || 'michael@greatlakes.bank']: { 
+      password: process.env.DEMO_PASSWORD || 'demo123', 
+      role: 'investor' 
+    },
+    [process.env.DEMO_ADMIN_EMAIL || 'admin@tcredex.com']: { 
+      password: process.env.DEMO_ADMIN_PASSWORD || 'admin123', 
+      role: 'admin' 
+    },
+  } : {};
 
 export interface ExtendedAuthContext extends AuthContext {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;

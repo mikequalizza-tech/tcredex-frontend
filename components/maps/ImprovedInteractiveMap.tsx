@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import logger from '@/lib/utils/logger';
 
 // =============================================================================
 // TYPES
@@ -38,7 +39,7 @@ interface TractInfo {
   programs: string[];
 }
 
-interface InteractiveMapPlatformProps {
+interface ImprovedInteractiveMapProps {
   deals: MapDeal[];
   selectedDealId: string | null;
   onSelectDeal: (dealId: string | null) => void;
@@ -46,6 +47,7 @@ interface InteractiveMapPlatformProps {
   className?: string;
   centerLocation?: [number, number] | null;
   showTracts?: boolean;
+  useFallbackData?: boolean;
 }
 
 // =============================================================================
@@ -99,7 +101,7 @@ function getCoordinatesForDeal(deal: MapDeal): [number, number] | null {
 // COMPONENT
 // =============================================================================
 
-export default function InteractiveMapPlatform({
+export default function ImprovedInteractiveMap({
   deals,
   selectedDealId,
   onSelectDeal,
@@ -107,10 +109,10 @@ export default function InteractiveMapPlatform({
   className = '',
   centerLocation,
   showTracts = true,
-}: InteractiveMapPlatformProps) {
+  useFallbackData = false,
+}: ImprovedInteractiveMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapboxModule = useRef<any>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -122,6 +124,8 @@ export default function InteractiveMapPlatform({
   const [currentZoom, setCurrentZoom] = useState(4);
   const [tractsLoading, setTractsLoading] = useState(false);
   const [tractCount, setTractCount] = useState(0);
+  const [tractError, setTractError] = useState<string | null>(null);
+  const [usingFallbackData, setUsingFallbackData] = useState(false);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -137,126 +141,78 @@ export default function InteractiveMapPlatform({
     const zoom = map.getZoom();
     if (zoom < MIN_TRACT_ZOOM) {
       setTractCount(0);
-      // Clear tracts when zoomed out
-      const source = map.getSource('tracts') as mapboxgl.GeoJSONSource;
-      if (source) {
-        source.setData({ type: 'FeatureCollection', features: [] });
-      }
+      setTractError(null);
       return;
     }
 
     isLoadingTracts.current = true;
     setTractsLoading(true);
+    setTractError(null);
     
     try {
       const bounds = map.getBounds();
       if (!bounds) return;
       
       const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
-      console.log('[Map] Loading tracts for bbox:', bbox);
       
-      // Fetch tract geometries from Census TigerWeb
-      const response = await fetch(`/api/geo/tracts?bbox=${bbox}&limit=100`);
-      if (!response.ok) throw new Error('Failed to fetch tracts');
+      // Try improved API first, then fallback to original
+      let apiUrl = `/api/geo/tracts-improved?bbox=${bbox}&limit=300`;
+      if (useFallbackData) {
+        apiUrl += '&fallback=true';
+      }
       
-      const geojson = await response.json();
+      logger.info('Loading tracts for viewport', { bbox, useFallbackData }, 'ImprovedMap');
+      
+      let response = await fetch(apiUrl);
+      let geojson;
+      
+      if (!response.ok) {
+        // Fallback to original API
+        logger.warn('Improved API failed, trying original', null, 'ImprovedMap');
+        response = await fetch(`/api/geo/tracts?bbox=${bbox}&limit=300`);
+        
+        if (!response.ok) {
+          throw new Error(`Both APIs failed: ${response.status}`);
+        }
+      }
+      
+      geojson = await response.json();
       
       // Verify map still exists
       if (!mapInstanceRef.current) return;
 
       if (!geojson || geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
-        console.warn('[Map] Invalid GeoJSON');
-        return;
+        throw new Error('Invalid GeoJSON response');
       }
 
-      console.log('[Map] Got', geojson.features.length, 'tract geometries');
-
-      // Enrich first 30 tracts with eligibility data
-      const tractsToEnrich = geojson.features.slice(0, 30);
-      const enrichmentPromises = tractsToEnrich.map(async (feature: GeoJSON.Feature) => {
-        const geoid = feature.properties?.GEOID;
-        if (!geoid) {
-          return {
-            ...feature,
-            id: `tract-${Math.random()}`,
-            properties: {
-              ...feature.properties,
-              eligible: false,
-              programs: JSON.stringify([]),
-              severelyDistressed: false,
-            }
-          };
+      // Check if using fallback data
+      if (geojson._fallback || geojson._error) {
+        setUsingFallbackData(true);
+        if (geojson._error) {
+          setTractError(geojson._error);
         }
-        
-        try {
-          const eligRes = await fetch(`/api/eligibility?tract=${geoid}`);
-          const eligData = await eligRes.json();
-          
-          return {
-            ...feature,
-            id: geoid,
-            properties: {
-              ...feature.properties,
-              geoid,
-              eligible: eligData.eligible || false,
-              programs: JSON.stringify(eligData.programs || []),
-              povertyRate: eligData.federal?.poverty_rate?.toFixed(1) || null,
-              medianIncomePct: eligData.federal?.median_income_pct?.toFixed(0) || null,
-              stateName: eligData.location?.state || null,
-              countyName: eligData.location?.county || null,
-              severelyDistressed: eligData.federal?.severely_distressed || false,
-            }
-          };
-        } catch (error) {
-          console.warn(`[Map] Failed to get eligibility for ${geoid}:`, error);
-          return {
-            ...feature,
-            id: geoid,
-            properties: {
-              ...feature.properties,
-              geoid,
-              eligible: false,
-              programs: JSON.stringify([]),
-              severelyDistressed: false,
-            }
-          };
-        }
-      });
+      } else {
+        setUsingFallbackData(false);
+      }
 
-      const enrichedFeatures = await Promise.all(enrichmentPromises);
-      
-      // Add remaining tracts without eligibility (they'll show as neutral)
-      const remainingFeatures = geojson.features.slice(30).map((feature: GeoJSON.Feature) => ({
-        ...feature,
-        id: feature.properties?.GEOID || `tract-${Math.random()}`,
-        properties: {
-          ...feature.properties,
-          eligible: false,
-          programs: JSON.stringify([]),
-          severelyDistressed: false,
-        }
-      }));
-
-      const allFeatures = [...enrichedFeatures, ...remainingFeatures];
-      console.log('[Map] Enriched', enrichedFeatures.length, 'tracts with eligibility data');
-      setTractCount(allFeatures.length);
+      logger.info(`Loaded ${geojson.features.length} tracts`, { fallback: !!geojson._fallback }, 'ImprovedMap');
+      setTractCount(geojson.features.length);
 
       // Update the source data
       const source = map.getSource('tracts') as mapboxgl.GeoJSONSource;
       if (source) {
-        source.setData({
-          type: 'FeatureCollection',
-          features: allFeatures
-        });
+        source.setData(geojson);
       }
 
     } catch (error) {
-      console.error('[Map] Error loading tracts:', error);
+      logger.error('Error loading tracts', error, 'ImprovedMap');
+      setTractError(`Failed to load tract data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTractCount(0);
     } finally {
       isLoadingTracts.current = false;
       setTractsLoading(false);
     }
-  }, [showTracts]);
+  }, [showTracts, useFallbackData]);
 
   // ==========================================================================
   // INITIALIZE MAP (runs once)
@@ -271,15 +227,12 @@ export default function InteractiveMapPlatform({
 
     const initMap = async () => {
       try {
-        console.log('[Map] Starting map initialization...');
         const mapboxgl = (await import('mapbox-gl')).default;
         if (!mounted) return;
         
-        console.log('[Map] Mapbox module loaded, setting token...');
         mapboxModule.current = mapboxgl;
         mapboxgl.accessToken = mapboxToken;
         
-        console.log('[Map] Creating map instance...');
         map = new mapboxgl.Map({
           container: mapContainer.current!,
           style: 'mapbox://styles/mapbox/dark-v11',
@@ -290,14 +243,13 @@ export default function InteractiveMapPlatform({
         });
 
         mapInstanceRef.current = map;
-        console.log('[Map] Map instance created, adding controls...');
 
         map.addControl(new mapboxgl.NavigationControl(), 'top-left');
         map.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
         map.on('load', () => {
           if (!mounted || !map) return;
-          console.log('[Map] ✓ Mapbox loaded successfully!');
+          logger.info('Mapbox map loaded successfully', null, 'ImprovedMap');
           
           // Add tract source (empty initially)
           map.addSource('tracts', {
@@ -305,33 +257,14 @@ export default function InteractiveMapPlatform({
             data: { type: 'FeatureCollection', features: [] },
           });
 
-          // Add tract fill layer - use CDFI Fund color scheme
+          // Add tract fill layer
           map.addLayer({
             id: 'tract-fills',
             type: 'fill',
             source: 'tracts',
             paint: {
-              'fill-color': [
-                'case',
-                // Eligible tracts
-                ['==', ['get', 'eligible'], true],
-                [
-                  'case',
-                  // Severely distressed = red (like CDFI map)
-                  ['==', ['get', 'severelyDistressed'], true], '#dc2626',
-                  // Regular eligible = purple (like CDFI map) 
-                  '#7c3aed'
-                ],
-                // Not eligible = light gray (subtle)
-                '#e5e7eb'
-              ],
-              'fill-opacity': [
-                'case',
-                // Eligible tracts are visible
-                ['==', ['get', 'eligible'], true], 0.6,
-                // Not eligible are very subtle
-                0.2
-              ]
+              'fill-color': TRACT_FILL_COLOR,
+              'fill-opacity': TRACT_FILL_OPACITY,
             },
           });
 
@@ -341,38 +274,14 @@ export default function InteractiveMapPlatform({
             type: 'line',
             source: 'tracts',
             paint: {
-              'line-color': [
-                'case',
-                ['==', ['get', 'eligible'], true],
-                [
-                  'case',
-                  ['==', ['get', 'severelyDistressed'], true], '#991b1b', // Dark red
-                  '#5b21b6' // Dark purple
-                ],
-                '#d1d5db' // Light gray for not eligible
-              ],
+              'line-color': TRACT_LINE_COLOR,
               'line-width': TRACT_LINE_WIDTH,
               'line-opacity': 0.8,
             },
           });
 
-          console.log('[Map] Layers added, setting mapReady to true');
           setMapReady(true);
         });
-
-        map.on('error', (e) => {
-          console.error('[Map] Mapbox error:', e);
-        });
-
-        console.log('[Map] Event listeners added, waiting for load event...');
-
-        // Fallback timeout in case map never loads
-        setTimeout(() => {
-          if (!mapReady) {
-            console.warn('[Map] Map load timeout - forcing mapReady to true');
-            setMapReady(true);
-          }
-        }, 10000); // 10 second timeout
 
         // Track zoom
         map.on('zoom', () => {
@@ -408,20 +317,10 @@ export default function InteractiveMapPlatform({
         // Tract hover popup
         map.on('mousemove', 'tract-fills', async (e) => {
           if (!e.features?.[0] || !map || !mapboxgl) return;
-          const feature = e.features[0];
-          const geoid = feature.properties?.GEOID || feature.properties?.geoid;
-          const eligible = feature.properties?.eligible === true || feature.properties?.eligible === 'true';
-          
+          const geoid = e.features[0].properties?.GEOID;
           if (!geoid) return;
 
           if (popupRef.current) popupRef.current.remove();
-          
-          let programs: string[] = [];
-          try {
-            programs = feature.properties?.programs ? JSON.parse(feature.properties.programs) : [];
-          } catch {
-            programs = [];
-          }
           
           popupRef.current = new mapboxgl.Popup({
             closeButton: false,
@@ -430,48 +329,10 @@ export default function InteractiveMapPlatform({
           })
             .setLngLat(e.lngLat)
             .setHTML(`
-              <div style="background: #1f2937; color: white; padding: 12px; border-radius: 8px; min-width: 200px; font-family: system-ui; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                  <span style="font-size: 20px;">${eligible ? '✓' : '✗'}</span>
-                  <span style="font-weight: 600; font-size: 14px; color: ${eligible ? '#4ade80' : '#f87171'};">
-                    ${eligible ? 'NMTC Eligible' : 'Not Eligible'}
-                  </span>
-                </div>
-                <p style="font-size: 12px; color: #9ca3af; margin-bottom: 8px;">
-                  Census Tract: <span style="font-family: monospace; color: #d1d5db; font-weight: 500;">${geoid}</span>
-                </p>
-                ${programs.length > 0 ? `
-                  <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px;">
-                    ${programs.map((p: string) => `
-                      <span style="
-                        padding: 3px 8px;
-                        font-size: 10px;
-                        font-weight: 600;
-                        border-radius: 9999px;
-                        background: ${p.includes('NMTC') ? 'rgba(34, 197, 94, 0.2)' : p === 'Opportunity Zone' ? 'rgba(168, 85, 247, 0.2)' : p === 'Severely Distressed' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(59, 130, 246, 0.2)'};
-                        color: ${p.includes('NMTC') ? '#4ade80' : p === 'Opportunity Zone' ? '#c084fc' : p === 'Severely Distressed' ? '#fb923c' : '#60a5fa'};
-                        border: 1px solid ${p.includes('NMTC') ? 'rgba(34, 197, 94, 0.4)' : p === 'Opportunity Zone' ? 'rgba(168, 85, 247, 0.4)' : p === 'Severely Distressed' ? 'rgba(249, 115, 22, 0.4)' : 'rgba(59, 130, 246, 0.4)'};
-                      ">${p}</span>
-                    `).join('')}
-                  </div>
-                ` : ''}
-                ${feature.properties?.povertyRate || feature.properties?.medianIncomePct ? `
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 10px; border-top: 1px solid #374151; font-size: 12px;">
-                    <div>
-                      <p style="color: #6b7280; font-size: 10px; margin-bottom: 2px;">Poverty Rate</p>
-                      <p style="font-weight: 600; color: ${parseFloat(feature.properties?.povertyRate || '0') >= 20 ? '#fb923c' : '#d1d5db'};">${feature.properties?.povertyRate ? feature.properties.povertyRate + '%' : 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p style="color: #6b7280; font-size: 10px; margin-bottom: 2px;">Median Income</p>
-                      <p style="font-weight: 600; color: ${parseFloat(feature.properties?.medianIncomePct || '100') <= 80 ? '#fb923c' : '#d1d5db'};">${feature.properties?.medianIncomePct ? feature.properties.medianIncomePct + '% AMI' : 'N/A'}</p>
-                    </div>
-                  </div>
-                ` : ''}
-                ${feature.properties?.stateName ? `
-                  <p style="font-size: 10px; color: #6b7280; margin-top: 8px; padding-top: 8px; border-top: 1px solid #374151;">
-                    📍 ${feature.properties?.countyName ? feature.properties.countyName + ', ' : ''}${feature.properties.stateName}
-                  </p>
-                ` : ''}
+              <div style="background: #1f2937; color: white; padding: 12px; border-radius: 8px; min-width: 160px;">
+                <div style="font-size: 11px; color: #9ca3af; margin-bottom: 4px;">Census Tract</div>
+                <div style="font-size: 14px; font-weight: 600; font-family: monospace;">${geoid}</div>
+                ${usingFallbackData ? '<div style="font-size: 10px; color: #fbbf24; margin-top: 4px;">Sample Data</div>' : ''}
               </div>
             `)
             .addTo(map);
@@ -492,7 +353,7 @@ export default function InteractiveMapPlatform({
         });
 
       } catch (error) {
-        console.error('[Map] Init error:', error);
+        logger.error('Map initialization error', error, 'ImprovedMap');
       }
     };
 
@@ -505,7 +366,7 @@ export default function InteractiveMapPlatform({
         mapInstanceRef.current = null;
       }
     };
-  }, [mapboxToken, onTractClick, loadTractsForViewport]);
+  }, [mapboxToken, onTractClick, loadTractsForViewport, usingFallbackData]);
 
   // ==========================================================================
   // LOAD TRACTS WHEN MAP IS READY
@@ -521,7 +382,7 @@ export default function InteractiveMapPlatform({
   }, [mapReady, showTracts, loadTractsForViewport]);
 
   // ==========================================================================
-  // DEAL MARKERS
+  // DEAL MARKERS (same as original)
   // ==========================================================================
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -582,11 +443,11 @@ export default function InteractiveMapPlatform({
           <div style="font-size: 12px; display: grid; gap: 4px;">
             <div style="display: flex; justify-content: space-between;">
               <span style="color: #9ca3af;">Cost:</span>
-              <span>$${(deal.projectCost / 1000000).toFixed(1)}M</span>
+              <span>${(deal.projectCost / 1000000).toFixed(1)}M</span>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span style="color: #9ca3af;">Gap:</span>
-              <span style="color: #fb923c;">$${(deal.financingGap / 1000000).toFixed(2)}M</span>
+              <span style="color: #fb923c;">${(deal.financingGap / 1000000).toFixed(2)}M</span>
             </div>
           </div>
           ${deal.shovelReady ? `
@@ -608,7 +469,7 @@ export default function InteractiveMapPlatform({
   }, [deals, selectedDealId, mapReady, onSelectDeal]);
 
   // ==========================================================================
-  // FLY TO SELECTED DEAL
+  // FLY TO SELECTED DEAL (same as original)
   // ==========================================================================
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -624,7 +485,7 @@ export default function InteractiveMapPlatform({
   }, [selectedDealId, deals, mapReady]);
 
   // ==========================================================================
-  // FLY TO SEARCH LOCATION
+  // FLY TO SEARCH LOCATION (same as original)
   // ==========================================================================
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -690,16 +551,38 @@ export default function InteractiveMapPlatform({
         </div>
       )}
 
+      {/* Error indicator */}
+      {tractError && !tractsLoading && (
+        <div className="absolute top-4 right-4 bg-red-900/90 rounded-lg px-3 py-2 border border-red-700 z-10 max-w-xs">
+          <p className="text-xs text-red-300">⚠️ {tractError}</p>
+          <button 
+            onClick={() => loadTractsForViewport()}
+            className="text-xs text-red-200 underline mt-1 hover:text-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Fallback data indicator */}
+      {usingFallbackData && !tractError && (
+        <div className="absolute top-4 right-4 bg-yellow-900/90 rounded-lg px-3 py-2 border border-yellow-700 z-10">
+          <p className="text-xs text-yellow-300">📍 Using sample tract data</p>
+        </div>
+      )}
+
       {/* Tract count indicator */}
-      {showTracts && currentZoom >= MIN_TRACT_ZOOM && tractCount > 0 && !tractsLoading && (
+      {showTracts && currentZoom >= MIN_TRACT_ZOOM && tractCount > 0 && !tractsLoading && !tractError && (
         <div className="absolute top-4 right-4 bg-gray-900/90 rounded-lg px-3 py-2 border border-gray-700 z-10">
-          <span className="text-xs text-orange-400">{tractCount} tracts</span>
+          <span className="text-xs text-orange-400">
+            {tractCount} tracts {usingFallbackData ? '(sample)' : ''}
+          </span>
         </div>
       )}
 
       {/* Legend */}
       <div className="absolute bottom-20 left-4 bg-gray-900/95 rounded-lg p-3 border border-gray-700 z-10">
-        <p className="text-xs font-semibold text-gray-300 mb-2">NMTC Eligibility</p>
+        <p className="text-xs font-semibold text-gray-300 mb-2">Legend</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-indigo-500 rounded-full border border-white"></div>
@@ -720,25 +603,15 @@ export default function InteractiveMapPlatform({
             <>
               <div className="w-full h-px bg-gray-700 my-2" />
               <div className="flex items-center gap-2">
-                <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(124, 58, 237, 0.6)', border: '1px solid #7c3aed' }} />
-                <span className="text-xs text-gray-400">Eligible (Distressed)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(220, 38, 38, 0.6)', border: '1px solid #dc2626' }} />
-                <span className="text-xs text-gray-400">Eligible (Severe Distress)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(229, 231, 235, 0.2)', border: '1px solid #d1d5db' }} />
-                <span className="text-xs text-gray-400">Not Eligible</span>
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: TRACT_FILL_COLOR, opacity: 0.5 }}></div>
+                <span className="text-xs text-gray-400">Census Tract</span>
               </div>
             </>
           )}
         </div>
         <div className="mt-2 pt-2 border-t border-gray-700 text-xs text-gray-500">
           {deals.length} deals • Zoom {currentZoom.toFixed(0)}
-          {showTracts && currentZoom >= MIN_TRACT_ZOOM && tractCount > 0 && (
-            <> • {tractCount} tracts</>
-          )}
+          {usingFallbackData && <span className="text-yellow-400"> • Sample Data</span>}
         </div>
       </div>
 

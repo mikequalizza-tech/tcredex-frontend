@@ -7,11 +7,10 @@ import DealCard from '@/components/DealCard';
 import MapFilterRail, { FilterState, defaultFilters } from '@/components/maps/MapFilterRail';
 import { mockDeals } from '@/lib/mockData';
 import { useCurrentUser } from '@/lib/auth';
-import type { MapDeal } from '@/components/maps/InteractiveMapPlatform';
 
-// Dynamic import to avoid SSR issues with Mapbox
-const InteractiveMapPlatform = dynamic(
-  () => import('@/components/maps/InteractiveMapPlatform'),
+// Dynamic import to avoid SSR issues with Mapbox - Use the WORKING HomeMapWithTracts
+const HomeMapWithTracts = dynamic(
+  () => import('@/components/maps/HomeMapWithTracts'),
   { 
     ssr: false,
     loading: () => (
@@ -85,8 +84,20 @@ function MapContent() {
     else setViewMode('sponsor');
   }, [orgType]);
 
-  // Convert mockDeals to MapDeal format with coordinates
-  const mapDeals: MapDeal[] = mockDeals.map(deal => ({
+  // Show loading state while auth is loading
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Convert mockDeals to simple format for display
+  const mapDeals = mockDeals.map(deal => ({
     ...deal,
     coordinates: DEAL_COORDINATES[deal.id] || undefined,
   }));
@@ -131,45 +142,44 @@ function MapContent() {
   const totalProjectValue = filteredDeals.reduce((sum, d) => sum + d.projectCost, 0);
   const shovelReadyCount = filteredDeals.filter(d => d.shovelReady).length;
 
-  // Show auth-dependent UI only after auth loaded
-  const showAuthUI = !isLoading && isAuthenticated;
-
   return (
     <div className="h-screen w-screen bg-gray-950 text-white overflow-hidden flex flex-col">
-      {/* Top Navigation Bar - Only for authenticated users */}
-      {showAuthUI && (
-        <div className="flex-none h-12 bg-gray-900 border-b border-gray-800 px-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/dashboard" 
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              <span className="text-sm">Dashboard</span>
-            </Link>
-            <div className="h-4 w-px bg-gray-700" />
-            <Link href="/" className="flex items-center gap-2">
-              <img src="/brand/tcredex_256x64.png" alt="tCredex" className="h-6 w-auto" />
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/deals/new" 
-              className="px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
-            >
-              + New Deal
-            </Link>
-            <Link 
-              href="/deals" 
-              className="text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              Marketplace
-            </Link>
-          </div>
+      {/* Top Navigation Bar - Always show for map page */}
+      <div className="flex-none h-12 bg-gray-900 border-b border-gray-800 px-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link 
+            href="/dashboard" 
+            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span className="text-sm">Dashboard</span>
+          </Link>
+          <div className="h-4 w-px bg-gray-700" />
+          <Link href="/" className="flex items-center gap-2">
+            <img src="/brand/tcredex_256x64.png" alt="tCredex" className="h-6 w-auto" />
+          </Link>
         </div>
-      )}
+        <div className="flex items-center gap-4">
+          {isAuthenticated && (
+            <>
+              <Link 
+                href="/deals/new" 
+                className="px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
+              >
+                + New Deal
+              </Link>
+              <Link 
+                href="/deals" 
+                className="text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Marketplace
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
@@ -193,11 +203,10 @@ function MapContent() {
 
         {/* Center: Map - Full width, panels overlay */}
         <div className="flex-1 h-full relative">
-          <InteractiveMapPlatform
-            deals={filteredDeals}
-            selectedDealId={selectedDealId}
-            onSelectDeal={handleSelectDeal}
-            centerLocation={searchedLocation}
+          <HomeMapWithTracts
+            height="100%"
+            className="w-full h-full"
+            searchedLocation={searchedLocation ? { lat: searchedLocation[1], lng: searchedLocation[0] } : null}
           />
           
           {/* Map Overlay Controls - Top Left */}

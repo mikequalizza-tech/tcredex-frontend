@@ -320,12 +320,21 @@ export default function InteractiveMapPlatform({
             paint: {
               'fill-color': [
                 'case',
-                // Eligible tracts
-                ['==', ['get', 'eligible'], true],
+                // Eligible tracts - handle both boolean true and string "true"
+                ['any',
+                  ['==', ['get', 'eligible'], true],
+                  ['==', ['get', 'eligible'], 'true'],
+                  ['==', ['get', 'eligible'], 1]
+                ],
                 [
                   'case',
                   // Severely distressed = red (like CDFI map)
-                  ['==', ['get', 'severelyDistressed'], true], '#dc2626',
+                  ['any',
+                    ['==', ['get', 'severelyDistressed'], true],
+                    ['==', ['get', 'severelyDistressed'], 'true'],
+                    ['==', ['get', 'severelyDistressed'], 1]
+                  ], 
+                  '#dc2626',
                   // Regular eligible = purple (like CDFI map) 
                   '#7c3aed'
                 ],
@@ -335,7 +344,12 @@ export default function InteractiveMapPlatform({
               'fill-opacity': [
                 'case',
                 // Eligible tracts are visible
-                ['==', ['get', 'eligible'], true], 0.6,
+                ['any',
+                  ['==', ['get', 'eligible'], true],
+                  ['==', ['get', 'eligible'], 'true'],
+                  ['==', ['get', 'eligible'], 1]
+                ], 
+                0.6,
                 // Not eligible are very subtle
                 0.2
               ]
@@ -350,10 +364,19 @@ export default function InteractiveMapPlatform({
             paint: {
               'line-color': [
                 'case',
-                ['==', ['get', 'eligible'], true],
+                ['any',
+                  ['==', ['get', 'eligible'], true],
+                  ['==', ['get', 'eligible'], 'true'],
+                  ['==', ['get', 'eligible'], 1]
+                ],
                 [
                   'case',
-                  ['==', ['get', 'severelyDistressed'], true], '#991b1b', // Dark red
+                  ['any',
+                    ['==', ['get', 'severelyDistressed'], true],
+                    ['==', ['get', 'severelyDistressed'], 'true'],
+                    ['==', ['get', 'severelyDistressed'], 1]
+                  ], 
+                  '#991b1b', // Dark red
                   '#5b21b6' // Dark purple
                 ],
                 '#d1d5db' // Light gray for not eligible

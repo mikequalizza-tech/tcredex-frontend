@@ -67,19 +67,41 @@ export default function SupportPage() {
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-indigo-300">Need faster help?</p>
-              <h3 className="mt-1 text-2xl font-bold text-white">Start a support request</h3>
-            <p className="mt-2 text-gray-400">
-              Tell us about the issue and share any deal IDs or screenshots to speed up triage. You'll be taken to our intake form.
-            </p>
-          </div>
-          <Link
-            href="/intake"
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors"
+              <h3 className="mt-1 text-2xl font-bold text-white">Open a Support Ticket</h3>
+              <p className="mt-2 text-gray-400">
+                Tell us about your issue and include any deal IDs or screenshots to help us assist you faster.
+              </p>
+            </div>
+            <Link
+              href="/support/request"
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors"
             >
               Open Request
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
+            </Link>
+          </div>
+        </div>
+
+        {/* Additional Resources */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-xl border border-gray-800 bg-gray-900/70 p-6">
+            <h3 className="text-lg font-semibold text-white mb-3">For Sponsors</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Ready to submit a project to the marketplace? Start your intake form to get matched with CDEs and investors.
+            </p>
+            <Link href="/intake" className="text-sm font-medium text-green-400 hover:text-green-300">
+              Submit a Project →
+            </Link>
+          </div>
+          <div className="rounded-xl border border-gray-800 bg-gray-900/70 p-6">
+            <h3 className="text-lg font-semibold text-white mb-3">For CDEs & Investors</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Update your profile to improve matching or browse available projects in the marketplace.
+            </p>
+            <Link href="/dashboard" className="text-sm font-medium text-purple-400 hover:text-purple-300">
+              Go to Dashboard →
             </Link>
           </div>
         </div>

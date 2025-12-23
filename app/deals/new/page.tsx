@@ -69,26 +69,48 @@ export default function NewDealPage() {
   const handleSave = async (data: IntakeData, readinessScore: number) => {
     console.log('Saving draft...', { data, readinessScore });
     
-    // In production, this would call the API
-    // await fetch('/api/deals', { method: 'POST', body: JSON.stringify({ data, readinessScore, status: 'draft' }) });
-    
-    // Show success message
-    alert('Draft saved successfully!');
+    try {
+      const response = await fetch('/api/deals', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, readinessScore, status: 'draft' }) 
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save draft');
+      }
+      
+      const deal = await response.json();
+      console.log('Draft saved:', deal);
+    } catch (error) {
+      console.error('Save failed:', error);
+      alert('Failed to save draft. Please try again.');
+    }
   };
 
   const handleSubmit = async (data: IntakeData, readinessScore: number) => {
     console.log('Submitting to marketplace...', { data, readinessScore });
     
-    // In production, this would call the API
-    // const response = await fetch('/api/deals', { 
-    //   method: 'POST', 
-    //   body: JSON.stringify({ data, readinessScore, status: 'submitted' }) 
-    // });
-    // const deal = await response.json();
-    
-    // For demo, simulate success and redirect
-    alert('Deal submitted to marketplace!');
-    router.push('/deals');
+    try {
+      const response = await fetch('/api/deals', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, readinessScore, status: 'submitted' }) 
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to submit deal');
+      }
+      
+      const deal = await response.json();
+      console.log('Deal submitted:', deal);
+      router.push('/deals');
+    } catch (error) {
+      console.error('Submit failed:', error);
+      alert('Failed to submit deal. Please try again.');
+    }
   };
 
   return (

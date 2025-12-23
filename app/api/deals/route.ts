@@ -95,26 +95,77 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const { data: intakeData, readinessScore, status: dealStatus } = body;
+
+    // Transform IntakeData to deals table columns
+    const dealRecord = {
+      // Ownership
+      user_id: user.id,
+      
+      // Core fields
+      project_name: intakeData.projectName || 'Untitled Project',
+      sponsor_name: intakeData.sponsorName || null,
+      program_type: intakeData.programs?.[0] || 'NMTC',
+      
+      // Status
+      status: dealStatus === 'submitted' ? 'available' : 'draft',
+      
+      // Location
+      address: intakeData.address || null,
+      city: intakeData.city || null,
+      state: intakeData.state || null,
+      zip: intakeData.zip || null,
+      census_tract: intakeData.censusTract || null,
+      
+      // Financials
+      total_project_cost: intakeData.totalProjectCost || null,
+      allocation_amount: intakeData.nmtcRequest || intakeData.financingGap || null,
+      financing_gap: intakeData.financingGap || null,
+      
+      // Metrics
+      readiness_score: readinessScore || 0,
+      poverty_rate: intakeData.povertyRate || null,
+      median_income_pct: intakeData.medianIncomePct || null,
+      
+      // Project details
+      project_description: intakeData.projectDescription || null,
+      project_type: intakeData.projectType || null,
+      industry_sector: intakeData.primaryBusinessActivity || null,
+      
+      // Jobs
+      jobs_created: intakeData.jobsCreated || null,
+      jobs_retained: intakeData.jobsRetained || null,
+      construction_jobs: intakeData.constructionJobs || null,
+      
+      // Timeline
+      expected_close_date: intakeData.expectedCloseDate || null,
+      construction_start: intakeData.constructionStart || null,
+      construction_end: intakeData.constructionEnd || null,
+      
+      // Store full intake data as JSONB
+      intake_data: intakeData,
+      programs: intakeData.programs || [],
+      
+      // Timestamps
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
     const { data: deal, error } = await supabase
       .from('deals')
-      .insert({
-        ...body,
-        user_id: user.id,
-        status: 'pending_approval',
-        created_at: new Date().toISOString(),
-      })
+      .insert(dealRecord)
       .select()
       .single();
 
     if (error) {
       console.error('Deal creation error:', error);
       return NextResponse.json(
-        { error: 'Failed to create deal' },
+        { error: 'Failed to create deal', details: error.message },
         { status: 500 }
       );
     }
 
+    console.log('[API] Deal created:', deal.id, deal.project_name, deal.status);
     return NextResponse.json(deal, { status: 201 });
   } catch (error) {
     console.error('Deal creation error:', error);

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useCurrentUser } from '@/lib/auth';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
 
@@ -13,6 +14,8 @@ interface TeamMember {
   avatar?: string;
   lastActive: string;
   status: 'active' | 'pending' | 'inactive';
+  phone?: string;
+  department?: string;
 }
 
 const DEMO_TEAM: TeamMember[] = [
@@ -24,6 +27,8 @@ const DEMO_TEAM: TeamMember[] = [
     role: 'owner',
     lastActive: '2 minutes ago',
     status: 'active',
+    phone: '(555) 123-4567',
+    department: 'Executive',
   },
   {
     id: 'user-002',
@@ -33,6 +38,8 @@ const DEMO_TEAM: TeamMember[] = [
     role: 'admin',
     lastActive: '1 hour ago',
     status: 'active',
+    phone: '(555) 234-5678',
+    department: 'Operations',
   },
   {
     id: 'user-003',
@@ -42,6 +49,8 @@ const DEMO_TEAM: TeamMember[] = [
     role: 'member',
     lastActive: '3 hours ago',
     status: 'active',
+    phone: '(555) 345-6789',
+    department: 'Finance',
   },
   {
     id: 'user-004',
@@ -51,6 +60,8 @@ const DEMO_TEAM: TeamMember[] = [
     role: 'member',
     lastActive: 'Yesterday',
     status: 'active',
+    phone: '(555) 456-7890',
+    department: 'Compliance',
   },
   {
     id: 'user-005',
@@ -60,6 +71,8 @@ const DEMO_TEAM: TeamMember[] = [
     role: 'viewer',
     lastActive: '2 days ago',
     status: 'active',
+    phone: '(555) 567-8901',
+    department: 'Legal',
   },
   {
     id: 'user-006',
@@ -69,6 +82,7 @@ const DEMO_TEAM: TeamMember[] = [
     role: 'member',
     lastActive: 'Pending',
     status: 'pending',
+    department: 'Finance',
   },
 ];
 
@@ -93,14 +107,31 @@ const STATUS_COLORS = {
 };
 
 export default function TeamPage() {
+  const { userName, userEmail, orgName } = useCurrentUser();
   const [members, setMembers] = useState<TeamMember[]>(DEMO_TEAM);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [editMode, setEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<MemberRole | 'all'>('all');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<MemberRole>('member');
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteSending, setInviteSending] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSendInvite = async () => {
     if (!inviteEmail.trim()) {
@@ -109,11 +140,8 @@ export default function TeamPage() {
     }
     
     setInviteSending(true);
-    
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Add new pending member to list
     const newMember: TeamMember = {
       id: `user-${Date.now()}`,
       name: inviteEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
@@ -132,6 +160,40 @@ export default function TeamPage() {
     setInviteMessage('');
     
     alert(`Invitation sent to ${inviteEmail}!`);
+  };
+
+  const handleMemberClick = (member: TeamMember) => {
+    setSelectedMember(member);
+    setEditMode(false);
+    setShowMemberModal(true);
+    setOpenMenuId(null);
+  };
+
+  const handleEditMember = (member: TeamMember) => {
+    setSelectedMember(member);
+    setEditMode(true);
+    setShowMemberModal(true);
+    setOpenMenuId(null);
+  };
+
+  const handleSaveMember = () => {
+    if (selectedMember) {
+      setMembers(prev => prev.map(m => m.id === selectedMember.id ? selectedMember : m));
+      setShowMemberModal(false);
+      setSelectedMember(null);
+    }
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    if (confirm('Are you sure you want to remove this team member?')) {
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      setOpenMenuId(null);
+    }
+  };
+
+  const handleResendInvite = (member: TeamMember) => {
+    alert(`Invitation resent to ${member.email}`);
+    setOpenMenuId(null);
   };
 
   const filteredMembers = members.filter((member) => {
@@ -193,12 +255,7 @@ export default function TeamPage() {
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -210,7 +267,6 @@ export default function TeamPage() {
               />
             </div>
           </div>
-
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as MemberRole | 'all')}
@@ -228,7 +284,11 @@ export default function TeamPage() {
       <div className="bg-gray-900 rounded-xl border border-gray-800">
         <div className="divide-y divide-gray-800">
           {filteredMembers.map((member) => (
-            <div key={member.id} className="p-4 hover:bg-gray-800/50 transition-colors">
+            <div 
+              key={member.id} 
+              className="p-4 hover:bg-gray-800/50 transition-colors cursor-pointer"
+              onClick={() => handleMemberClick(member)}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   {/* Avatar */}
@@ -253,22 +313,71 @@ export default function TeamPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-4">
-                  <div className="text-sm text-gray-500">
+                <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="text-sm text-gray-500 hidden md:block">
                     {member.status === 'pending' ? 'Invitation sent' : `Active ${member.lastActive}`}
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    {member.status === 'pending' && (
-                      <button className="text-amber-400 hover:text-amber-300 text-sm font-medium">
-                        Resend
-                      </button>
-                    )}
-                    <button className="text-gray-500 hover:text-gray-300 p-1 hover:bg-gray-800 rounded transition-colors">
+                  {/* Dropdown Menu */}
+                  <div className="relative" ref={openMenuId === member.id ? menuRef : null}>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === member.id ? null : member.id);
+                      }}
+                      className="text-gray-500 hover:text-gray-300 p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                    >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                       </svg>
                     </button>
+                    
+                    {openMenuId === member.id && (
+                      <div className="absolute right-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                        <div className="py-1">
+                          <button
+                            onClick={() => handleMemberClick(member)}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View Profile
+                          </button>
+                          <button
+                            onClick={() => handleEditMember(member)}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit Member
+                          </button>
+                          {member.status === 'pending' && (
+                            <button
+                              onClick={() => handleResendInvite(member)}
+                              className="w-full px-4 py-2 text-left text-sm text-amber-400 hover:bg-gray-700 flex items-center gap-2"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              Resend Invite
+                            </button>
+                          )}
+                          <hr className="border-gray-700 my-1" />
+                          <button
+                            onClick={() => handleRemoveMember(member.id)}
+                            className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Remove Member
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -325,6 +434,173 @@ export default function TeamPage() {
         </div>
       </div>
 
+      {/* Member Detail/Edit Modal */}
+      {showMemberModal && selectedMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowMemberModal(false)} />
+          <div className="relative bg-gray-900 rounded-xl w-full max-w-lg mx-4 shadow-xl border border-gray-800 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-800">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-100">
+                  {editMode ? 'Edit Team Member' : 'Team Member'}
+                </h3>
+                <button onClick={() => setShowMemberModal(false)} className="text-gray-500 hover:text-white">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {/* Avatar & Name */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center text-2xl font-medium text-gray-300 border border-gray-700">
+                  {selectedMember.name.split(' ').map((n) => n[0]).join('')}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-medium text-gray-100">{selectedMember.name}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[selectedMember.role]}`}>
+                      {ROLE_LABELS[selectedMember.role]}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-400">{selectedMember.title}</div>
+                </div>
+              </div>
+
+              {editMode ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={selectedMember.name}
+                      onChange={(e) => setSelectedMember({ ...selectedMember, name: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={selectedMember.title}
+                      onChange={(e) => setSelectedMember({ ...selectedMember, title: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={selectedMember.email}
+                      onChange={(e) => setSelectedMember({ ...selectedMember, email: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      value={selectedMember.phone || ''}
+                      onChange={(e) => setSelectedMember({ ...selectedMember, phone: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Department</label>
+                    <input
+                      type="text"
+                      value={selectedMember.department || ''}
+                      onChange={(e) => setSelectedMember({ ...selectedMember, department: e.target.value })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">Role</label>
+                    <select
+                      value={selectedMember.role}
+                      onChange={(e) => setSelectedMember({ ...selectedMember, role: e.target.value as MemberRole })}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
+                    >
+                      {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-500">Email</span>
+                    <span className="text-gray-200">{selectedMember.email}</span>
+                  </div>
+                  {selectedMember.phone && (
+                    <div className="flex justify-between py-2 border-b border-gray-800">
+                      <span className="text-gray-500">Phone</span>
+                      <span className="text-gray-200">{selectedMember.phone}</span>
+                    </div>
+                  )}
+                  {selectedMember.department && (
+                    <div className="flex justify-between py-2 border-b border-gray-800">
+                      <span className="text-gray-500">Department</span>
+                      <span className="text-gray-200">{selectedMember.department}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-2 border-b border-gray-800">
+                    <span className="text-gray-500">Status</span>
+                    <span className={`capitalize ${selectedMember.status === 'active' ? 'text-green-400' : selectedMember.status === 'pending' ? 'text-amber-400' : 'text-gray-400'}`}>
+                      {selectedMember.status}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-gray-500">Last Active</span>
+                    <span className="text-gray-200">{selectedMember.lastActive}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-800 flex gap-3">
+              {editMode ? (
+                <>
+                  <button
+                    onClick={() => setEditMode(false)}
+                    className="flex-1 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveMember}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
+                  >
+                    Save Changes
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowMemberModal(false)}
+                    className="flex-1 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
+                  >
+                    Edit
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -340,7 +616,7 @@ export default function TeamPage() {
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="colleague@example.com"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500"
                 />
               </div>
               
@@ -349,7 +625,7 @@ export default function TeamPage() {
                 <select 
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value as MemberRole)}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100"
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
@@ -362,9 +638,9 @@ export default function TeamPage() {
                 <textarea
                   value={inviteMessage}
                   onChange={(e) => setInviteMessage(e.target.value)}
-                  placeholder="Add a personal note to your invitation..."
+                  placeholder="Add a personal note..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500"
                 />
               </div>
             </div>
@@ -372,14 +648,14 @@ export default function TeamPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowInviteModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+                className="flex-1 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSendInvite}
                 disabled={inviteSending}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-wait transition-colors"
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800"
               >
                 {inviteSending ? 'Sending...' : 'Send Invite'}
               </button>

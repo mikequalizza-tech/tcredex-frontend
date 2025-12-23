@@ -452,6 +452,14 @@ export interface IntakeData {
   docsRequired?: number;
   
   // -------------------------------------------------------------------------
+  // PLATFORM AGREEMENTS
+  // -------------------------------------------------------------------------
+  exclusivityAgreed?: boolean;
+  exclusivityAgreedAt?: string;
+  termsAgreed?: boolean;
+  termsAgreedAt?: string;
+  
+  // -------------------------------------------------------------------------
   // METADATA
   // -------------------------------------------------------------------------
   createdAt?: string;

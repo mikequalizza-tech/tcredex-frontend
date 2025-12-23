@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useCurrentUser } from '@/lib/auth';
 
 type DealStatus = 'in_progress' | 'pending_docs' | 'ready_to_close' | 'closed';
 type ProgramType = 'nmtc' | 'htc' | 'lihtc' | 'oz';
@@ -96,6 +97,7 @@ const demoDeals: ClosingDeal[] = [
 ];
 
 export default function ClosingRoomIndexPage() {
+  const { orgType } = useCurrentUser();
   const [filter, setFilter] = useState<DealStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -114,21 +116,34 @@ export default function ClosingRoomIndexPage() {
     totalAllocation: demoDeals.reduce((sum, d) => sum + d.allocation, 0),
   };
 
+  // Role-specific page title and description
+  const pageConfig = {
+    cde: { title: 'Closing Room', desc: 'Manage all deals in the closing pipeline' },
+    investor: { title: 'My Investments', desc: 'Track your investments through closing' },
+    sponsor: { title: 'My Deals', desc: 'Track your projects through closing' },
+    admin: { title: 'Closing Room', desc: 'Manage all deals in the closing pipeline' },
+  };
+
+  const config = pageConfig[orgType as keyof typeof pageConfig] || pageConfig.sponsor;
+
   return (
     <main className="min-h-screen bg-gray-900 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-100">Closing Room</h1>
-            <p className="text-gray-400 mt-1">Manage all deals in the closing pipeline</p>
+            <h1 className="text-3xl font-bold text-gray-100">{config.title}</h1>
+            <p className="text-gray-400 mt-1">{config.desc}</p>
           </div>
-          <Link 
-            href="/deals/new"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
-          >
-            + New Deal
-          </Link>
+          {/* Only CDEs can add new deals to closing room */}
+          {orgType === 'cde' && (
+            <Link 
+              href="/cde/pipeline"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors"
+            >
+              + Add from Pipeline
+            </Link>
+          )}
         </div>
 
         {/* Stats */}

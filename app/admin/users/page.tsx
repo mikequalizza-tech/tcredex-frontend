@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 interface User {
   id: string;
@@ -14,56 +15,11 @@ interface User {
 }
 
 const sampleUsers: User[] = [
-  {
-    id: 'U001',
-    name: 'Mike Qualizza',
-    email: 'mike@tcredex.com',
-    role: 'admin',
-    status: 'active',
-    organization: 'tCredex',
-    lastActive: '2024-01-15',
-    dealsCount: 24,
-  },
-  {
-    id: 'U002',
-    name: 'Sarah Johnson',
-    email: 'sarah@clearwatercde.com',
-    role: 'cde',
-    status: 'active',
-    organization: 'Clearwater CDE',
-    lastActive: '2024-01-14',
-    dealsCount: 18,
-  },
-  {
-    id: 'U003',
-    name: 'Robert Chen',
-    email: 'rchen@capitalpartners.com',
-    role: 'investor',
-    status: 'active',
-    organization: 'Capital Partners LLC',
-    lastActive: '2024-01-13',
-    dealsCount: 12,
-  },
-  {
-    id: 'U004',
-    name: 'Maria Garcia',
-    email: 'mgarcia@communityfirst.org',
-    role: 'sponsor',
-    status: 'pending',
-    organization: 'Community First Development',
-    lastActive: '2024-01-10',
-    dealsCount: 3,
-  },
-  {
-    id: 'U005',
-    name: 'James Wilson',
-    email: 'jwilson@midwestcde.com',
-    role: 'cde',
-    status: 'active',
-    organization: 'Midwest Community CDE',
-    lastActive: '2024-01-15',
-    dealsCount: 31,
-  },
+  { id: 'U001', name: 'Mike Qualizza', email: 'mqualizza@americanimpactventures.com', role: 'admin', status: 'active', organization: 'tCredex', lastActive: '2024-01-15', dealsCount: 24 },
+  { id: 'U002', name: 'Sarah Johnson', email: 'sarah@clearwatercde.com', role: 'cde', status: 'active', organization: 'Clearwater CDE', lastActive: '2024-01-14', dealsCount: 18 },
+  { id: 'U003', name: 'Robert Chen', email: 'rchen@capitalpartners.com', role: 'investor', status: 'active', organization: 'Capital Partners LLC', lastActive: '2024-01-13', dealsCount: 12 },
+  { id: 'U004', name: 'Maria Garcia', email: 'mgarcia@communityfirst.org', role: 'sponsor', status: 'pending', organization: 'Community First Development', lastActive: '2024-01-10', dealsCount: 3 },
+  { id: 'U005', name: 'James Wilson', email: 'jwilson@midwestcde.com', role: 'cde', status: 'active', organization: 'Midwest Community CDE', lastActive: '2024-01-15', dealsCount: 31 },
 ];
 
 const roleColors = {
@@ -80,11 +36,14 @@ const statusColors = {
 };
 
 export default function AdminUsersPage() {
+  const [users, setUsers] = useState<User[]>(sampleUsers);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
-  const filteredUsers = sampleUsers.filter((user) => {
+  const filteredUsers = users.filter((user) => {
     const matchesSearch = !searchQuery || 
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -93,73 +52,85 @@ export default function AdminUsersPage() {
     return matchesSearch && matchesRole;
   });
 
+  const handleEditUser = (user: User, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingUser({ ...user });
+    setShowEditModal(true);
+  };
+
+  const handleSaveUser = () => {
+    if (!editingUser) return;
+    setUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
+    if (selectedUser?.id === editingUser.id) {
+      setSelectedUser(editingUser);
+    }
+    setShowEditModal(false);
+    setEditingUser(null);
+  };
+
+  const handleSuspendUser = (user: User, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const newStatus = user.status === 'suspended' ? 'active' : 'suspended';
+    setUsers(users.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+    if (selectedUser?.id === user.id) {
+      setSelectedUser({ ...user, status: newStatus });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-950 flex">
-      {/* Main Content */}
-      <div className="flex-1">
-        {/* Header */}
-        <div className="border-b border-gray-800 bg-gray-900">
-          <div className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-100">User Management</h1>
-                <p className="text-sm text-gray-400">Manage platform users and permissions</p>
-              </div>
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors">
-                + Invite User
-              </button>
+    <div className="min-h-screen bg-gray-950">
+      {/* Header */}
+      <div className="border-b border-gray-800 bg-gray-900">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-100">User Management</h1>
+              <p className="text-sm text-gray-400">Manage platform users and permissions</p>
             </div>
+            <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors">
+              + Invite User
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Stats */}
-        <div className="px-6 py-4 grid grid-cols-4 gap-4 border-b border-gray-800">
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-            <p className="text-sm text-gray-400">Total Users</p>
-            <p className="text-2xl font-bold text-gray-100">{sampleUsers.length}</p>
-          </div>
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-            <p className="text-sm text-gray-400">Active</p>
-            <p className="text-2xl font-bold text-green-400">{sampleUsers.filter(u => u.status === 'active').length}</p>
-          </div>
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-            <p className="text-sm text-gray-400">Pending</p>
-            <p className="text-2xl font-bold text-yellow-400">{sampleUsers.filter(u => u.status === 'pending').length}</p>
-          </div>
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-            <p className="text-sm text-gray-400">CDEs</p>
-            <p className="text-2xl font-bold text-blue-400">{sampleUsers.filter(u => u.role === 'cde').length}</p>
-          </div>
+      {/* Stats */}
+      <div className="px-6 py-4 grid grid-cols-4 gap-4 border-b border-gray-800">
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+          <p className="text-sm text-gray-400">Total Users</p>
+          <p className="text-2xl font-bold text-gray-100">{users.length}</p>
         </div>
-
-        {/* Filters */}
-        <div className="px-6 py-4 border-b border-gray-800 flex gap-4 items-center">
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 max-w-md px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-indigo-500"
-          />
-          <div className="flex gap-2">
-            {['all', 'admin', 'cde', 'investor', 'sponsor'].map((role) => (
-              <button
-                key={role}
-                onClick={() => setRoleFilter(role)}
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  roleFilter === role
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                {role.charAt(0).toUpperCase() + role.slice(1)}
-              </button>
-            ))}
-          </div>
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+          <p className="text-sm text-gray-400">Active</p>
+          <p className="text-2xl font-bold text-green-400">{users.filter(u => u.status === 'active').length}</p>
         </div>
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+          <p className="text-sm text-gray-400">Pending</p>
+          <p className="text-2xl font-bold text-yellow-400">{users.filter(u => u.status === 'pending').length}</p>
+        </div>
+        <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+          <p className="text-sm text-gray-400">CDEs</p>
+          <p className="text-2xl font-bold text-blue-400">{users.filter(u => u.role === 'cde').length}</p>
+        </div>
+      </div>
 
+      {/* Filters */}
+      <div className="px-6 py-4 border-b border-gray-800 flex gap-4 items-center">
+        <input type="text" placeholder="Search users..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 max-w-md px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+        <div className="flex gap-2">
+          {['all', 'admin', 'cde', 'investor', 'sponsor'].map((role) => (
+            <button key={role} onClick={() => setRoleFilter(role)}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${roleFilter === role ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}`}>
+              {role.charAt(0).toUpperCase() + role.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex">
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className={`flex-1 overflow-x-auto transition-all ${selectedUser ? 'pr-0' : ''}`}>
           <table className="w-full">
             <thead className="bg-gray-900 border-b border-gray-800">
               <tr>
@@ -173,11 +144,8 @@ export default function AdminUsersPage() {
             </thead>
             <tbody className="divide-y divide-gray-800">
               {filteredUsers.map((user) => (
-                <tr 
-                  key={user.id} 
-                  className={`hover:bg-gray-900/50 cursor-pointer ${selectedUser?.id === user.id ? 'bg-gray-900' : ''}`}
-                  onClick={() => setSelectedUser(user)}
-                >
+                <tr key={user.id} className={`hover:bg-gray-900/50 cursor-pointer ${selectedUser?.id === user.id ? 'bg-gray-900' : ''}`}
+                  onClick={() => setSelectedUser(user)}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">
@@ -203,8 +171,10 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-4 text-sm text-gray-300">{user.dealsCount}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      <button className="text-xs text-indigo-400 hover:text-indigo-300">Edit</button>
-                      <button className="text-xs text-gray-400 hover:text-gray-300">Suspend</button>
+                      <button onClick={(e) => handleEditUser(user, e)} className="text-xs text-indigo-400 hover:text-indigo-300">Edit</button>
+                      <button onClick={(e) => handleSuspendUser(user, e)} className="text-xs text-gray-400 hover:text-gray-300">
+                        {user.status === 'suspended' ? 'Activate' : 'Suspend'}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -212,57 +182,108 @@ export default function AdminUsersPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Preview Panel */}
+        {selectedUser && (
+          <div className="w-80 border-l border-gray-800 bg-gray-900 p-4 flex-shrink-0">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-sm font-semibold text-gray-100">User Details</h2>
+              <button onClick={() => setSelectedUser(null)} className="text-gray-400 hover:text-gray-200 text-lg">×</button>
+            </div>
+            
+            <div className="text-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xl mx-auto mb-2">
+                {selectedUser.name.split(' ').map(n => n[0]).join('')}
+              </div>
+              <h3 className="text-base font-semibold text-gray-100">{selectedUser.name}</h3>
+              <p className="text-xs text-gray-400">{selectedUser.email}</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-gray-800 rounded-lg p-3">
+                <p className="text-xs text-gray-500 uppercase mb-1">Organization</p>
+                <p className="text-sm text-gray-200">{selectedUser.organization}</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-3">
+                <p className="text-xs text-gray-500 uppercase mb-1">Role</p>
+                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${roleColors[selectedUser.role]}`}>
+                  {selectedUser.role.toUpperCase()}
+                </span>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-3">
+                <p className="text-xs text-gray-500 uppercase mb-1">Total Deals</p>
+                <p className="text-xl font-bold text-indigo-400">{selectedUser.dealsCount}</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-3">
+                <p className="text-xs text-gray-500 uppercase mb-1">Last Active</p>
+                <p className="text-sm text-gray-200">{selectedUser.lastActive}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <button onClick={() => handleEditUser(selectedUser)} className="w-full px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 transition-colors">
+                Edit User
+              </button>
+              <Link href={`/admin/deals?user=${selectedUser.id}`} className="block w-full px-4 py-2 bg-gray-800 text-gray-200 text-sm rounded-lg hover:bg-gray-700 transition-colors text-center">
+                View Activity
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Preview Panel */}
-      {selectedUser && (
-        <div className="w-[350px] border-l border-gray-800 bg-gray-900 p-6 overflow-y-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-100">User Details</h2>
-            <button 
-              onClick={() => setSelectedUser(null)}
-              className="text-gray-400 hover:text-gray-200"
-            >
-              ✕
-            </button>
-          </div>
-          
-          <div className="text-center mb-6">
-            <div className="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3">
-              {selectedUser.name.split(' ').map(n => n[0]).join('')}
+      {/* Edit Modal */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-gray-100">Edit User</h2>
+              <button onClick={() => { setShowEditModal(false); setEditingUser(null); }} className="text-gray-400 hover:text-gray-200 text-xl">×</button>
             </div>
-            <h3 className="text-lg font-semibold text-gray-100">{selectedUser.name}</h3>
-            <p className="text-sm text-gray-400">{selectedUser.email}</p>
-          </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Name</label>
+                <input type="text" value={editingUser.name} onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Email</label>
+                <input type="email" value={editingUser.email} onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Organization</label>
+                <input type="text" value={editingUser.organization} onChange={(e) => setEditingUser({ ...editingUser, organization: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Role</label>
+                <select value={editingUser.role} onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as User['role'] })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:border-indigo-500">
+                  <option value="admin">Admin</option>
+                  <option value="cde">CDE</option>
+                  <option value="investor">Investor</option>
+                  <option value="sponsor">Sponsor</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Status</label>
+                <select value={editingUser.status} onChange={(e) => setEditingUser({ ...editingUser, status: e.target.value as User['status'] })}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:border-indigo-500">
+                  <option value="active">Active</option>
+                  <option value="pending">Pending</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
+            </div>
 
-          <div className="space-y-4">
-            <div className="bg-gray-800 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase mb-1">Organization</p>
-              <p className="text-sm text-gray-200">{selectedUser.organization}</p>
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => { setShowEditModal(false); setEditingUser(null); }}
+                className="flex-1 px-4 py-2 bg-gray-800 text-gray-200 rounded-lg hover:bg-gray-700 transition-colors">Cancel</button>
+              <button onClick={handleSaveUser}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors">Save Changes</button>
             </div>
-            <div className="bg-gray-800 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase mb-1">Role</p>
-              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${roleColors[selectedUser.role]}`}>
-                {selectedUser.role.toUpperCase()}
-              </span>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase mb-1">Total Deals</p>
-              <p className="text-2xl font-bold text-indigo-400">{selectedUser.dealsCount}</p>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4">
-              <p className="text-xs text-gray-500 uppercase mb-1">Last Active</p>
-              <p className="text-sm text-gray-200">{selectedUser.lastActive}</p>
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-2">
-            <button className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors">
-              Edit User
-            </button>
-            <button className="w-full px-4 py-2 bg-gray-800 text-gray-200 rounded-lg hover:bg-gray-700 transition-colors">
-              View Activity
-            </button>
           </div>
         </div>
       )}

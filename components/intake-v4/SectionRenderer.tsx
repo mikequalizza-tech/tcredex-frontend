@@ -28,9 +28,12 @@ interface SectionRendererProps {
 }
 
 export function SectionRenderer({ programs, data, onChange, onProgramsChange, activeSection }: SectionRendererProps) {
+  // Check if any program is selected
+  const hasProgramSelected = programs.length > 0;
+
   return (
     <div className="space-y-6">
-      {/* PART A: PROJECT INFORMATION */}
+      {/* PART A: PROJECT INFORMATION - Always visible */}
       
       {/* Section 1 & 2: Basics + Sponsor */}
       <SectionWrapper id="basics" title="Project Basics" activeSection={activeSection}>
@@ -46,7 +49,7 @@ export function SectionRenderer({ programs, data, onChange, onProgramsChange, ac
         <LocationTract data={data} onChange={onChange} />
       </SectionWrapper>
 
-      {/* Programs Selection */}
+      {/* Programs Selection - Always visible */}
       <SectionWrapper id="programs" title="Programs Selected" activeSection={activeSection}>
         <ProgramSelector 
           programs={programs} 
@@ -56,73 +59,89 @@ export function SectionRenderer({ programs, data, onChange, onProgramsChange, ac
         />
       </SectionWrapper>
 
-      {/* Section 5: Social Impact */}
-      <SectionWrapper id="impact" title="Social Investment Criteria" activeSection={activeSection}>
-        <SocialImpact data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      {/* Section 6: Economic Benefits */}
-      <SectionWrapper id="benefits" title="Economic & Social Benefits" activeSection={activeSection}>
-        <EconomicBenefits data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      {/* Section 7: Project Team */}
-      <SectionWrapper id="team" title="Project Team" activeSection={activeSection}>
-        <ProjectTeam data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      {/* Section 8: Financing */}
-      <SectionWrapper id="costs" title="Project Costs & Financing Gap" activeSection={activeSection}>
-        <ProjectCosts data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      <SectionWrapper id="capital" title="Capital Stack" activeSection={activeSection}>
-        <CapitalStack data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      {/* Section 9: Readiness */}
-      <SectionWrapper id="site" title="Site Control" activeSection={activeSection}>
-        <SiteControl data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      <SectionWrapper id="timeline" title="Timeline" activeSection={activeSection}>
-        <Timeline data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      <SectionWrapper id="readiness" title="Due Diligence Status" activeSection={activeSection}>
-        <ProjectReadiness data={data} onChange={onChange} />
-      </SectionWrapper>
-
-      {/* PART B: PROGRAM-SPECIFIC SECTIONS */}
-      
-      {programs.includes('NMTC') && (
-        <SectionWrapper id="nmtc_qalicb" title="QALICB Eligibility Tests" activeSection={activeSection} program="NMTC">
-          <NMTC_QALICB data={data} onChange={onChange} />
-        </SectionWrapper>
+      {/* Prompt to select program if none selected */}
+      {!hasProgramSelected && (
+        <div className="bg-amber-900/20 border border-amber-500/30 rounded-xl p-6 text-center">
+          <div className="text-4xl mb-3">👆</div>
+          <h3 className="text-lg font-semibold text-amber-300 mb-2">Select a Program to Continue</h3>
+          <p className="text-sm text-gray-400">
+            Choose one or more tax credit programs above to unlock the remaining form sections.
+          </p>
+        </div>
       )}
 
-      {programs.includes('HTC') && (
-        <SectionWrapper id="htc_status" title="Historic Tax Credit Details" activeSection={activeSection} program="HTC">
-          <HTC_Details data={data} onChange={onChange} />
-        </SectionWrapper>
-      )}
+      {/* REMAINING SECTIONS - Only show after program is selected */}
+      {hasProgramSelected && (
+        <>
+          {/* Section 5: Social Impact */}
+          <SectionWrapper id="impact" title="Social Investment Criteria" activeSection={activeSection}>
+            <SocialImpact data={data} onChange={onChange} />
+          </SectionWrapper>
 
-      {programs.includes('LIHTC') && (
-        <SectionWrapper id="lihtc_housing" title="LIHTC Housing Metrics" activeSection={activeSection} program="LIHTC">
-          <LIHTC_Housing data={data} onChange={onChange} />
-        </SectionWrapper>
-      )}
+          {/* Section 6: Economic Benefits */}
+          <SectionWrapper id="benefits" title="Economic & Social Benefits" activeSection={activeSection}>
+            <EconomicBenefits data={data} onChange={onChange} />
+          </SectionWrapper>
 
-      {programs.includes('OZ') && (
-        <SectionWrapper id="oz_eligibility" title="Opportunity Zone Details" activeSection={activeSection} program="OZ">
-          <OZ_Details data={data} onChange={onChange} />
-        </SectionWrapper>
-      )}
+          {/* Section 7: Project Team */}
+          <SectionWrapper id="team" title="Project Team" activeSection={activeSection}>
+            <ProjectTeam data={data} onChange={onChange} />
+          </SectionWrapper>
 
-      {/* DOCUMENTS SECTION (Always visible) */}
-      <SectionWrapper id="documents" title="Due Diligence Documents" activeSection={activeSection}>
-        <DueDiligenceDocs data={data} onChange={onChange} />
-      </SectionWrapper>
+          {/* Section 8: Financing */}
+          <SectionWrapper id="costs" title="Project Costs & Financing Gap" activeSection={activeSection}>
+            <ProjectCosts data={data} onChange={onChange} />
+          </SectionWrapper>
+
+          <SectionWrapper id="capital" title="Capital Stack" activeSection={activeSection}>
+            <CapitalStack data={data} onChange={onChange} />
+          </SectionWrapper>
+
+          {/* Section 9: Readiness */}
+          <SectionWrapper id="site" title="Site Control" activeSection={activeSection}>
+            <SiteControl data={data} onChange={onChange} />
+          </SectionWrapper>
+
+          <SectionWrapper id="timeline" title="Timeline" activeSection={activeSection}>
+            <Timeline data={data} onChange={onChange} />
+          </SectionWrapper>
+
+          <SectionWrapper id="readiness" title="Due Diligence Status" activeSection={activeSection}>
+            <ProjectReadiness data={data} onChange={onChange} />
+          </SectionWrapper>
+
+          {/* PART B: PROGRAM-SPECIFIC SECTIONS */}
+          
+          {programs.includes('NMTC') && (
+            <SectionWrapper id="nmtc_qalicb" title="QALICB Eligibility Tests" activeSection={activeSection} program="NMTC">
+              <NMTC_QALICB data={data} onChange={onChange} />
+            </SectionWrapper>
+          )}
+
+          {programs.includes('HTC') && (
+            <SectionWrapper id="htc_status" title="Historic Tax Credit Details" activeSection={activeSection} program="HTC">
+              <HTC_Details data={data} onChange={onChange} />
+            </SectionWrapper>
+          )}
+
+          {programs.includes('LIHTC') && (
+            <SectionWrapper id="lihtc_housing" title="LIHTC Housing Metrics" activeSection={activeSection} program="LIHTC">
+              <LIHTC_Housing data={data} onChange={onChange} />
+            </SectionWrapper>
+          )}
+
+          {programs.includes('OZ') && (
+            <SectionWrapper id="oz_eligibility" title="Opportunity Zone Details" activeSection={activeSection} program="OZ">
+              <OZ_Details data={data} onChange={onChange} />
+            </SectionWrapper>
+          )}
+
+          {/* DOCUMENTS SECTION */}
+          <SectionWrapper id="documents" title="Due Diligence Documents" activeSection={activeSection}>
+            <DueDiligenceDocs data={data} onChange={onChange} />
+          </SectionWrapper>
+        </>
+      )}
     </div>
   );
 }

@@ -25,8 +25,8 @@ const CAMPAIGN_DESTINATIONS: Record<string, string> = {
   'cde-partner': '/founders?utm_source=cde-partner',
   'investor-intro': '/founders?utm_source=investor-intro',
   
-  // Demo/testing
-  'demo': '/map',
+  // Demo/testing - these now require signin
+  'demo': '/signin?redirect=/map',
   'test': '/founders?utm_source=test',
 };
 
@@ -49,25 +49,39 @@ const PUBLIC_ROUTES = [
   '/how-it-works',
   '/privacy',
   '/terms',
-  '/deals',
   '/founders', // Pre-launch signup page
   '/blog',
   '/help',
-  '/map', // Map is public for demos
-  '/intake', // Intake is public for deal submission
   '/who-we-serve',
+  // NOTE: /map and /intake are PROTECTED - require login
 ];
 
 const PUBLIC_PREFIXES = [
-  '/api/',
+  '/api/auth/', // Auth APIs are public
+  '/api/register', // Registration API
+  '/api/contact', // Contact form API
   '/_next',
   '/favicon',
   '/images',
   '/fonts',
   '/icons',
-  '/deals/',
   '/blog/',
   '/r/', // QR/referral redirects
+];
+
+// Protected route prefixes that always need auth
+const PROTECTED_PREFIXES = [
+  '/admin',
+  '/dashboard',
+  '/map',
+  '/intake',
+  '/cde',
+  '/investor',
+  '/deals',
+  '/documents',
+  '/closing-room',
+  '/settings',
+  '/profile',
 ];
 
 // ============================================================================
@@ -125,7 +139,12 @@ export async function middleware(request: NextRequest) {
   // Standard Auth Middleware
   // -------------------------------------------------------------------------
   
-  // Allow public routes
+  // Allow static files
+  if (pathname.includes('.')) {
+    return NextResponse.next();
+  }
+
+  // Allow public routes (exact match)
   if (PUBLIC_ROUTES.includes(pathname)) {
     return NextResponse.next();
   }
@@ -135,20 +154,42 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow static files
-  if (pathname.includes('.')) {
-    return NextResponse.next();
-  }
-
-  // Check for session cookie/token
+  // Check if this is a protected route
+  const isProtectedRoute = PROTECTED_PREFIXES.some(prefix => pathname.startsWith(prefix));
+  
+  // Get session
   const session = request.cookies.get('tcredex_session')?.value;
   const authHeader = request.headers.get('x-tcredex-auth');
 
   if (!session && !authHeader) {
-    // No session - redirect to signin
+    // No session - redirect to signin for protected routes
+    if (isProtectedRoute) {
+      const signinUrl = new URL('/signin', request.url);
+      signinUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(signinUrl);
+    }
+    
+    // For other non-public routes, also redirect
     const signinUrl = new URL('/signin', request.url);
     signinUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(signinUrl);
+  }
+
+  // Validate session for admin routes
+  if (pathname.startsWith('/admin')) {
+    try {
+      const sessionData = JSON.parse(session || '{}');
+      // Only admin role can access admin routes
+      if (sessionData.role !== 'admin') {
+        const dashboardUrl = new URL('/dashboard', request.url);
+        return NextResponse.redirect(dashboardUrl);
+      }
+    } catch {
+      // Invalid session - redirect to signin
+      const signinUrl = new URL('/signin', request.url);
+      signinUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(signinUrl);
+    }
   }
 
   return NextResponse.next();

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCurrentUser } from '@/lib/auth';
 
-export default function SignIn() {
-  const router = useRouter();
+// Inner component that uses useSearchParams
+function SignInForm() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
   const { login, isAuthenticated, isLoading } = useCurrentUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,10 +20,9 @@ export default function SignIn() {
   useEffect(() => {
     if (!isLoading && isAuthenticated && !hasRedirected.current) {
       hasRedirected.current = true;
-      // Use window.location for cleaner redirect without React state issues
-      window.location.href = '/dashboard';
+      window.location.href = redirectTo;
     }
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,8 +32,7 @@ export default function SignIn() {
     const result = await login(email, password);
     
     if (result.success) {
-      // Use window.location to avoid React Router state issues
-      window.location.href = '/dashboard';
+      window.location.href = redirectTo;
     } else {
       setError(result.error || 'Login failed');
       setIsSubmitting(false);
@@ -46,7 +46,7 @@ export default function SignIn() {
     
     const result = await login(demoEmail, demoPassword);
     if (result.success) {
-      window.location.href = '/dashboard';
+      window.location.href = redirectTo;
     } else {
       setError(result.error || 'Demo login failed');
       setIsSubmitting(false);
@@ -68,7 +68,7 @@ export default function SignIn() {
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-gray-400">Redirecting to dashboard...</p>
+          <p className="text-gray-400">Redirecting...</p>
         </div>
       </div>
     );
@@ -86,6 +86,11 @@ export default function SignIn() {
             <p className="mt-4 text-indigo-200/65">
               Sign in to access your deals, matches, and closing rooms.
             </p>
+            {redirectTo !== '/dashboard' && (
+              <p className="mt-2 text-sm text-gray-500">
+                You&apos;ll be redirected to {redirectTo} after signing in.
+              </p>
+            )}
           </div>
 
           {/* Sign in form */}
@@ -185,7 +190,7 @@ export default function SignIn() {
               </button>
             </div>
             <p className="text-center text-xs text-gray-500 mt-3">
-              Demo password: <code className="bg-gray-800 px-1.5 py-0.5 rounded">{process.env.NODE_ENV === 'development' ? 'demo123' : 'Contact support'}</code>
+              Demo password: <code className="bg-gray-800 px-1.5 py-0.5 rounded">demo123</code> (admin: <code className="bg-gray-800 px-1.5 py-0.5 rounded">admin123</code>)
             </p>
           </div>
 
@@ -199,5 +204,23 @@ export default function SignIn() {
         </div>
       </div>
     </section>
+  );
+}
+
+// Loading fallback for Suspense
+function SignInLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-950">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// Main export wrapped in Suspense
+export default function SignIn() {
+  return (
+    <Suspense fallback={<SignInLoading />}>
+      <SignInForm />
+    </Suspense>
   );
 }

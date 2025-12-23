@@ -35,64 +35,65 @@ const TEAM_ROLES: TeamRole[] = [
   { field: 'nmtcAccountantModeler', label: 'NMTC Accountant / Modeler', required: false, category: 'nmtc', placeholder: 'Financial modeling firm' },
 ];
 
-export function ProjectTeam({ data, onChange }: ProjectTeamProps) {
-  const getRolesByCategory = (category: string) => 
-    TEAM_ROLES.filter(role => role.category === category);
+// Helper functions
+const getRolesByCategory = (category: string) => 
+  TEAM_ROLES.filter(role => role.category === category);
 
-  const getFilledCount = (category: string) => 
-    getRolesByCategory(category).filter(role => data[role.field]).length;
+// CategorySection component - defined OUTSIDE to prevent recreation
+function CategorySection({ 
+  category, 
+  title, 
+  icon,
+  data,
+  onChange,
+}: { 
+  category: 'development' | 'operations' | 'nmtc';
+  title: string;
+  icon: string;
+  data: IntakeData;
+  onChange: (updates: Partial<IntakeData>) => void;
+}) {
+  const roles = getRolesByCategory(category);
+  const filledCount = roles.filter(role => data[role.field]).length;
+  const totalCount = roles.length;
 
-  const getTotalCount = (category: string) => 
-    getRolesByCategory(category).length;
-
-  const CategorySection = ({ 
-    category, 
-    title, 
-    icon 
-  }: { 
-    category: 'development' | 'operations' | 'nmtc';
-    title: string;
-    icon: string;
-  }) => {
-    const roles = getRolesByCategory(category);
-    const filledCount = getFilledCount(category);
-    const totalCount = getTotalCount(category);
-
-    return (
-      <div className="bg-gray-800/30 rounded-lg border border-gray-700 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-800/50 border-b border-gray-700 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{icon}</span>
-            <h4 className="text-sm font-semibold text-gray-200">{title}</h4>
-          </div>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-            filledCount === totalCount ? 'bg-green-900/50 text-green-300' : 
-            filledCount > 0 ? 'bg-yellow-900/50 text-yellow-300' : 
-            'bg-gray-700 text-gray-400'
-          }`}>
-            {filledCount}/{totalCount}
-          </span>
+  return (
+    <div className="bg-gray-800/30 rounded-lg border border-gray-700 overflow-hidden">
+      <div className="px-4 py-3 bg-gray-800/50 border-b border-gray-700 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{icon}</span>
+          <h4 className="text-sm font-semibold text-gray-200">{title}</h4>
         </div>
-        <div className="p-4 space-y-4">
-          {roles.map((role) => (
-            <div key={role.field as string}>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                {role.label}
-                {role.required && <span className="text-red-400 ml-1">*</span>}
-              </label>
-              <input
-                type="text"
-                value={(data[role.field] as string) || ''}
-                onChange={(e) => onChange({ [role.field]: e.target.value || undefined })}
-                placeholder={role.placeholder}
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-              />
-            </div>
-          ))}
-        </div>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+          filledCount === totalCount ? 'bg-green-900/50 text-green-300' : 
+          filledCount > 0 ? 'bg-yellow-900/50 text-yellow-300' : 
+          'bg-gray-700 text-gray-400'
+        }`}>
+          {filledCount}/{totalCount}
+        </span>
       </div>
-    );
-  };
+      <div className="p-4 space-y-4">
+        {roles.map((role) => (
+          <div key={role.field as string}>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              {role.label}
+              {role.required && <span className="text-red-400 ml-1">*</span>}
+            </label>
+            <input
+              type="text"
+              value={(data[role.field] as string) || ''}
+              onChange={(e) => onChange({ [role.field]: e.target.value || undefined })}
+              placeholder={role.placeholder}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ProjectTeam({ data, onChange }: ProjectTeamProps) {
 
   const totalFilled = TEAM_ROLES.filter(role => data[role.field]).length;
   const requiredFilled = TEAM_ROLES.filter(role => role.required && data[role.field]).length;
@@ -128,17 +129,23 @@ export function ProjectTeam({ data, onChange }: ProjectTeamProps) {
         <CategorySection 
           category="development" 
           title="Development Team" 
-          icon="🏗️" 
+          icon="🏗️"
+          data={data}
+          onChange={onChange}
         />
         <CategorySection 
           category="operations" 
           title="Operations Team" 
-          icon="📋" 
+          icon="📋"
+          data={data}
+          onChange={onChange}
         />
         <CategorySection 
           category="nmtc" 
           title="NMTC Specialists" 
-          icon="💼" 
+          icon="💼"
+          data={data}
+          onChange={onChange}
         />
       </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { IntakeData } from '@/types/intake';
 
 interface NMTC_QALICBProps {
@@ -20,8 +20,170 @@ const PROHIBITED_BUSINESSES = [
   { id: 'excludedIntangibles', label: 'Primarily holds intangibles' },
 ];
 
+// TestSection - defined OUTSIDE to prevent recreation
+function TestSection({ 
+  id, 
+  title, 
+  children, 
+  testNum,
+  isExpanded,
+  onToggle,
+}: { 
+  id: string; 
+  title: string; 
+  children: React.ReactNode; 
+  testNum?: string;
+  isExpanded: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <div className="border border-gray-700 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        className="w-full px-4 py-3 bg-gray-800/50 flex items-center justify-between hover:bg-gray-800 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          {testNum && (
+            <span className="w-8 h-8 rounded-full bg-emerald-900/50 text-emerald-400 flex items-center justify-center text-xs font-bold">
+              {testNum}
+            </span>
+          )}
+          <span className="text-sm font-medium text-gray-200">{title}</span>
+        </div>
+        <svg 
+          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isExpanded && (
+        <div className="p-4 bg-gray-900/50 border-t border-gray-700">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// PercentSlider - defined OUTSIDE to prevent recreation
+function PercentSlider({ 
+  field, 
+  threshold, 
+  label, 
+  description,
+  value,
+  onChange,
+}: { 
+  field: string; 
+  threshold: number; 
+  label: string; 
+  description: string;
+  value: number;
+  onChange: (field: string, value: number) => void;
+}) {
+  const passes = value >= threshold;
+  
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <span className="text-sm font-medium text-gray-300">{label}</span>
+          <p className="text-xs text-gray-500">{description}</p>
+        </div>
+        <span className={`px-2 py-1 rounded text-xs font-medium ${
+          passes ? 'bg-green-900/50 text-green-300' : 'bg-gray-700 text-gray-400'
+        }`}>
+          {passes ? 'PASS' : `NEEDS ${threshold}%+`}
+        </span>
+      </div>
+      <div className="flex items-center gap-4">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={value}
+          onChange={(e) => onChange(field, parseInt(e.target.value))}
+          className={`flex-1 h-2 rounded-lg appearance-none cursor-pointer ${
+            passes ? 'accent-green-500' : 'accent-gray-500'
+          }`}
+          style={{
+            background: `linear-gradient(to right, ${passes ? '#22c55e' : '#6b7280'} ${value}%, #374151 ${value}%)`
+          }}
+        />
+        <span className="w-16 text-right font-mono font-bold text-gray-100">
+          {value}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// YesNoToggle - defined OUTSIDE to prevent recreation
+function YesNoToggle({ 
+  field, 
+  label, 
+  yesIsGood = true,
+  value,
+  onChange,
+}: { 
+  field: string; 
+  label: string; 
+  yesIsGood?: boolean;
+  value: boolean | undefined;
+  onChange: (field: string, value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+      <span className="text-sm text-gray-300">{label}</span>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(field, true)}
+          className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+            value === true
+              ? yesIsGood ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+              : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+          }`}
+        >
+          Yes
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(field, false)}
+          className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+            value === false
+              ? !yesIsGood ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'
+              : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+          }`}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
   const [expandedTest, setExpandedTest] = useState<string | null>('core');
+
+  // Stable handler for slider changes
+  const handleSliderChange = useCallback((field: string, value: number) => {
+    onChange({ [field]: value });
+  }, [onChange]);
+
+  // Stable handler for yes/no changes  
+  const handleYesNoChange = useCallback((field: string, value: boolean) => {
+    onChange({ [field]: value });
+  }, [onChange]);
+
+  // Stable handler for section toggle
+  const handleSectionToggle = useCallback((id: string) => {
+    setExpandedTest(prev => prev === id ? null : id);
+  }, []);
 
   // Calculate test results
   const coreTestsPass = [
@@ -31,156 +193,8 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
     data.isProhibitedBusiness === false,
   ];
 
-  const additionalTestsPass = [
-    // Collectibles test
-    data.holdsCollectibles === false || (data.holdsCollectibles && data.collectiblesUnder5Pct),
-    // NQFP test
-    data.holdsNQFP === false || (data.holdsNQFP && data.nqfpUnder5Pct),
-    // 7-year operation
-    data.intends7YrOperation === true,
-    // Active conduct
-    data.currentlyGeneratingRevenue === true || data.revenueStart3YrExpectation === true,
-  ];
-
   const corePassCount = coreTestsPass.filter(Boolean).length;
-  const additionalPassCount = additionalTestsPass.filter(Boolean).length;
   const allCorePass = corePassCount === 4;
-
-  const TestSection = ({ 
-    id, 
-    title, 
-    children, 
-    testNum 
-  }: { 
-    id: string; 
-    title: string; 
-    children: React.ReactNode; 
-    testNum?: string;
-  }) => {
-    const isExpanded = expandedTest === id;
-    return (
-      <div className="border border-gray-700 rounded-lg overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setExpandedTest(isExpanded ? null : id)}
-          className="w-full px-4 py-3 bg-gray-800/50 flex items-center justify-between hover:bg-gray-800 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            {testNum && (
-              <span className="w-8 h-8 rounded-full bg-emerald-900/50 text-emerald-400 flex items-center justify-center text-xs font-bold">
-                {testNum}
-              </span>
-            )}
-            <span className="text-sm font-medium text-gray-200">{title}</span>
-          </div>
-          <svg 
-            className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        {isExpanded && (
-          <div className="p-4 bg-gray-900/50 border-t border-gray-700">
-            {children}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const PercentSlider = ({ 
-    field, 
-    threshold, 
-    label, 
-    description 
-  }: { 
-    field: keyof IntakeData; 
-    threshold: number; 
-    label: string; 
-    description: string;
-  }) => {
-    const value = (data[field] as number) ?? 0;
-    const passes = value >= threshold;
-    
-    return (
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <span className="text-sm font-medium text-gray-300">{label}</span>
-            <p className="text-xs text-gray-500">{description}</p>
-          </div>
-          <span className={`px-2 py-1 rounded text-xs font-medium ${
-            passes ? 'bg-green-900/50 text-green-300' : 'bg-gray-700 text-gray-400'
-          }`}>
-            {passes ? 'PASS' : `NEEDS ${threshold}%+`}
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={value}
-            onChange={(e) => onChange({ [field]: parseInt(e.target.value) })}
-            className={`flex-1 h-2 rounded-lg appearance-none cursor-pointer ${
-              passes ? 'accent-green-500' : 'accent-gray-500'
-            }`}
-            style={{
-              background: `linear-gradient(to right, ${passes ? '#22c55e' : '#6b7280'} ${value}%, #374151 ${value}%)`
-            }}
-          />
-          <span className="w-16 text-right font-mono font-bold text-gray-100">
-            {value}%
-          </span>
-        </div>
-      </div>
-    );
-  };
-
-  const YesNoToggle = ({ 
-    field, 
-    label, 
-    yesIsGood = true 
-  }: { 
-    field: keyof IntakeData; 
-    label: string; 
-    yesIsGood?: boolean;
-  }) => {
-    const value = data[field] as boolean | undefined;
-    
-    return (
-      <div className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
-        <span className="text-sm text-gray-300">{label}</span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onChange({ [field]: true })}
-            className={`px-3 py-1 rounded text-xs font-medium transition-all ${
-              value === true
-                ? yesIsGood ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-            }`}
-          >
-            Yes
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ [field]: false })}
-            className={`px-3 py-1 rounded text-xs font-medium transition-all ${
-              value === false
-                ? !yesIsGood ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'
-                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-            }`}
-          >
-            No
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-4">
@@ -206,13 +220,15 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
       </div>
 
       {/* Core Tests */}
-      <TestSection id="core" title="Core QALICB Tests (Required)" testNum="1-4">
+      <TestSection id="core" title="Core QALICB Tests (Required)" testNum="1-4" isExpanded={expandedTest === 'core'} onToggle={handleSectionToggle}>
         <div className="space-y-6">
           <PercentSlider 
             field="qalicbGrossIncome"
             threshold={50}
             label="Gross Income Test"
             description="≥50% of gross income from active business in LIC"
+            value={(data.qalicbGrossIncome as number) ?? 0}
+            onChange={handleSliderChange}
           />
           
           <PercentSlider 
@@ -220,6 +236,8 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
             threshold={40}
             label="Tangible Property Test"
             description="≥40% of tangible property used in LIC"
+            value={(data.qalicbTangibleProperty as number) ?? 0}
+            onChange={handleSliderChange}
           />
           
           <PercentSlider 
@@ -227,6 +245,8 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
             threshold={40}
             label="Employee Services Test"
             description="≥40% of employee services performed in LIC"
+            value={(data.qalicbEmployeeServices as number) ?? 0}
+            onChange={handleSliderChange}
           />
 
           {/* Prohibited Business */}
@@ -299,12 +319,14 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
       </TestSection>
 
       {/* Collectibles Test */}
-      <TestSection id="collectibles" title="Collectibles Test" testNum="11">
+      <TestSection id="collectibles" title="Collectibles Test" testNum="11" isExpanded={expandedTest === 'collectibles'} onToggle={handleSectionToggle}>
         <div className="space-y-3">
           <YesNoToggle 
             field="holdsCollectibles" 
             label="Does the business hold collectibles?"
             yesIsGood={false}
+            value={data.holdsCollectibles as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           {data.holdsCollectibles && (
             <>
@@ -312,11 +334,15 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
                 field="collectiblesUnder5Pct" 
                 label="Are collectibles <5% of total assets?"
                 yesIsGood={true}
+                value={data.collectiblesUnder5Pct as boolean | undefined}
+                onChange={handleYesNoChange}
               />
               <YesNoToggle 
                 field="collectibles7YrRepresentation" 
                 label="Will collectibles remain <5% for 7 years?"
                 yesIsGood={true}
+                value={data.collectibles7YrRepresentation as boolean | undefined}
+                onChange={handleYesNoChange}
               />
             </>
           )}
@@ -327,12 +353,14 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
       </TestSection>
 
       {/* Non-Qualified Financial Property Test */}
-      <TestSection id="nqfp" title="Non-Qualified Financial Property (NQFP) Test" testNum="12">
+      <TestSection id="nqfp" title="Non-Qualified Financial Property (NQFP) Test" testNum="12" isExpanded={expandedTest === 'nqfp'} onToggle={handleSectionToggle}>
         <div className="space-y-3">
           <YesNoToggle 
             field="holdsNQFP" 
             label="Does the business hold non-qualified financial property?"
             yesIsGood={false}
+            value={data.holdsNQFP as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           {data.holdsNQFP && (
             <>
@@ -340,11 +368,15 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
                 field="nqfpUnder5Pct" 
                 label="Is NQFP <5% of total assets?"
                 yesIsGood={true}
+                value={data.nqfpUnder5Pct as boolean | undefined}
+                onChange={handleYesNoChange}
               />
               <YesNoToggle 
                 field="nqfp7YrRepresentation" 
                 label="Will NQFP remain <5% for 7 years?"
                 yesIsGood={true}
+                value={data.nqfp7YrRepresentation as boolean | undefined}
+                onChange={handleYesNoChange}
               />
             </>
           )}
@@ -355,17 +387,21 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
       </TestSection>
 
       {/* 7-Year Operation */}
-      <TestSection id="operation" title="LIC Reasonable Expectation (7-Year Test)" testNum="13">
+      <TestSection id="operation" title="LIC Reasonable Expectation (7-Year Test)" testNum="13" isExpanded={expandedTest === 'operation'} onToggle={handleSectionToggle}>
         <div className="space-y-3">
           <YesNoToggle 
             field="intends7YrOperation" 
             label="Does the business intend to operate for at least 7 years?"
             yesIsGood={true}
+            value={data.intends7YrOperation as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           <YesNoToggle 
             field="leasingLandBuildings" 
             label="Will the business lease (rather than own) land/buildings?"
             yesIsGood={false}
+            value={data.leasingLandBuildings as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           {data.leasingLandBuildings && (
             <div>
@@ -387,50 +423,64 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
             field="expansionPlans7Yr" 
             label="Are there expansion plans outside the LIC within 7 years?"
             yesIsGood={false}
+            value={data.expansionPlans7Yr as boolean | undefined}
+            onChange={handleYesNoChange}
           />
         </div>
       </TestSection>
 
       {/* Active Conduct */}
-      <TestSection id="active" title="Active Trade or Business Test" testNum="15">
+      <TestSection id="active" title="Active Trade or Business Test" testNum="15" isExpanded={expandedTest === 'active'} onToggle={handleSectionToggle}>
         <div className="space-y-3">
           <YesNoToggle 
             field="activePrimarilyRental" 
             label="Is this primarily a rental real estate project?"
             yesIsGood={false}
+            value={data.activePrimarilyRental as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           <YesNoToggle 
             field="currentlyGeneratingRevenue" 
             label="Is the business currently generating revenue?"
             yesIsGood={true}
+            value={data.currentlyGeneratingRevenue as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           {!data.currentlyGeneratingRevenue && (
             <YesNoToggle 
               field="revenueStart3YrExpectation" 
               label="Is revenue expected to start within 3 years?"
               yesIsGood={true}
+              value={data.revenueStart3YrExpectation as boolean | undefined}
+              onChange={handleYesNoChange}
             />
           )}
           <YesNoToggle 
             field="revenueContinuationExpectation" 
             label="Is revenue expected to continue for the compliance period?"
             yesIsGood={true}
+            value={data.revenueContinuationExpectation as boolean | undefined}
+            onChange={handleYesNoChange}
           />
         </div>
       </TestSection>
 
       {/* Related Party */}
-      <TestSection id="related" title="Related Party Test" testNum="16">
+      <TestSection id="related" title="Related Party Test" testNum="16" isExpanded={expandedTest === 'related'} onToggle={handleSectionToggle}>
         <div className="space-y-3">
           <YesNoToggle 
             field="commonMgmtOwnershipTCredex" 
             label="Common management/ownership with CDE or investor?"
             yesIsGood={false}
+            value={data.commonMgmtOwnershipTCredex as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           <YesNoToggle 
             field="postCloseCommonMgmt" 
             label="Will there be common management post-closing?"
             yesIsGood={false}
+            value={data.postCloseCommonMgmt as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           <p className="text-xs text-gray-500 mt-2 p-2 bg-gray-800/50 rounded">
             Related party transactions require additional disclosure and may affect credit pricing.
@@ -439,12 +489,14 @@ export function NMTC_QALICB({ data, onChange }: NMTC_QALICBProps) {
       </TestSection>
 
       {/* Rental Income */}
-      <TestSection id="rental" title="Rental Income Disclosure" testNum="17">
+      <TestSection id="rental" title="Rental Income Disclosure" testNum="17" isExpanded={expandedTest === 'rental'} onToggle={handleSectionToggle}>
         <div className="space-y-3">
           <YesNoToggle 
             field="derivesRentalIncome" 
             label="Does the project derive rental income?"
             yesIsGood={true}
+            value={data.derivesRentalIncome as boolean | undefined}
+            onChange={handleYesNoChange}
           />
           {data.derivesRentalIncome && (
             <div>

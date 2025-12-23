@@ -49,7 +49,7 @@ export function ProgramSelector({ programs, onChange, programLevel = [], onLevel
               </span>
               <span className="font-medium">Federal</span>
             </div>
-            <div className="text-xs opacity-75 mt-1">CDFI Fund allocated credits</div>
+            <div className="text-xs opacity-75 mt-1">Federal-allocated credits</div>
           </button>
           <button type="button" onClick={() => toggleLevel('state')}
             className={`flex-1 px-4 py-3 rounded-lg border-2 text-center transition-all ${isStateSelected ? 'border-sky-500 bg-sky-900/30 text-sky-300' : 'border-gray-700 text-gray-400 hover:border-gray-600'}`}>

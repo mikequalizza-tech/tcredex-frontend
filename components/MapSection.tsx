@@ -204,6 +204,7 @@ function MapSectionContent({
                               key={program}
                               className={`px-3 py-1 text-xs font-medium rounded-full ${
                                 program === 'NMTC' ? 'bg-green-900/50 text-green-300 border border-green-500/30' :
+                                program === 'Federal NMTC' ? 'bg-green-900/50 text-green-300 border border-green-500/30' :
                                 program === 'Opportunity Zone' ? 'bg-purple-900/50 text-purple-300 border border-purple-500/30' :
                                 program === 'Severely Distressed' ? 'bg-orange-900/50 text-orange-300 border border-orange-500/30' :
                                 'bg-blue-900/50 text-blue-300 border border-blue-500/30'
@@ -212,11 +213,18 @@ function MapSectionContent({
                               {program}
                             </span>
                           ))}
+                          
+                          {/* High Unemployment Badge */}
+                          {eligibilityResult.federal?.unemployment_qualifies && (
+                            <span className="px-3 py-1 text-xs font-medium rounded-full bg-orange-900/50 text-orange-300 border border-orange-500/30">
+                              High Unemployment ({eligibilityResult.federal.unemployment_rate?.toFixed(1)}%)
+                            </span>
+                          )}
                         </div>
                       )}
                       
                       {eligibilityResult.povertyRate !== null && eligibilityResult.povertyRate !== undefined && (
-                        <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-700">
+                        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-700">
                           <div>
                             <p className="text-xs text-gray-500">Poverty Rate</p>
                             <p className="text-lg font-semibold text-gray-200">{eligibilityResult.povertyRate}%</p>
@@ -225,6 +233,12 @@ function MapSectionContent({
                             <p className="text-xs text-gray-500">Median Income</p>
                             <p className="text-lg font-semibold text-gray-200">
                               {eligibilityResult.medianIncomePct != null ? `${Math.round(eligibilityResult.medianIncomePct)}% AMI` : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Area Type</p>
+                            <p className="text-lg font-semibold text-gray-200">
+                              {eligibilityResult.federal?.metro_status || 'Unknown'}
                             </p>
                           </div>
                         </div>

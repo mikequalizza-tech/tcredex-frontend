@@ -143,18 +143,10 @@ export default function Header() {
     window.location.href = '/';
   };
 
-  // Render auth buttons placeholder while checking auth to prevent hydration mismatch
+  // Render auth buttons - always show Login/Register by default, switch to user menu when logged in
   const renderAuthButtons = () => {
-    // Until mounted, render a placeholder with same dimensions to prevent layout shift
-    if (!isMounted) {
-      return (
-        <li className="w-[140px]">
-          {/* Placeholder to prevent layout shift */}
-        </li>
-      );
-    }
-
-    if (isLoggedIn) {
+    // Show logged-in state only after mount AND if actually logged in
+    if (isMounted && isLoggedIn) {
       return (
         <>
           {/* Dashboard link */}

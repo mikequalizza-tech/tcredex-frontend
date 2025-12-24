@@ -60,6 +60,11 @@ const PUBLIC_PREFIXES = [
   '/api/auth/', // Auth APIs are public
   '/api/register', // Registration API
   '/api/contact', // Contact form API
+  '/api/eligibility', // Census tract eligibility lookup
+  '/api/geo/', // Geo/tract resolution APIs
+  '/api/tracts/', // Tract data APIs
+  '/api/pricing', // Pricing calculator
+  '/api/founders/', // Founders registration
   '/_next',
   '/favicon',
   '/images',

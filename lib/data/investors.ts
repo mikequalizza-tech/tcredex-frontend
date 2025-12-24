@@ -376,6 +376,10 @@ export function getInvestorsByProgram(program: ProgramInterest): Investor[] {
   return DEMO_INVESTORS.filter(inv => inv.programs.includes(program));
 }
 
+export function getInvestorBySlug(slug: string): Investor | undefined {
+  return DEMO_INVESTORS.find(inv => inv.slug === slug);
+}
+
 export function getInvestorsByState(state: string): Investor[] {
   return DEMO_INVESTORS.filter(inv => 
     inv.geographicFocus.includes('ALL') || inv.geographicFocus.includes(state)

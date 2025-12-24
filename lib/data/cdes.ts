@@ -349,6 +349,10 @@ export const DEMO_CDES: CDE[] = [
 ];
 
 // Helper functions
+export function getCDEBySlug(slug: string): CDE | undefined {
+  return DEMO_CDES.find(cde => cde.slug === slug);
+}
+
 export function getCDEsByState(state: string): CDE[] {
   return DEMO_CDES.filter(cde => 
     cde.serviceArea.includes('ALL') || cde.serviceArea.includes(state)

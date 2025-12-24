@@ -53,7 +53,7 @@ function NavDropdownMenu({ dropdown, isLoggedIn }: { dropdown: NavDropdown; isLo
 
   return (
     <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-      <button className="flex items-center gap-1 text-gray-300 transition hover:text-white py-2">
+      <button className="flex items-center gap-1 transition hover:text-white py-2" style={{ color: '#d1d5db' }}>
         {dropdown.name}
         <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -161,7 +161,7 @@ export default function Header() {
           <li>
             <Link
               href="/dashboard"
-              className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
+              className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
             >
               Dashboard
             </Link>
@@ -218,7 +218,7 @@ export default function Header() {
         <li>
           <Link
             href="/signin"
-            className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
+            className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
           >
             Login
           </Link>
@@ -226,7 +226,7 @@ export default function Header() {
         <li>
           <Link
             href="/signup"
-            className="btn-sm bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] py-[5px] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]"
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
           >
             Register
           </Link>
@@ -240,15 +240,15 @@ export default function Header() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="relative flex h-14 items-center justify-between gap-3 rounded-2xl bg-gray-900/90 px-3 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] after:absolute after:inset-0 after:-z-10 after:backdrop-blur-xs">
           {/* Site branding */}
-          <div className="flex flex-1 items-center">
-            <Logo />
+          <div className="flex flex-1 items-center" style={{ minWidth: '160px' }}>
+            <Logo size="md" />
           </div>
 
           {/* Desktop navigation */}
           <nav className="hidden md:flex md:grow">
             <ul className="flex grow flex-wrap items-center justify-center gap-6 text-sm">
               <li>
-                <Link href="/" className="flex items-center text-gray-300 transition hover:text-white">Home</Link>
+                <Link href="/" className="flex items-center transition hover:text-white" style={{ color: '#d1d5db' }}>Home</Link>
               </li>
               <li>
                 <NavDropdownMenu dropdown={platformDropdown} isLoggedIn={isLoggedIn} />
@@ -257,7 +257,7 @@ export default function Header() {
                 <NavDropdownMenu dropdown={resourcesDropdown} isLoggedIn={isLoggedIn} />
               </li>
               <li>
-                <Link href="/blog" className="flex items-center text-gray-300 transition hover:text-white">Blog</Link>
+                <Link href="/blog" className="flex items-center transition hover:text-white" style={{ color: '#d1d5db' }}>Blog</Link>
               </li>
             </ul>
           </nav>

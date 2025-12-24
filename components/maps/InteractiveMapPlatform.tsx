@@ -79,7 +79,7 @@ const TRACT_FILL_COLOR = '#f97316';
 const TRACT_FILL_OPACITY = 0.25;
 const TRACT_LINE_COLOR = '#f97316';
 const TRACT_LINE_WIDTH = 1.5;
-const MIN_TRACT_ZOOM = 8;
+const MIN_TRACT_ZOOM = 6;
 
 // =============================================================================
 // HELPERS

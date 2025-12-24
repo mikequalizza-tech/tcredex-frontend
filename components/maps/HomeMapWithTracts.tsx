@@ -59,7 +59,7 @@ export default function HomeMapWithTracts({
   const [searchEligible, setSearchEligible] = useState<boolean | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-  const MIN_TRACT_ZOOM = 10;
+  const MIN_TRACT_ZOOM = 6;
 
   // Load tracts for current viewport - direct function that doesn't depend on React state
   const loadTractsForViewportDirect = async () => {
@@ -101,7 +101,15 @@ export default function HomeMapWithTracts({
         throw new Error('Failed to fetch tracts');
       }
       
-      const geojson = await geoRes.json();
+      const geoText = await geoRes.text();
+      let geojson;
+      try {
+        geojson = JSON.parse(geoText);
+      } catch {
+        console.error('[Tracts] Invalid JSON from geo API:', geoText.substring(0, 200));
+        setLoadingTract(false);
+        return;
+      }
       console.log(`[Tracts] API returned ${geojson.features?.length || 0} features`);
       
       if (!geojson.features?.length) {
@@ -127,7 +135,17 @@ export default function HomeMapWithTracts({
         
         try {
           const res = await fetch(`/api/eligibility?tract=${geoid}`);
-          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(`API error: ${res.status}`);
+          }
+          const text = await res.text();
+          let data;
+          try {
+            data = JSON.parse(text);
+          } catch {
+            console.error('[Eligibility] Invalid JSON:', text.substring(0, 100));
+            throw new Error('Invalid JSON response');
+          }
           
           return {
             ...feature,
@@ -217,7 +235,7 @@ export default function HomeMapWithTracts({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
       center: [-98.5795, 39.8283], // Center of continental US
-      zoom: 3.5,  // Show entire US
+      zoom: 7,  // Zoom in enough to show tracts
       minZoom: 3,
       maxZoom: 18,
     });

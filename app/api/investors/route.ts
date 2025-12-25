@@ -4,9 +4,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = getSupabaseAdmin();
+// Lazy init
+let supabase: SupabaseClient | null = null;
+function getSupabase() {
+  if (!supabase) {
+    supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return supabase;
+}
 
 // =============================================================================
 // GET /api/investors - List investors with filters
@@ -20,7 +30,7 @@ export async function GET(request: NextRequest) {
     const craMotivated = searchParams.get('cra_motivated');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = supabase
+    let query = getSupabase()
       .from('investors')
       .select(`
         *,
@@ -57,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (!organizationId && body.organization_name) {
       const slug = body.organization_name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       
-      const { data: org, error: orgError } = await supabase
+      const { data: org, error: orgError } = await getSupabase()
         .from('organizations')
         .insert({
           name: body.organization_name,
@@ -74,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create investor profile
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('investors')
       .insert({
         organization_id: organizationId,

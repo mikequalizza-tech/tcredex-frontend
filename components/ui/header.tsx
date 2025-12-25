@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Logo from "./logo";
 import MobileMenu from "./mobile-menu";
-import HeaderSearch from "./header-search";
 
 interface DropdownItem {
   name: string;
@@ -34,7 +33,6 @@ const resourcesDropdown: NavDropdown = {
     { name: "How It Works", href: "/how-it-works", description: "Step-by-step process" },
     { name: "Who We Serve", href: "/who-we-serve", description: "Sponsors, CDEs, and Investors" },
     { name: "About", href: "/about", description: "Our mission and team" },
-    { name: "Help", href: "/help", description: "Support and documentation" },
   ],
 };
 
@@ -53,7 +51,7 @@ function NavDropdownMenu({ dropdown, isLoggedIn }: { dropdown: NavDropdown; isLo
 
   return (
     <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-      <button className="flex items-center gap-1 transition hover:text-white py-2" style={{ color: '#d1d5db' }}>
+      <button className="flex items-center gap-1 text-gray-300 transition hover:text-white py-2">
         {dropdown.name}
         <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -89,40 +87,33 @@ function NavDropdownMenu({ dropdown, isLoggedIn }: { dropdown: NavDropdown; isLo
 }
 
 export default function Header() {
-  // Hydration fix: track mount state
-  const [isMounted, setIsMounted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLLIElement>(null);
 
-  // Set mounted state first
+  // Check auth state on mount
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Check auth state AFTER mount
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    const session = localStorage.getItem('tcredex_session');
-    if (session) {
-      try {
-        const { role } = JSON.parse(session);
-        setIsLoggedIn(true);
-        // Get user name based on role
-        const names: Record<string, string> = {
-          cde: 'Sarah Chen',
-          sponsor: 'John Martinez',
-          investor: 'Michael Thompson',
-          admin: 'Platform Admin',
-        };
-        setUserName(names[role] || 'User');
-      } catch {
-        setIsLoggedIn(false);
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('tcredex_session');
+      if (session) {
+        try {
+          const { role } = JSON.parse(session);
+          setIsLoggedIn(true);
+          // Get user name based on role
+          const names: Record<string, string> = {
+            cde: 'Sarah Chen',
+            sponsor: 'John Martinez',
+            investor: 'Michael Thompson',
+            admin: 'Platform Admin',
+          };
+          setUserName(names[role] || 'User');
+        } catch {
+          setIsLoggedIn(false);
+        }
       }
     }
-  }, [isMounted]);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -136,95 +127,13 @@ export default function Header() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('tcredex_session');
-    localStorage.removeItem('tcredex_demo_role');
-    setIsLoggedIn(false);
-    setUserMenuOpen(false);
-    window.location.href = '/';
-  };
-
-  // Render auth buttons - always show Login/Register by default, switch to user menu when logged in
-  const renderAuthButtons = () => {
-    // Show logged-in state only after mount AND if actually logged in
-    if (isMounted && isLoggedIn) {
-      return (
-        <>
-          {/* Dashboard link */}
-          <li>
-            <Link
-              href="/dashboard"
-              className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              Dashboard
-            </Link>
-          </li>
-          {/* User menu */}
-          <li className="relative" ref={userMenuRef}>
-            <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                {userName.charAt(0)}
-              </div>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-            {userMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden z-50">
-                <div className="px-4 py-3 border-b border-gray-800">
-                  <p className="text-sm font-medium text-gray-200">{userName}</p>
-                  <p className="text-xs text-gray-500">Logged in</p>
-                </div>
-                <Link
-                  href="/dashboard"
-                  className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                  onClick={() => setUserMenuOpen(false)}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
-                  onClick={() => setUserMenuOpen(false)}
-                >
-                  Settings
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors border-t border-gray-800"
-                >
-                  Sign out
-                </button>
-              </div>
-            )}
-          </li>
-        </>
-      );
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('tcredex_session');
+      localStorage.removeItem('tcredex_demo_role');
+      setIsLoggedIn(false);
+      setUserMenuOpen(false);
+      window.location.href = '/';
     }
-
-    return (
-      <>
-        <li>
-          <Link
-            href="/signin"
-            className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            Login
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/signup"
-            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
-          >
-            Register
-          </Link>
-        </li>
-      </>
-    );
   };
 
   return (
@@ -232,15 +141,15 @@ export default function Header() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="relative flex h-14 items-center justify-between gap-3 rounded-2xl bg-gray-900/90 px-3 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] after:absolute after:inset-0 after:-z-10 after:backdrop-blur-xs">
           {/* Site branding */}
-          <div className="flex flex-1 items-center" style={{ minWidth: '160px' }}>
-            <Logo size="md" />
+          <div className="flex flex-1 items-center">
+            <Logo />
           </div>
 
           {/* Desktop navigation */}
           <nav className="hidden md:flex md:grow">
             <ul className="flex grow flex-wrap items-center justify-center gap-6 text-sm">
               <li>
-                <Link href="/" className="flex items-center transition hover:text-white" style={{ color: '#d1d5db' }}>Home</Link>
+                <Link href="/" className="flex items-center text-gray-300 transition hover:text-white">Home</Link>
               </li>
               <li>
                 <NavDropdownMenu dropdown={platformDropdown} isLoggedIn={isLoggedIn} />
@@ -248,20 +157,86 @@ export default function Header() {
               <li>
                 <NavDropdownMenu dropdown={resourcesDropdown} isLoggedIn={isLoggedIn} />
               </li>
-              <li>
-                <Link href="/blog" className="flex items-center transition hover:text-white" style={{ color: '#d1d5db' }}>Blog</Link>
-              </li>
             </ul>
           </nav>
 
-          {/* Search */}
-          <div className="hidden md:block">
-            <HeaderSearch />
-          </div>
-
           {/* Desktop auth */}
           <ul className="flex flex-1 items-center justify-end gap-3">
-            {renderAuthButtons()}
+            {isLoggedIn ? (
+              <>
+                {/* Dashboard link */}
+                <li>
+                  <Link
+                    href="/dashboard"
+                    className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
+                  >
+                    Dashboard
+                  </Link>
+                </li>
+                {/* User menu */}
+                <li className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-2 p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+                  >
+                    <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+                      {userName.charAt(0)}
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden z-50">
+                      <div className="px-4 py-3 border-b border-gray-800">
+                        <p className="text-sm font-medium text-gray-200">{userName}</p>
+                        <p className="text-xs text-gray-500">Logged in</p>
+                      </div>
+                      <Link
+                        href="/dashboard"
+                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Dashboard
+                      </Link>
+                      <Link
+                        href="/dashboard/settings"
+                        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        Settings
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors border-t border-gray-800"
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </li>
+              </>
+            ) : (
+              <>
+                <li>
+                  <Link
+                    href="/signin"
+                    className="btn-sm relative bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] py-[5px] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%]"
+                  >
+                    Login
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/signup"
+                    className="btn-sm bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] py-[5px] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]"
+                  >
+                    Register
+                  </Link>
+                </li>
+              </>
+            )}
             <li>
               <MobileMenu />
             </li>

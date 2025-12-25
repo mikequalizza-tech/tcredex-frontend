@@ -5,13 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { calculateReadiness } from '@/lib/intake/readinessScore';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -19,6 +14,7 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const supabase = getSupabaseAdmin();
     const { id } = await params;
     const body = await request.json();
     

@@ -7,15 +7,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 // GET - Load draft
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
   const id = searchParams.get('id');
@@ -64,6 +60,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Save/update draft
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   try {
     const body = await request.json();
     const { email, data, readinessScore } = body;
@@ -135,6 +132,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Delete draft
 export async function DELETE(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const email = searchParams.get('email');

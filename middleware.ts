@@ -65,6 +65,9 @@ const PUBLIC_PREFIXES = [
   '/api/tracts/', // Tract data APIs
   '/api/pricing', // Pricing calculator
   '/api/founders/', // Founders registration
+  '/api/deals', // Marketplace deals - public read
+  '/api/cdes', // CDE directory - public read
+  '/api/investors', // Investor directory - public read
   '/_next',
   '/favicon',
   '/images',

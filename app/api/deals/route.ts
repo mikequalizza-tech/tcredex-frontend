@@ -4,17 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 // =============================================================================
 // GET /api/deals - List deals with filters
 // =============================================================================
 export async function GET(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   try {
     const { searchParams } = new URL(request.url);
     
@@ -66,6 +62,7 @@ export async function GET(request: NextRequest) {
 // POST /api/deals - Create new deal
 // =============================================================================
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseAdmin();
   try {
     const body = await request.json();
 

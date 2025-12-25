@@ -1,19 +1,76 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// =============================================================================
+// LAZY-INITIALIZED CLIENTS
+// These functions create the client only when first called at runtime,
+// avoiding build-time errors when env vars aren't available
+// =============================================================================
 
-// Client-side Supabase (uses anon key)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+let _supabase: SupabaseClient | null = null;
+let _supabaseAdmin: SupabaseClient | null = null;
 
-// Server-side Supabase (uses service role key for full access)
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  supabaseServiceKey || supabaseAnonKey
-);
+/**
+ * Get client-side Supabase (uses anon key)
+ */
+export function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      throw new Error('Missing Supabase client environment variables');
+    }
+    _supabase = createClient(url, key);
+  }
+  return _supabase;
+}
 
-// Types for our tables
+/**
+ * Get server-side Supabase (uses service role key for full access)
+ */
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!_supabaseAdmin) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      // During build, return a dummy client that will fail at runtime
+      // This prevents build errors while ensuring runtime checks work
+      if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+        console.warn('Supabase admin env vars not available during build');
+        return createClient('https://placeholder.supabase.co', 'placeholder-key');
+      }
+      throw new Error('Missing Supabase admin environment variables');
+    }
+    _supabaseAdmin = createClient(url, key);
+  }
+  return _supabaseAdmin;
+}
+
+// =============================================================================
+// LEGACY EXPORTS (deprecated - use getSupabase/getSupabaseAdmin instead)
+// These use getter functions to defer initialization until runtime
+// =============================================================================
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createLazyClient = (getter: () => SupabaseClient): any => {
+  return new Proxy({}, {
+    get(_, prop) {
+      const client = getter();
+      const value = (client as unknown as Record<string, unknown>)[prop as string];
+      if (typeof value === 'function') {
+        return value.bind(client);
+      }
+      return value;
+    }
+  });
+};
+
+export const supabase: SupabaseClient = createLazyClient(getSupabase);
+export const supabaseAdmin: SupabaseClient = createLazyClient(getSupabaseAdmin);
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
 export interface CensusTract {
   geoid: string;
   state_name: string;

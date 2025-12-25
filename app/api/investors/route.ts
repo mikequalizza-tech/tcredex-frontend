@@ -1,15 +1,12 @@
 /**
  * tCredex Investors API
- * CRUD operations for Tax Credit Investors
+ * CRUD operations for Investors with Supabase
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = getSupabaseAdmin();
 
 // =============================================================================
 // GET /api/investors - List investors with filters
@@ -27,7 +24,7 @@ export async function GET(request: NextRequest) {
       .from('investors')
       .select(`
         *,
-        organization:organizations(id, name, slug, website, city, state)
+        organization:organizations(id, name, slug, city, state)
       `)
       .order('max_investment', { ascending: false })
       .limit(limit);
@@ -48,13 +45,13 @@ export async function GET(request: NextRequest) {
 }
 
 // =============================================================================
-// POST /api/investors - Create new investor profile
+// POST /api/investors - Create investor profile
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // First create or get organization
+    // Create or get organization
     let organizationId = body.organization_id;
     
     if (!organizationId && body.organization_name) {
@@ -64,9 +61,8 @@ export async function POST(request: NextRequest) {
         .from('organizations')
         .insert({
           name: body.organization_name,
-          slug: slug,
+          slug,
           type: 'investor',
-          website: body.website,
           city: body.city,
           state: body.state,
         })
@@ -84,14 +80,12 @@ export async function POST(request: NextRequest) {
         organization_id: organizationId,
         primary_contact_name: body.primary_contact_name,
         primary_contact_email: body.primary_contact_email,
-        primary_contact_phone: body.primary_contact_phone,
         investor_type: body.investor_type || 'Bank',
         cra_motivated: body.cra_motivated ?? true,
         min_investment: body.min_investment || 1000000,
         max_investment: body.max_investment || 25000000,
         target_credit_types: body.target_credit_types || ['NMTC'],
         target_states: body.target_states,
-        target_sectors: body.target_sectors,
         accredited: body.accredited ?? true,
       })
       .select()

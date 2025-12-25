@@ -3,12 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -18,6 +13,7 @@ interface RouteParams {
 // GET /api/cdes/[id] - Get single CDE with allocations
 // =============================================================================
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const supabase = getSupabaseAdmin();
   try {
     const { id } = await params;
 
@@ -49,6 +45,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // PATCH /api/cdes/[id] - Update CDE profile
 // =============================================================================
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const supabase = getSupabaseAdmin();
   try {
     const { id } = await params;
     const body = await request.json();
@@ -119,6 +116,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 // DELETE /api/cdes/[id] - Deactivate CDE
 // =============================================================================
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const supabase = getSupabaseAdmin();
   try {
     const { id } = await params;
 

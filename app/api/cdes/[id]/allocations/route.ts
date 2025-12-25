@@ -3,12 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -19,6 +14,7 @@ interface RouteParams {
 // =============================================================================
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const supabase = getSupabaseAdmin();
   try {
     const { id } = await params;
     
@@ -46,6 +42,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 // =============================================================================
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const supabase = getSupabaseAdmin();
   try {
     const { id } = await params;
     const body = await request.json();
@@ -80,7 +77,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (error) throw error;
     
     // Update CDE totals
-    await updateCDETotals(id);
+    await updateCDETotals(id, supabase);
     
     return NextResponse.json(data, { status: 201 });
     
@@ -97,7 +94,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 // Helper: Update CDE allocation totals
 // =============================================================================
 
-async function updateCDETotals(cdeId: string) {
+async function updateCDETotals(cdeId: string, supabase: ReturnType<typeof getSupabaseAdmin>) {
   const { data: allocations } = await supabase
     .from('cde_allocations')
     .select('awarded_amount, available_on_platform, deployment_deadline')

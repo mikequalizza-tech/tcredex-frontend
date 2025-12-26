@@ -1,10 +1,36 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFeaturedDeals, PROGRAM_COLORS } from '@/lib/data/deals';
+import { getFeaturedDeals, PROGRAM_COLORS, Deal } from '@/lib/data/deals';
 
 export default function FeaturedDeals() {
-  const deals = getFeaturedDeals();
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDeals() {
+      try {
+        const featured = await getFeaturedDeals();
+        setDeals(featured);
+      } catch (error) {
+        console.error('Failed to load featured deals:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDeals();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="relative py-16 md:py-24 bg-gray-950">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="relative py-16 md:py-24 bg-gray-950">

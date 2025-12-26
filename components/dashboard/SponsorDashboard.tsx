@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { fetchDeals } from '@/lib/supabase/queries';
 
 interface DealSummary {
   id: string;
@@ -19,13 +20,6 @@ interface SponsorDashboardProps {
   orgName: string;
 }
 
-const DEMO_DEALS: DealSummary[] = [
-  { id: 'deal-001', projectName: 'Downtown Community Center', program: 'NMTC', status: 'closing', allocation: 15000000, creditPrice: 0.76, submittedDate: '2024-10-15', matchedDate: '2024-11-01' },
-  { id: 'deal-002', projectName: 'Heritage Theater Restoration', program: 'HTC', status: 'matched', allocation: 8500000, creditPrice: 0.92, submittedDate: '2024-11-20', matchedDate: '2024-12-05' },
-  { id: 'deal-003', projectName: 'Riverside Affordable Housing', program: 'LIHTC', status: 'submitted', allocation: 22000000, creditPrice: 0.88, submittedDate: '2024-12-01' },
-  { id: 'deal-007', projectName: 'Main Street Revitalization', program: 'OZ', status: 'draft', allocation: 10000000, creditPrice: 0.85 },
-];
-
 const STATUS_COLORS = {
   draft: 'bg-gray-800 text-gray-400',
   submitted: 'bg-blue-900/50 text-blue-400',
@@ -42,14 +36,41 @@ const PROGRAM_COLORS = {
 };
 
 export default function SponsorDashboard({ userName, orgName }: SponsorDashboardProps) {
-  const deals = DEMO_DEALS;
+  const [deals, setDeals] = useState<DealSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDeals() {
+      setLoading(true);
+      try {
+        const fetchedDeals = await fetchDeals();
+        // Map to DealSummary format
+        const mappedDeals: DealSummary[] = fetchedDeals.map(d => ({
+          id: d.id,
+          projectName: d.projectName,
+          program: d.programType as any,
+          status: d.status as any,
+          allocation: d.allocation,
+          creditPrice: d.creditPrice,
+          submittedDate: d.submittedDate,
+          // matchedDate is not in Deal interface yet, but we can add it or leave it undefined
+        }));
+        setDeals(mappedDeals);
+      } catch (error) {
+        console.error('Failed to load deals:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDeals();
+  }, []);
   
   const stats = {
     totalDeals: deals.length,
     inClosing: deals.filter(d => d.status === 'closing').length,
     matched: deals.filter(d => d.status === 'matched').length,
     totalAllocation: deals.reduce((sum, d) => sum + d.allocation, 0),
-    avgCreditPrice: deals.reduce((sum, d) => sum + d.creditPrice, 0) / deals.length,
+    avgCreditPrice: deals.length > 0 ? deals.reduce((sum, d) => sum + d.creditPrice, 0) / deals.length : 0,
   };
 
   const formatCurrency = (num: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
@@ -99,45 +120,51 @@ export default function SponsorDashboard({ userName, orgName }: SponsorDashboard
           <h2 className="text-lg font-semibold text-gray-100">Your Projects</h2>
           <Link href="/dashboard/projects" className="text-sm text-indigo-400 hover:text-indigo-300">View All →</Link>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-800/50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Project</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Program</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Allocation</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Credit Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                <th className="px-6 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {deals.map((deal) => (
-                <tr key={deal.id} className="hover:bg-gray-800/50">
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-gray-100">{deal.projectName}</p>
-                    {deal.submittedDate && <p className="text-xs text-gray-500">Submitted {deal.submittedDate}</p>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white ${PROGRAM_COLORS[deal.program]}`}>
-                      {deal.program}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-300">{formatCurrency(deal.allocation)}</td>
-                  <td className="px-6 py-4 text-gray-300">${deal.creditPrice.toFixed(2)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[deal.status]}`}>
-                      {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm">View →</Link>
-                  </td>
+        {loading ? (
+          <div className="p-12 flex justify-center">
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-800/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Project</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Program</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Allocation</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Credit Price</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                  <th className="px-6 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {deals.map((deal) => (
+                  <tr key={deal.id} className="hover:bg-gray-800/50">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-100">{deal.projectName}</p>
+                      {deal.submittedDate && <p className="text-xs text-gray-500">Submitted {deal.submittedDate}</p>}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white ${PROGRAM_COLORS[deal.program]}`}>
+                        {deal.program}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-300">{formatCurrency(deal.allocation)}</td>
+                    <td className="px-6 py-4 text-gray-300">${deal.creditPrice.toFixed(2)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[deal.status]}`}>
+                        {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm">View →</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Activity Feed */}

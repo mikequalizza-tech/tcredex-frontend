@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useCurrentUser } from '@/lib/auth';
+import { fetchDeals } from '@/lib/supabase/queries';
 
 // ============================================
 // ROLE-SPECIFIC STAGE CONFIGURATIONS
@@ -309,9 +310,40 @@ function PipelineContent() {
   const [selectedDeal, setSelectedDeal] = useState<PipelineDeal | null>(null);
   const [drafts, setDrafts] = useState<PipelineDeal[]>([]);
   const [isLoadingDrafts, setIsLoadingDrafts] = useState(true);
+  const [supabaseDeals, setSupabaseDeals] = useState<PipelineDeal[]>([]);
+  const [isLoadingSupabase, setIsLoadingSupabase] = useState(true);
 
   // Get role-specific configuration
   const effectiveRole = currentDemoRole === 'admin' ? 'cde' : orgType;
+
+  useEffect(() => {
+    async function loadSupabaseDeals() {
+      setIsLoadingSupabase(true);
+      try {
+        const fetched = await fetchDeals();
+        const mapped: PipelineDeal[] = fetched.map(d => ({
+          id: d.id,
+          projectName: d.projectName,
+          sponsorName: d.sponsorName,
+          city: d.city,
+          state: d.state,
+          programType: d.programType as any,
+          allocationRequest: d.allocation,
+          stage: d.status as any, // Map status to stage
+          matchScore: 85, // Placeholder
+          tractType: d.tractType,
+          daysInStage: 5, // Placeholder
+          submittedDate: d.submittedDate,
+        }));
+        setSupabaseDeals(mapped);
+      } catch (error) {
+        console.error('Failed to load deals from Supabase:', error);
+      } finally {
+        setIsLoadingSupabase(false);
+      }
+    }
+    loadSupabaseDeals();
+  }, []);
   
   const getStageConfig = (): Record<string, StageConfig> => {
     switch (effectiveRole) {
@@ -331,7 +363,15 @@ function PipelineContent() {
     }
   };
 
-  const getDemoDeals = (): PipelineDeal[] => {
+  const getPipelineDeals = (): PipelineDeal[] => {
+    // Combine drafts and supabase deals
+    const allDeals = [...drafts, ...supabaseDeals];
+    
+    // If we have real deals, use them. Otherwise fallback to demo deals for visual completeness
+    if (supabaseDeals.length > 0) {
+      return allDeals;
+    }
+
     switch (effectiveRole) {
       case 'sponsor': return SPONSOR_DEMO_DEALS;
       case 'cde': return CDE_DEMO_DEALS;
@@ -360,7 +400,7 @@ function PipelineContent() {
 
   const stageConfig = getStageConfig();
   const stages = getStages();
-  const pipeline = getDemoDeals();
+  const pipeline = getPipelineDeals();
 
   // Load drafts for sponsors only
   useEffect(() => {
@@ -517,7 +557,11 @@ function PipelineContent() {
       )}
 
       {/* Kanban View */}
-      {viewMode === 'kanban' && (
+      {isLoadingSupabase && isLoadingDrafts ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : viewMode === 'kanban' ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
           {stages.map(stage => {
             const config = stageConfig[stage];
@@ -704,7 +748,7 @@ function PipelineContent() {
       )}
 
       {/* List View */}
-      {viewMode === 'list' && (
+      {viewMode === 'list' && !isLoadingSupabase && !isLoadingDrafts && (
         <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
           <table className="w-full">
             <thead className="bg-gray-800/50">

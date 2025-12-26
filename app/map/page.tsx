@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import DealCard from '@/components/DealCard';
+import DealCard, { Deal } from '@/components/DealCard';
 import CDECard from '@/components/CDECard';
 import MapFilterRail, { FilterState, defaultFilters } from '@/components/maps/MapFilterRail';
-import { mockDeals } from '@/lib/mockData';
-import { mockCDEs, calculateCDEMatchScore } from '@/lib/mockCDEData';
+import { fetchDeals, fetchCDEs } from '@/lib/supabase/queries';
+import { calculateCDEMatchScore } from '@/lib/mockCDEData';
+import { CDEDealCard } from '@/lib/types/cde';
 import { useCurrentUser } from '@/lib/auth';
 
 const HomeMapWithTracts = dynamic(
@@ -61,7 +62,7 @@ interface SearchedTract {
 }
 
 function MapContent() {
-  const { isAuthenticated, orgType, isLoading } = useCurrentUser();
+  const { isAuthenticated, orgType, isLoading: authLoading } = useCurrentUser();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [autoMatchEnabled, setAutoMatchEnabled] = useState(false);
@@ -69,13 +70,37 @@ function MapContent() {
   const [showFilterRail, setShowFilterRail] = useState(true);
   const [showDealPanel, setShowDealPanel] = useState(true);
   
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [cdes, setCDEs] = useState<CDEDealCard[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  
   const cardListRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Fetch data from Supabase
+  useEffect(() => {
+    async function loadData() {
+      setDataLoading(true);
+      try {
+        const [fetchedDeals, fetchedCDEs] = await Promise.all([
+          fetchDeals(),
+          fetchCDEs()
+        ]);
+        setDeals(fetchedDeals);
+        setCDEs(fetchedCDEs);
+      } catch (error) {
+        console.error('Failed to load data from Supabase:', error);
+      } finally {
+        setDataLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   // VIEW MODE IS LOCKED TO USER TYPE - No switcher!
   const viewMode: ViewMode = orgType === 'cde' ? 'cde' : orgType === 'investor' ? 'investor' : 'sponsor';
 
-  if (isLoading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="h-screen w-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
@@ -93,9 +118,9 @@ function MapContent() {
   // CDEs → See Project cards (what projects need allocation?)
   // INVESTORS → See Project cards (what deals are closing?)
   
-  const mapDeals = mockDeals.map(deal => ({
+  const mapDeals = deals.map(deal => ({
     ...deal,
-    coordinates: DEAL_COORDINATES[deal.id] || undefined,
+    coordinates: deal.coordinates || DEAL_COORDINATES[deal.id] || undefined,
   }));
 
   const filteredDeals = mapDeals.filter(deal => {
@@ -104,7 +129,7 @@ function MapContent() {
     return true;
   });
 
-  const filteredCDEs = mockCDEs
+  const filteredCDEs = cdes
     .filter(cde => cde.status === 'active')
     .map(cde => {
       const { score, reasons } = autoMatchEnabled 

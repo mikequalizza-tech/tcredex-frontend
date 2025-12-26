@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { fetchDeals } from '@/lib/supabase/queries';
 
 interface TractData {
   geoid: string;
@@ -27,9 +28,6 @@ interface HomeMapWithTractsProps {
   onTractSelect?: (tract: TractData | null) => void;
   searchedLocation?: { lat: number; lng: number; tract?: string } | null;
 }
-
-// Demo deal pins - empty for now, will be populated from real data
-const DEMO_DEALS: DealPin[] = [];
 
 const PIN_COLORS: Record<string, string> = {
   nmtc: '#22c55e',    // green
@@ -369,8 +367,17 @@ export default function HomeMapWithTracts({
         }
       });
 
-      // Add demo deal markers
-      addDealMarkers(DEMO_DEALS);
+      // Add deal markers from Supabase
+      fetchDeals().then(deals => {
+        const pins: DealPin[] = deals.map(d => ({
+          id: d.id,
+          name: d.projectName,
+          coordinates: [-87.6298, 41.8781], // Default to Chicago for now if no coords
+          type: d.programType.toLowerCase() as any,
+          projectCost: d.allocation * 5
+        }));
+        addDealMarkers(pins);
+      }).catch(err => console.error('Failed to load deal pins:', err));
       
       // Load ALL tracts once on init - no need to reload on pan/zoom
       console.log('[Map] Map loaded, loading all US tracts...');

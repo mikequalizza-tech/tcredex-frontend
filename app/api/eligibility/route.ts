@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
         unemployment_rate: unemploymentRate,
         unemployment_qualifies: unemploymentQualifies,
         severely_distressed: isSeverelyDistressed,
-        metro_status: tractData.omb_metro_non_metro,
+        metro_status: tractData.metro_status || tractData.omb_metro_non_metro,
         opportunity_zone: isOzDesignated
       },
       state: stateData ? {

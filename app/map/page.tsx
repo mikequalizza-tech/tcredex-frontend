@@ -55,12 +55,17 @@ export default function MapPlatformPage() {
   return <MapContent />;
 }
 
+interface SearchedTract {
+  coordinates: [number, number];
+  geoid: string;
+}
+
 function MapContent() {
   const { isAuthenticated, orgType, isLoading } = useCurrentUser();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [autoMatchEnabled, setAutoMatchEnabled] = useState(false);
-  const [searchedLocation, setSearchedLocation] = useState<[number, number] | null>(null);
+  const [searchedTract, setSearchedTract] = useState<SearchedTract | null>(null);
   const [showFilterRail, setShowFilterRail] = useState(true);
   const [showDealPanel, setShowDealPanel] = useState(true);
   
@@ -125,8 +130,8 @@ function MapContent() {
       return b.remainingAllocation - a.remainingAllocation;
     });
 
-  const handleTractFound = useCallback((tract: unknown, coordinates: [number, number]) => {
-    setSearchedLocation(coordinates);
+  const handleTractFound = useCallback((tract: { geoid: string }, coordinates: [number, number]) => {
+    setSearchedTract({ coordinates, geoid: tract.geoid });
   }, []);
 
   useEffect(() => {
@@ -227,7 +232,7 @@ function MapContent() {
           <HomeMapWithTracts
             height="100%"
             className="w-full h-full"
-            searchedLocation={searchedLocation ? { lat: searchedLocation[1], lng: searchedLocation[0] } : null}
+            searchedLocation={searchedTract ? { lat: searchedTract.coordinates[1], lng: searchedTract.coordinates[0], tract: searchedTract.geoid } : null}
           />
           
           {/* Map Overlay Controls - Top Left */}

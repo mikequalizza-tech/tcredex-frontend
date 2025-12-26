@@ -540,10 +540,25 @@ export default function HomeMapWithTracts({
       // Update the existing tract in the source to mark it as searched
       const source = map.current.getSource('tracts') as mapboxgl.GeoJSONSource;
       if (source && tractFeaturesRef.current.length > 0) {
+        // Normalize GEOID to handle format differences (leading zeros)
+        const normalizeGeoid = (g: string | number | undefined): string => {
+          if (!g) return '';
+          return String(g).padStart(11, '0');
+        };
+        
+        const searchGeoid = normalizeGeoid(geoid);
+        console.log(`[Map] Looking for tract with normalized GEOID: ${searchGeoid}`);
+        
         // Clear previous searched flag and set new one
+        let foundMatch = false;
         const updatedFeatures = tractFeaturesRef.current.map((f: GeoJSON.Feature) => {
-          const fGeoid = f.properties?.geoid || f.id;
-          const isSearched = fGeoid === geoid;
+          const fGeoid = normalizeGeoid(f.properties?.geoid || f.id);
+          const isSearched = fGeoid === searchGeoid;
+          
+          if (isSearched) {
+            foundMatch = true;
+            console.log(`[Map] Found matching tract: ${f.properties?.geoid}`);
+          }
           
           return {
             ...f,
@@ -568,7 +583,15 @@ export default function HomeMapWithTracts({
           type: 'FeatureCollection',
           features: updatedFeatures,
         });
-        console.log(`[Map] Marked tract ${geoid} as searched`);
+        
+        if (foundMatch) {
+          console.log(`[Map] ✓ Marked tract ${geoid} as searched - will show ${eligibility.eligible ? 'GREEN' : 'RED'}`);
+        } else {
+          console.warn(`[Map] ✗ No matching tract found for GEOID ${geoid} (normalized: ${searchGeoid})`);
+          // Log sample GEOIDs from features for debugging
+          const sampleGeoids = tractFeaturesRef.current.slice(0, 5).map(f => f.properties?.geoid);
+          console.log(`[Map] Sample feature GEOIDs:`, sampleGeoids);
+        }
       }
 
       // Fly to the searched location

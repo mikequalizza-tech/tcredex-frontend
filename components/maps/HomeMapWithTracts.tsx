@@ -52,6 +52,7 @@ export default function HomeMapWithTracts({
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const searchMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const tractFeaturesRef = useRef<GeoJSON.Feature[]>([]);
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -59,157 +60,62 @@ export default function HomeMapWithTracts({
   const [searchEligible, setSearchEligible] = useState<boolean | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-  const MIN_TRACT_ZOOM = 6;
 
-  // Load tracts for current viewport - direct function that doesn't depend on React state
-  const loadTractsForViewportDirect = async () => {
+  // Load ALL tracts on init - no zoom restriction
+  const loadAllTracts = async () => {
     if (!map.current) {
       console.log('[Tracts] No map ref');
       return;
     }
 
-    // Check if source exists before making API calls
     const source = map.current.getSource('tracts');
     if (!source) {
       console.log('[Tracts] Source not ready, skipping load');
       return;
     }
-    
-    const zoom = map.current.getZoom();
-    console.log(`[Tracts] Current zoom: ${zoom}, MIN_TRACT_ZOOM: ${MIN_TRACT_ZOOM}`);
-    if (zoom < MIN_TRACT_ZOOM) {
-      console.log('[Tracts] Zoom too low, skipping tract load');
-      return;
-    }
 
     setLoadingTract(true);
+    console.log('[Tracts] Loading ALL tracts for entire US...');
     
     try {
-      const bounds = map.current.getBounds();
-      if (!bounds) {
-        console.log('[Tracts] No bounds available');
-        return;
-      }
-      
-      const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
-      console.log(`[Tracts] Fetching tracts for bbox: ${bbox}`);
-      
-      // Fetch tract geometries
-      const geoRes = await fetch(`/api/geo/tracts?bbox=${bbox}&limit=100`);
+      // Fetch ALL tracts - no bbox, high limit
+      const geoRes = await fetch(`/api/tracts/geojson?limit=100000`);
       if (!geoRes.ok) {
         console.error(`[Tracts] API error: ${geoRes.status}`);
         throw new Error('Failed to fetch tracts');
       }
       
-      const geoText = await geoRes.text();
-      let geojson;
-      try {
-        geojson = JSON.parse(geoText);
-      } catch {
-        console.error('[Tracts] Invalid JSON from geo API:', geoText.substring(0, 200));
-        setLoadingTract(false);
-        return;
-      }
+      const geojson = await geoRes.json();
       console.log(`[Tracts] API returned ${geojson.features?.length || 0} features`);
       
       if (!geojson.features?.length) {
-        console.log('[Tracts] No features returned, skipping');
+        console.log('[Tracts] No features returned');
         setLoadingTract(false);
         return;
       }
       
-      // Enrich with eligibility data (fetch in parallel for up to 50 tracts)
-      const tractsToFetch = geojson.features.slice(0, 50);
-      const eligibilityPromises = tractsToFetch.map(async (feature: GeoJSON.Feature) => {
-        const geoid = feature.properties?.GEOID;
-        if (!geoid) return {
-          ...feature,
-          id: geoid || `tract-${Math.random()}`,
-          properties: {
-            ...feature.properties,
-            eligible: false, // Default to not eligible if no GEOID
-            programs: JSON.stringify([]),
-            severelyDistressed: false,
-          }
-        };
-        
-        try {
-          const res = await fetch(`/api/eligibility?tract=${geoid}`);
-          if (!res.ok) {
-            throw new Error(`API error: ${res.status}`);
-          }
-          const text = await res.text();
-          let data;
-          try {
-            data = JSON.parse(text);
-          } catch {
-            console.error('[Eligibility] Invalid JSON:', text.substring(0, 100));
-            throw new Error('Invalid JSON response');
-          }
-          
-          return {
-            ...feature,
-            id: geoid,
-            properties: {
-              ...feature.properties,
-              geoid,
-              eligible: data.eligible,
-              programs: JSON.stringify(data.programs || []),
-              povertyRate: data.federal?.poverty_rate?.toFixed(1) || null,
-              medianIncomePct: data.federal?.median_income_pct?.toFixed(0) || null,
-              stateName: data.location?.state || null,
-              countyName: data.location?.county || null,
-              severelyDistressed: data.federal?.severely_distressed || false,
-            }
-          };
-        } catch {
-          // If eligibility fetch fails, mark as unknown (neutral styling)
-          return {
-            ...feature,
-            id: geoid,
-            properties: {
-              ...feature.properties,
-              geoid,
-              eligible: false,
-              programs: JSON.stringify([]),
-              severelyDistressed: false,
-            }
-          };
-        }
-      });
+      // Add IDs for feature state
+      const features = geojson.features.map((feature: GeoJSON.Feature) => ({
+        ...feature,
+        id: feature.properties?.geoid || `tract-${Math.random()}`,
+      }));
       
-      const enrichedFeatures = await Promise.all(eligibilityPromises);
-      console.log(`[Tracts] Enriched ${enrichedFeatures.length} features with eligibility`);
+      // Store features for later updates
+      tractFeaturesRef.current = features;
       
-      // Preserve the searched tract if it exists (don't let viewport load overwrite it)
-      const searchedTractFeature = (window as unknown as { __searchedTractFeature?: GeoJSON.Feature }).__searchedTractFeature;
-      let finalFeatures = enrichedFeatures;
-      
-      if (searchedTractFeature && searchedTractFeature.properties?.geoid) {
-        const searchedGeoid = searchedTractFeature.properties.geoid;
-        // Remove any duplicate of the searched tract from viewport results
-        finalFeatures = enrichedFeatures.filter((f: GeoJSON.Feature) => 
-          f.properties?.geoid !== searchedGeoid && f.properties?.GEOID !== searchedGeoid
-        );
-        // Add the searched tract with its special styling
-        finalFeatures.unshift(searchedTractFeature);
-        console.log(`[Tracts] Preserved searched tract ${searchedGeoid}`);
-      }
-      
-      // Update the map source - wrap in try-catch to prevent Mapbox errors from bubbling
+      // Update the map source
       try {
-        // We already confirmed source exists at top of function, just cast and use it
         const tractsSource = map.current?.getSource('tracts') as mapboxgl.GeoJSONSource;
         tractsSource.setData({
           type: 'FeatureCollection',
-          features: finalFeatures,
+          features,
         });
-        console.log('[Tracts] ✅ Updated map source with tract features');
-      } catch (mapError) {
-        console.warn('[Tracts] Error updating tract source:', mapError);
+        console.log(`[Tracts] Loaded ${features.length} tracts`);
+      } catch (sourceErr) {
+        console.warn('[Tracts] Source update error:', sourceErr);
       }
     } catch (error) {
-      console.error('[Tracts] Error loading tracts:', error);
+      console.error('[Tracts] Failed to load tracts:', error);
     } finally {
       setLoadingTract(false);
     }
@@ -252,10 +158,11 @@ export default function HomeMapWithTracts({
         data: {
           type: 'FeatureCollection',
           features: []
-        }
+        },
+        promoteId: 'geoid'  // Use geoid property as feature ID for feature-state
       });
 
-      // Tract fill layer - colored by eligibility type like CDFI Fund map
+      // Tract fill layer - simple: eligible or not
       map.current.addLayer({
         id: 'tract-fills',
         type: 'fill',
@@ -263,40 +170,39 @@ export default function HomeMapWithTracts({
         paint: {
           'fill-color': [
             'case',
-            // Searched tract - bright highlight based on eligibility
+            // Searched tract - GREEN if eligible, RED if not
             ['==', ['get', 'searched'], true],
             [
               'case',
-              ['==', ['get', 'eligible'], true], '#22c55e', // Bright green for searched eligible
-              '#ef4444' // Bright red for searched not eligible
+              ['any',
+                ['==', ['get', 'nmtc_lic'], true],
+                ['==', ['get', 'lihtc_qct'], true],
+                ['==', ['get', 'oz'], true],
+                ['==', ['get', 'eligible'], true]
+              ],
+              '#22c55e', // Green - qualifies
+              '#ef4444'  // Red - doesn't qualify
             ],
-            // Regular tracts - use CDFI Fund color scheme
-            ['==', ['get', 'eligible'], true],
-            [
-              'case',
-              // Severely distressed = red (like CDFI map)
-              ['==', ['get', 'severelyDistressed'], true], '#dc2626',
-              // Regular eligible = purple/blue (like CDFI map) 
-              '#7c3aed'
+            // Normal tracts - Purple if eligible, Gray if not
+            ['any',
+              ['==', ['get', 'nmtc_lic'], true],
+              ['==', ['get', 'lihtc_qct'], true],
+              ['==', ['get', 'oz'], true],
+              ['==', ['get', 'eligible'], true]
             ],
-            // Not eligible = light gray/cream (subtle, not red)
-            '#e5e7eb'
+            '#7C3AED', // Purple - qualifies
+            '#6B7280'  // Gray - doesn't qualify
           ],
           'fill-opacity': [
             'case',
-            // Searched tracts are very visible
-            ['==', ['get', 'searched'], true], 0.8,
-            // Eligible tracts are visible
-            ['==', ['get', 'eligible'], true], 0.6,
-            // Hover makes tracts more visible
-            ['boolean', ['feature-state', 'hover'], false], 0.4,
-            // Non-eligible are very subtle
-            0.2
+            ['==', ['get', 'searched'], true], 0.85,
+            ['boolean', ['feature-state', 'hover'], false], 0.7,
+            0.5
           ]
         }
       });
 
-      // Tract outline layer - match the fill colors
+      // Tract outline layer - simple
       map.current.addLayer({
         id: 'tract-outlines',
         type: 'line',
@@ -304,28 +210,14 @@ export default function HomeMapWithTracts({
         paint: {
           'line-color': [
             'case',
-            // Searched tract outline
-            ['==', ['get', 'searched'], true],
-            [
-              'case',
-              ['==', ['get', 'eligible'], true], '#16a34a', // Dark green outline for searched eligible
-              '#dc2626' // Dark red outline for searched not eligible
-            ],
-            // Regular tract outlines
-            ['==', ['get', 'eligible'], true],
-            [
-              'case',
-              ['==', ['get', 'severelyDistressed'], true], '#991b1b', // Dark red outline
-              '#5b21b6' // Dark purple outline
-            ],
-            // Not eligible = subtle gray outline
-            '#d1d5db'
+            ['==', ['get', 'searched'], true], '#22c55e',
+            '#FFFFFF'
           ],
           'line-width': [
             'case',
-            ['==', ['get', 'searched'], true], 3, // Thicker for searched
+            ['==', ['get', 'searched'], true], 3,
             ['boolean', ['feature-state', 'hover'], false], 2,
-            1
+            0.5
           ]
         }
       });
@@ -361,13 +253,34 @@ export default function HomeMapWithTracts({
         const props = e.features[0].properties;
         if (!props) return;
 
-        const eligible = props.eligible === true || props.eligible === 'true';
-        let programs: string[] = [];
-        try {
-          programs = props.programs ? JSON.parse(props.programs) : [];
-        } catch {
-          programs = [];
+        console.log('[Hover] Props:', props); // Debug
+
+        // Helper to check boolean values (handles true, 'true', 1, '1')
+        const isTruthy = (val: unknown): boolean => {
+          return val === true || val === 'true' || val === 1 || val === '1';
+        };
+
+        // Handle both searched tract format AND viewport tract format
+        const eligible = isTruthy(props.eligible) || isTruthy(props.nmtc_lic) || isTruthy(props.lihtc_qct) || isTruthy(props.oz);
+        
+        // Build programs list from individual flags
+        const programs: string[] = [];
+        if (isTruthy(props.nmtc_lic)) programs.push('Federal NMTC');
+        if (isTruthy(props.lihtc_qct)) programs.push('LIHTC QCT');
+        if (isTruthy(props.oz)) programs.push('Opportunity Zone');
+        
+        // Also check if programs is a string (from searched tract)
+        if (props.programs && typeof props.programs === 'string') {
+          try {
+            const parsed = JSON.parse(props.programs);
+            parsed.forEach((p: string) => {
+              if (!programs.includes(p)) programs.push(p);
+            });
+          } catch {}
         }
+        
+        const povertyRate = props.povertyRate || props.poverty_rate;
+        const medianIncome = props.medianIncomePct || props.mfi_pct;
         
         popupRef.current = new mapboxgl.Popup({
           closeButton: false,
@@ -380,7 +293,7 @@ export default function HomeMapWithTracts({
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 20px;">${eligible ? '✓' : '✗'}</span>
                 <span style="font-weight: 600; font-size: 14px; color: ${eligible ? '#4ade80' : '#f87171'};">
-                  ${eligible ? 'NMTC Eligible' : 'Not Eligible'}
+                  ${eligible ? 'Eligible' : 'Not Eligible'}
                 </span>
               </div>
               <p style="font-size: 12px; color: #9ca3af; margin-bottom: 8px;">
@@ -394,29 +307,23 @@ export default function HomeMapWithTracts({
                       font-size: 10px;
                       font-weight: 600;
                       border-radius: 9999px;
-                      background: ${p.includes('NMTC') ? 'rgba(34, 197, 94, 0.2)' : p === 'Opportunity Zone' ? 'rgba(168, 85, 247, 0.2)' : p === 'Severely Distressed' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(59, 130, 246, 0.2)'};
-                      color: ${p.includes('NMTC') ? '#4ade80' : p === 'Opportunity Zone' ? '#c084fc' : p === 'Severely Distressed' ? '#fb923c' : '#60a5fa'};
-                      border: 1px solid ${p.includes('NMTC') ? 'rgba(34, 197, 94, 0.4)' : p === 'Opportunity Zone' ? 'rgba(168, 85, 247, 0.4)' : p === 'Severely Distressed' ? 'rgba(249, 115, 22, 0.4)' : 'rgba(59, 130, 246, 0.4)'};
+                      background: ${p.includes('NMTC') ? 'rgba(34, 197, 94, 0.2)' : p.includes('Opportunity') || p.includes('OZ') ? 'rgba(168, 85, 247, 0.2)' : p.includes('Distressed') ? 'rgba(249, 115, 22, 0.2)' : 'rgba(59, 130, 246, 0.2)'};
+                      color: ${p.includes('NMTC') ? '#4ade80' : p.includes('Opportunity') || p.includes('OZ') ? '#c084fc' : p.includes('Distressed') ? '#fb923c' : '#60a5fa'};
                     ">${p}</span>
                   `).join('')}
                 </div>
               ` : ''}
-              ${props.povertyRate || props.medianIncomePct ? `
+              ${povertyRate || medianIncome ? `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 10px; border-top: 1px solid #374151; font-size: 12px;">
                   <div>
                     <p style="color: #6b7280; font-size: 10px; margin-bottom: 2px;">Poverty Rate</p>
-                    <p style="font-weight: 600; color: ${parseFloat(props.povertyRate) >= 20 ? '#fb923c' : '#d1d5db'};">${props.povertyRate ? props.povertyRate + '%' : 'N/A'}</p>
+                    <p style="font-weight: 600; color: ${parseFloat(povertyRate) >= 20 ? '#fb923c' : '#d1d5db'};">${povertyRate ? povertyRate + '%' : 'N/A'}</p>
                   </div>
                   <div>
                     <p style="color: #6b7280; font-size: 10px; margin-bottom: 2px;">Median Income</p>
-                    <p style="font-weight: 600; color: ${parseFloat(props.medianIncomePct) <= 80 ? '#fb923c' : '#d1d5db'};">${props.medianIncomePct ? props.medianIncomePct + '% AMI' : 'N/A'}</p>
+                    <p style="font-weight: 600; color: ${parseFloat(medianIncome) <= 80 ? '#fb923c' : '#d1d5db'};">${medianIncome ? medianIncome + '% AMI' : 'N/A'}</p>
                   </div>
                 </div>
-              ` : ''}
-              ${props.stateName ? `
-                <p style="font-size: 10px; color: #6b7280; margin-top: 8px; padding-top: 8px; border-top: 1px solid #374151;">
-                  📍 ${props.countyName ? props.countyName + ', ' : ''}${props.stateName}
-                </p>
               ` : ''}
             </div>
           `)
@@ -465,21 +372,11 @@ export default function HomeMapWithTracts({
       // Add demo deal markers
       addDealMarkers(DEMO_DEALS);
       
-      // Load tracts on pan/zoom (debounced)
-      let moveendTimeout: NodeJS.Timeout | null = null;
-      map.current.on('moveend', () => {
-        if (moveendTimeout) clearTimeout(moveendTimeout);
-        moveendTimeout = setTimeout(() => {
-          loadTractsForViewportDirect();
-        }, 300);
-      });
-
-      // Load tracts for initial viewport
-      console.log('[Map] Map loaded, scheduling initial tract load...');
+      // Load ALL tracts once on init - no need to reload on pan/zoom
+      console.log('[Map] Map loaded, loading all US tracts...');
       setTimeout(() => {
-        console.log('[Map] Triggering initial tract load');
-        loadTractsForViewportDirect();
-      }, 500);
+        loadAllTracts();
+      }, 300);
     });
 
     return () => {
@@ -629,7 +526,7 @@ export default function HomeMapWithTracts({
     if (!map.current) return;
     setLoadingTract(true);
 
-    console.log(`[Map] Fetching tract data for GEOID: ${geoid}`);
+    console.log(`[Map] Fetching eligibility for GEOID: ${geoid}`);
 
     try {
       // Fetch eligibility data from our API
@@ -640,97 +537,46 @@ export default function HomeMapWithTracts({
       // Update search marker color based on eligibility
       setSearchEligible(eligibility.eligible);
 
-      // Fetch real tract geometry from Census TIGERweb if not provided
-      let geometry = existingGeometry;
-      if (!geometry) {
-        console.log(`[Map] Fetching geometry from TIGERweb for GEOID: ${geoid}`);
-        const geoRes = await fetch(`/api/geo/tract-geometry?geoid=${geoid}`);
-        const geoData = await geoRes.json();
-        console.log(`[Map] Geometry response:`, geoData);
+      // Update the existing tract in the source to mark it as searched
+      const source = map.current.getSource('tracts') as mapboxgl.GeoJSONSource;
+      if (source && tractFeaturesRef.current.length > 0) {
+        // Clear previous searched flag and set new one
+        const updatedFeatures = tractFeaturesRef.current.map((f: GeoJSON.Feature) => {
+          const fGeoid = f.properties?.geoid || f.id;
+          const isSearched = fGeoid === geoid;
+          
+          return {
+            ...f,
+            properties: {
+              ...f.properties,
+              searched: isSearched,
+              // Add eligibility data to searched tract
+              ...(isSearched ? {
+                eligible: eligibility.eligible,
+                programs: JSON.stringify(eligibility.programs || []),
+                povertyRate: eligibility.federal?.poverty_rate?.toFixed(1) || null,
+                medianIncomePct: eligibility.federal?.median_income_pct?.toFixed(0) || null,
+              } : {})
+            }
+          };
+        });
         
-        if (geoData.found && geoData.geometry && geoData.geometry.type && geoData.geometry.coordinates) {
-          geometry = geoData.geometry;
-          console.log(`[Map] Got real geometry, type: ${geoData.geometry.type}`);
-        } else {
-          console.warn(`[Map] TIGERweb returned no valid geometry:`, geoData.message || 'Unknown reason');
-        }
-      } else {
-        // Validate existing geometry (check with 'in' operator for TypeScript compatibility)
-        if (!existingGeometry?.type || !('coordinates' in existingGeometry)) {
-          console.warn('[Map] Provided geometry is invalid, will use fallback');
-          geometry = undefined;
-        } else {
-          console.log(`[Map] Using provided geometry, type: ${existingGeometry?.type}`);
-        }
+        // Update the ref with new features
+        tractFeaturesRef.current = updatedFeatures;
+        
+        source.setData({
+          type: 'FeatureCollection',
+          features: updatedFeatures,
+        });
+        console.log(`[Map] Marked tract ${geoid} as searched`);
       }
 
-      // If we still don't have valid geometry, create a fallback bounding box
-      if (!geometry || !geometry.type || !('coordinates' in geometry)) {
-        console.warn('[Map] No valid geometry available, using fallback bounding box');
-        const offset = 0.012;
-        geometry = {
-          type: 'Polygon',
-          coordinates: [[
-            [center[0] - offset, center[1] - offset],
-            [center[0] + offset, center[1] - offset],
-            [center[0] + offset, center[1] + offset],
-            [center[0] - offset, center[1] + offset],
-            [center[0] - offset, center[1] - offset],
-          ]]
-        };
-      }
-
-      // Build the GeoJSON feature with all properties
-      const tractFeature: GeoJSON.Feature = {
-        type: 'Feature',
-        id: geoid,
-        properties: {
-          geoid,
-          name: `Tract ${geoid.slice(-6)}`,
-          eligible: eligibility.eligible,
-          searched: true,  // Mark as the searched tract for special styling
-          programs: JSON.stringify(eligibility.programs || []),
-          povertyRate: eligibility.federal?.poverty_rate?.toFixed(1) || null,
-          medianIncomePct: eligibility.federal?.median_income_pct?.toFixed(0) || null,
-          stateName: eligibility.location?.state || null,
-          countyName: eligibility.location?.county || null,
-          severelyDistressed: eligibility.federal?.severely_distressed || false,
-        },
-        geometry: geometry as GeoJSON.Geometry,
-      };
-      
-      // Store the searched tract geoid so we can preserve it during viewport loads
-      (window as unknown as { __searchedTractGeoid?: string }).__searchedTractGeoid = geoid;
-      (window as unknown as { __searchedTractFeature?: GeoJSON.Feature }).__searchedTractFeature = tractFeature;
-
-      // Update the tracts source - wrap in try-catch to prevent Mapbox errors from bubbling
-      try {
-        const source = map.current.getSource('tracts') as mapboxgl.GeoJSONSource;
-        if (source) {
-          source.setData({
-            type: 'FeatureCollection',
-            features: [tractFeature]
-          });
-        }
-      } catch (mapError) {
-        console.warn('[Map] Error updating tract source:', mapError);
-      }
-
-      // Fit map to tract bounds if we have real geometry
-      if (geometry && geometry.type === 'Polygon' && map.current) {
-        try {
-          const coords = (geometry as GeoJSON.Polygon).coordinates[0];
-          if (coords && coords.length > 0) {
-            const bounds = coords.reduce(
-              (b, coord) => b.extend(coord as [number, number]),
-              new mapboxgl.LngLatBounds(coords[0] as [number, number], coords[0] as [number, number])
-            );
-            map.current.fitBounds(bounds, { padding: 80, duration: 1000 });
-          }
-        } catch (boundsError) {
-          console.warn('[Map] Error fitting bounds:', boundsError);
-        }
-      }
+      // Fly to the searched location
+      map.current.flyTo({
+        center: center,
+        zoom: 13,
+        duration: 1500,
+      });
 
     } catch (error) {
       console.error('Error fetching tract data:', error);
@@ -779,40 +625,25 @@ export default function HomeMapWithTracts({
         </div>
       )}
       
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-900/95 rounded-lg p-3 border border-gray-700 z-10">
-        <p className="text-xs font-semibold text-gray-300 mb-2">NMTC Eligibility</p>
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(124, 58, 237, 0.6)', border: '1px solid #7c3aed' }} />
-            <span className="text-xs text-gray-400">Eligible (Distressed)</span>
+      {/* Legend - Simple */}
+      <div className="absolute bottom-4 left-4 bg-gray-900/95 rounded-lg px-3 py-2 border border-gray-700 z-10">
+        <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ background: '#7C3AED' }} />
+            <span className="text-gray-300">Eligible</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(220, 38, 38, 0.6)', border: '1px solid #dc2626' }} />
-            <span className="text-xs text-gray-400">Eligible (Severe Distress)</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ background: '#6B7280' }} />
+            <span className="text-gray-300">Not Eligible</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-3 rounded-sm" style={{ background: 'rgba(229, 231, 235, 0.2)', border: '1px solid #d1d5db' }} />
-            <span className="text-xs text-gray-400">Not Eligible</span>
+          <div className="w-px h-4 bg-gray-600" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ background: '#22c55e' }} />
+            <span className="text-gray-300">Your Search ✓</span>
           </div>
-          <div className="w-full h-px bg-gray-700 my-1.5" />
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ background: PIN_COLORS.nmtc, border: '2px solid white' }} />
-            <span className="text-xs text-gray-400">NMTC Deal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ background: PIN_COLORS.htc, border: '2px solid white' }} />
-            <span className="text-xs text-gray-400">HTC Deal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ background: PIN_COLORS.oz, border: '2px solid white' }} />
-            <span className="text-xs text-gray-400">OZ Deal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ background: searchEligible === true ? PIN_COLORS.searchEligible : searchEligible === false ? PIN_COLORS.searchNotEligible : PIN_COLORS.search, border: '2px solid white' }} />
-            <span className="text-xs text-gray-400">
-              Your Search {searchEligible === true ? '(Eligible)' : searchEligible === false ? '(Not Eligible)' : ''}
-            </span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ background: '#ef4444' }} />
+            <span className="text-gray-300">Your Search ✗</span>
           </div>
         </div>
       </div>

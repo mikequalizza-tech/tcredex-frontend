@@ -14,8 +14,8 @@ export default function HomePage() {
       <NoRiskSection />
       <FeaturedDeals />
       <MapSection 
-        title="Free Census Tract Check" 
-        description="Search any U.S. address to determine NMTC, LIHTC, and HTC eligibility instantly. No login required." 
+        title="Tax Credit Eligibility Lookup" 
+        description="Search any U.S. address for all 5 federal credits (NMTC, LIHTC QCT, DDA, HTC, OZ) plus state programs. No login required." 
         showLegend 
         showSearch 
       />

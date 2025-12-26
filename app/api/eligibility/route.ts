@@ -170,6 +170,7 @@ export async function GET(request: NextRequest) {
     const unemploymentQualifies = isYes(tractData.unemployment_ratio_qualifies);
     const isSeverelyDistressed = povertyQualifies || incomeQualifies || unemploymentQualifies;
     const isOzDesignated = isYes(tractData.oz_designated);
+    const isLihtcQct = isYes(tractData.lihtc_qct) || isYes(tractData.is_lihtc_qct);
 
     // Build programs list
     const programs: string[] = [];
@@ -180,6 +181,8 @@ export async function GET(request: NextRequest) {
         programs.push('Severely Distressed');
       }
     }
+    
+    if (isLihtcQct) programs.push('LIHTC QCT');
 
     if (stateData?.is_state_nmtc) programs.push('State NMTC');
     if (stateData?.is_state_htc) programs.push('State HTC');
@@ -192,6 +195,7 @@ export async function GET(request: NextRequest) {
       programs,
       federal: {
         nmtc_eligible: isNmtcEligible,
+        lihtc_qct: isLihtcQct,
         poverty_rate: povertyRate,
         poverty_qualifies: povertyQualifies,
         median_income_pct: medianIncomePct,

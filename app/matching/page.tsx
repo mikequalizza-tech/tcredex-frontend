@@ -1,39 +1,74 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DealCard from '@/components/DealCard';
-import { DEMO_DEALS } from '@/lib/data/deals';
+import { getMarketplaceDeals, Deal } from '@/lib/data/deals';
 
-// Convert DEMO_DEALS to DealCard format
-const allDeals = DEMO_DEALS.slice(0, 10).map(deal => ({
-  id: deal.id,
-  projectName: deal.projectName,
-  location: `${deal.city}, ${deal.state}`,
-  parent: deal.sponsorName,
-  address: '',
-  censusTract: '',
-  povertyRate: deal.povertyRate || 0,
-  medianIncome: deal.medianIncome || 0,
-  unemployment: 0,
-  projectCost: deal.allocation * 5,  // Estimate: allocation is ~20% of project cost
-  fedNmtcReq: deal.programType === 'NMTC' && deal.programLevel === 'federal' ? deal.allocation : undefined,
-  stateNmtcReq: deal.programType === 'NMTC' && deal.programLevel === 'state' ? deal.allocation : undefined,
-  htc: deal.programType === 'HTC' ? deal.allocation : undefined,
-  lihtc: deal.programType === 'LIHTC' ? deal.allocation : undefined,
-  shovelReady: deal.status === 'available',
-  completionDate: deal.submittedDate,
-  financingGap: deal.allocation,
-}));
+interface DealCardFormat {
+  id: string;
+  projectName: string;
+  location: string;
+  parent: string | undefined;
+  address: string;
+  censusTract: string;
+  povertyRate: number;
+  medianIncome: number;
+  unemployment: number;
+  projectCost: number;
+  fedNmtcReq: number | undefined;
+  stateNmtcReq: number | undefined;
+  htc: number | undefined;
+  lihtc: number | undefined;
+  shovelReady: boolean;
+  completionDate: string;
+  financingGap: number;
+}
 
 type CreditType = 'all' | 'nmtc' | 'htc' | 'lihtc';
 
 export default function MatchingPage() {
   const router = useRouter();
+  const [allDeals, setAllDeals] = useState<DealCardFormat[]>([]);
+  const [loading, setLoading] = useState(true);
   const [creditFilter, setCreditFilter] = useState<CreditType>('all');
   const [shovelReadyOnly, setShovelReadyOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [memoRequested, setMemoRequested] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    async function loadDeals() {
+      setLoading(true);
+      try {
+        const deals = await getMarketplaceDeals();
+        const formattedDeals = deals.slice(0, 10).map(deal => ({
+          id: deal.id,
+          projectName: deal.projectName,
+          location: `${deal.city}, ${deal.state}`,
+          parent: deal.sponsorName,
+          address: '',
+          censusTract: '',
+          povertyRate: deal.povertyRate || 0,
+          medianIncome: deal.medianIncome || 0,
+          unemployment: 0,
+          projectCost: deal.allocation * 5,  // Estimate: allocation is ~20% of project cost
+          fedNmtcReq: deal.programType === 'NMTC' && deal.programLevel === 'federal' ? deal.allocation : undefined,
+          stateNmtcReq: deal.programType === 'NMTC' && deal.programLevel === 'state' ? deal.allocation : undefined,
+          htc: deal.programType === 'HTC' ? deal.allocation : undefined,
+          lihtc: deal.programType === 'LIHTC' ? deal.allocation : undefined,
+          shovelReady: deal.status === 'available',
+          completionDate: deal.submittedDate,
+          financingGap: deal.allocation,
+        }));
+        setAllDeals(formattedDeals);
+      } catch (error) {
+        console.error('Failed to load deals:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDeals();
+  }, []);
 
   const filteredDeals = allDeals.filter((deal) => {
     if (creditFilter === 'nmtc' && !deal.fedNmtcReq && !deal.stateNmtcReq) return false;
@@ -107,25 +142,33 @@ export default function MatchingPage() {
           </label>
         </div>
 
-        <p className="mb-4 text-sm text-gray-400">
-          Showing {filteredDeals.length} of {allDeals.length} deals
-        </p>
-
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredDeals.map((deal) => (
-            <DealCard
-              key={deal.id}
-              deal={deal}
-              onRequestMemo={handleRequestMemo}
-              memoRequested={memoRequested.has(deal.id)}
-            />
-          ))}
-        </div>
-
-        {filteredDeals.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400">No deals match your filters.</p>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : (
+          <>
+            <p className="mb-4 text-sm text-gray-400">
+              Showing {filteredDeals.length} of {allDeals.length} deals
+            </p>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredDeals.map((deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  onRequestMemo={handleRequestMemo}
+                  memoRequested={memoRequested.has(deal.id)}
+                />
+              ))}
+            </div>
+
+            {filteredDeals.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-400">No deals match your filters.</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

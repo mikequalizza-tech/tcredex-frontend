@@ -1,21 +1,18 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getDealById, TRACT_LABELS } from '@/lib/data/deals';
+import { getDealById, TRACT_LABELS, Deal } from '@/lib/data/deals';
 
 // Extended profile data generator
-function generateProfileData(dealId: string) {
-  const deal = getDealById(dealId);
-  if (!deal) return null;
-  
+function generateProfileData(deal: Deal) {
   const totalProjectCost = deal.allocation * 2.5;
   const financingGap = deal.allocation * 0.2;
   
   // Generate mock census tract from state and deal ID
   const stateCode = deal.state === 'IL' ? '17' : deal.state === 'WI' ? '55' : deal.state === 'MI' ? '26' : deal.state === 'MO' ? '29' : deal.state === 'IN' ? '18' : deal.state === 'AL' ? '01' : '99';
-  const censusTract = `${stateCode}031${dealId.replace(/\D/g, '').padStart(6, '0').slice(0, 6)}`;
+  const censusTract = `${stateCode}031${deal.id.replace(/\D/g, '').padStart(6, '0').slice(0, 6)}`;
   
   return {
     // Header
@@ -38,7 +35,7 @@ function generateProfileData(dealId: string) {
     lihtcAvail: 'N/A',
     shovelReady: 'Yes',
     completion: 'Q2 2026',
-    dealId: `TC-${dealId.toUpperCase()}`,
+    dealId: `TC-${deal.id.toUpperCase()}`,
     
     // Contact
     contactName: 'Michael Qualizza',
@@ -67,9 +64,35 @@ function generateProfileData(dealId: string) {
 export default function ProjectProfilePage() {
   const params = useParams();
   const dealId = params.id as string;
-  const profile = generateProfileData(dealId);
+  const [deal, setDeal] = useState<Deal | null>(null);
+  const [loading, setLoading] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadDeal() {
+      setLoading(true);
+      try {
+        const fetchedDeal = await getDealById(dealId);
+        setDeal(fetchedDeal || null);
+      } catch (error) {
+        console.error('Failed to load deal:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDeal();
+  }, [dealId]);
+
+  const profile = deal ? generateProfileData(deal) : null;
   
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (!profile) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">

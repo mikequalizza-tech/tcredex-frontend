@@ -1,15 +1,39 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getDealById, PROGRAM_COLORS, TRACT_LABELS } from '@/lib/data/deals';
+import { getDealById, PROGRAM_COLORS, TRACT_LABELS, Deal } from '@/lib/data/deals';
 
 export default function DealCardPage() {
   const params = useParams();
   const dealId = params.id as string;
-  const deal = getDealById(dealId);
+  const [deal, setDeal] = useState<Deal | null>(null);
+  const [loading, setLoading] = useState(true);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadDeal() {
+      setLoading(true);
+      try {
+        const fetchedDeal = await getDealById(dealId);
+        setDeal(fetchedDeal || null);
+      } catch (error) {
+        console.error('Failed to load deal:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDeal();
+  }, [dealId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!deal) {
     return (

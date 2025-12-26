@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getDealById, PROGRAM_COLORS, STATUS_CONFIG } from '@/lib/data/deals';
+import { getDealById, PROGRAM_COLORS, STATUS_CONFIG, Deal } from '@/lib/data/deals';
 import { useCurrentUser } from '@/lib/auth';
 
 interface DealPageProps {
@@ -13,8 +13,24 @@ interface DealPageProps {
 export default function DealDetailPage({ params }: DealPageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const deal = getDealById(id);
+  const [deal, setDeal] = useState<Deal | undefined>(undefined);
+  const [dealLoading, setDealLoading] = useState(true);
   const { isAuthenticated, isLoading, orgType, userName, orgName } = useCurrentUser();
+
+  useEffect(() => {
+    async function loadDeal() {
+      setDealLoading(true);
+      try {
+        const fetchedDeal = await getDealById(id);
+        setDeal(fetchedDeal);
+      } catch (error) {
+        console.error('Failed to load deal:', error);
+      } finally {
+        setDealLoading(false);
+      }
+    }
+    loadDeal();
+  }, [id]);
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [interestMessage, setInterestMessage] = useState('');
   const [interestSubmitting, setInterestSubmitting] = useState(false);
@@ -38,7 +54,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
   }, [isLoading, isAuthenticated, router, id]);
 
   // Show loading state
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || dealLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">

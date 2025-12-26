@@ -1,3 +1,5 @@
+import { fetchDeals, fetchDealById as fetchSupabaseDealById } from '../supabase/queries';
+
 /**
  * tCredex Demo Data — Single Source of Truth
  * 
@@ -646,50 +648,54 @@ The project addresses critical gaps in healthcare access, job training, and chil
 // ============================================================
 
 /**
- * Get a deal by ID
+ * Get a deal by ID (Async version)
  */
-export function getDealById(id: string): Deal | undefined {
-  return DEMO_DEALS.find(d => d.id === id);
+export async function getDealById(id: string): Promise<Deal | undefined> {
+  const deal = await fetchSupabaseDealById(id);
+  return deal || undefined;
 }
 
 /**
  * Get featured deals for homepage (first 4 with full details)
  */
-export function getFeaturedDeals(): Deal[] {
-  return DEMO_DEALS.filter(d => 
+export async function getFeaturedDeals(): Promise<Deal[]> {
+  const deals = await fetchDeals();
+  return deals.filter(d => 
     d.visible && 
-    d.description && 
-    d.projectHighlights && 
-    d.useOfFunds
+    d.description
   ).slice(0, 4);
 }
 
 /**
  * Get deals for marketplace (all visible)
  */
-export function getMarketplaceDeals(): Deal[] {
-  return DEMO_DEALS.filter(d => d.visible);
+export async function getMarketplaceDeals(): Promise<Deal[]> {
+  const deals = await fetchDeals();
+  return deals.filter(d => d.visible);
 }
 
 /**
  * Get deals by program type
  */
-export function getDealsByProgram(program: ProgramType): Deal[] {
-  return DEMO_DEALS.filter(d => d.visible && d.programType === program);
+export async function getDealsByProgram(program: ProgramType): Promise<Deal[]> {
+  const deals = await fetchDeals();
+  return deals.filter(d => d.visible && d.programType === program);
 }
 
 /**
  * Get deals by status
  */
-export function getDealsByStatus(status: DealStatus): Deal[] {
-  return DEMO_DEALS.filter(d => d.visible && d.status === status);
+export async function getDealsByStatus(status: DealStatus): Promise<Deal[]> {
+  const deals = await fetchDeals();
+  return deals.filter(d => d.visible && d.status === status);
 }
 
 /**
  * Get program statistics
  */
-export function getProgramStats() {
-  const visible = DEMO_DEALS.filter(d => d.visible);
+export async function getProgramStats() {
+  const deals = await fetchDeals();
+  const visible = deals.filter(d => d.visible);
   return {
     nmtc: visible.filter(d => d.programType === 'NMTC').length,
     htc: visible.filter(d => d.programType === 'HTC').length,

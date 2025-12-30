@@ -101,7 +101,7 @@ export async function middleware(request: NextRequest) {
   // Enforce HTTPS in production
   const proto = request.headers.get('x-forwarded-proto');
   const isHttps = proto === 'https' || request.nextUrl.protocol === 'https:';
-  if (process.env.NODE_ENV === 'production' && !isHttps && proto) {
+  if (process.env.NODE_ENV === 'production' && !isHttps) {
     const httpsUrl = request.nextUrl.clone();
     httpsUrl.protocol = 'https:';
     return NextResponse.redirect(httpsUrl);

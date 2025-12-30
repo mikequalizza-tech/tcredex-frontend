@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { recordAuditEvent } from '@/lib/utils/audit';
 
+const SESSION_TTL_SECONDS = 60 * 60 * 24;
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24, // 1 day
+        maxAge: SESSION_TTL_SECONDS,
         path: '/',
       });
     }
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24,
+      maxAge: SESSION_TTL_SECONDS,
       path: '/',
     });
 

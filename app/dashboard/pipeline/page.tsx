@@ -102,6 +102,10 @@ function PipelineContent() {
   const MATCH_BASELINE_SCORE = 70;
   const MATCH_POVERTY_FLOOR = 20;
   const MATCH_ALLOCATION_DIVISOR = 1_000_000;
+  const MATCH_POVERTY_WEIGHT = 0.3;
+  const MATCH_POVERTY_CAP = 15;
+  const MATCH_ALLOCATION_WEIGHT = 1;
+  const MATCH_ALLOCATION_CAP = 20;
 
   // Get role-specific configuration
   const effectiveRole = currentDemoRole === 'admin' ? 'cde' : orgType;
@@ -142,13 +146,18 @@ function PipelineContent() {
           programType: d.programType as any,
           allocationRequest: d.allocation,
           stage: mapStatusToStage(d.status as DealStatus, effectiveRole),
-          matchScore: Math.min(
-            MATCH_MAX_SCORE,
-            Math.max(
-              MATCH_BASELINE_SCORE,
-              Math.round((d.povertyRate || MATCH_POVERTY_FLOOR) + (d.allocation || 0) / MATCH_ALLOCATION_DIVISOR),
-            ),
-          ),
+          matchScore: (() => {
+            const povertyComponent = Math.min(
+              MATCH_POVERTY_CAP,
+              Math.round((d.povertyRate || MATCH_POVERTY_FLOOR) * MATCH_POVERTY_WEIGHT),
+            );
+            const allocationComponent = Math.min(
+              MATCH_ALLOCATION_CAP,
+              Math.floor(((d.allocation || 0) / MATCH_ALLOCATION_DIVISOR) * MATCH_ALLOCATION_WEIGHT),
+            );
+            const base = MATCH_BASELINE_SCORE + povertyComponent + allocationComponent;
+            return Math.min(MATCH_MAX_SCORE, base);
+          })(),
           tractType: d.tractType,
           daysInStage: Math.max(1, Math.floor((Date.now() - new Date(d.submittedDate).getTime()) / (1000 * 60 * 60 * 24))),
           submittedDate: d.submittedDate,

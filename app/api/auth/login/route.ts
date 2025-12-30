@@ -55,18 +55,25 @@ export async function POST(request: NextRequest) {
     });
 
     // Set secure session cookie for middleware-based auth
+    const sessionToken = data.session?.access_token;
+    if (sessionToken) {
+      response.cookies.set({
+        name: 'tcredex_session',
+        value: sessionToken,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24, // 1 day
+        path: '/',
+      });
+    }
     response.cookies.set({
-      name: 'tcredex_session',
-      value: JSON.stringify({
-        userId: data.user.id,
-        email: data.user.email,
-        role: profile?.role || 'sponsor',
-        orgId: profile?.organizations?.id || null,
-      }),
+      name: 'tcredex_role',
+      value: profile?.role || 'sponsor',
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24, // 1 day
+      maxAge: 60 * 60 * 24,
       path: '/',
     });
 

@@ -98,6 +98,15 @@ const PROTECTED_PREFIXES = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Enforce HTTPS in production
+  const proto = request.headers.get('x-forwarded-proto');
+  const isHttps = proto === 'https' || request.nextUrl.protocol === 'https:';
+  if (process.env.NODE_ENV === 'production' && !isHttps) {
+    const httpsUrl = request.nextUrl.clone();
+    httpsUrl.protocol = 'https:';
+    return NextResponse.redirect(httpsUrl);
+  }
+
   // -------------------------------------------------------------------------
   // QR Code / Referral Link Handler
   // Intercepts /r/[code] paths and redirects with tracking
@@ -166,10 +175,11 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute = PROTECTED_PREFIXES.some(prefix => pathname.startsWith(prefix));
   
   // Get session
-  const session = request.cookies.get('tcredex_session')?.value;
+  const sessionToken = request.cookies.get('tcredex_session')?.value;
+  const sessionRole = request.cookies.get('tcredex_role')?.value;
   const authHeader = request.headers.get('x-tcredex-auth');
 
-  if (!session && !authHeader) {
+  if (!sessionToken && !authHeader) {
     // No session - redirect to signin for protected routes
     if (isProtectedRoute) {
       const signinUrl = new URL('/signin', request.url);
@@ -185,15 +195,7 @@ export async function middleware(request: NextRequest) {
 
   // Validate session for admin routes
   if (pathname.startsWith('/admin')) {
-    try {
-      const sessionData = JSON.parse(session || '{}');
-      // Only admin role can access admin routes
-      if (sessionData.role !== 'admin') {
-        const dashboardUrl = new URL('/dashboard', request.url);
-        return NextResponse.redirect(dashboardUrl);
-      }
-    } catch {
-      // Invalid session - redirect to signin
+    if (sessionRole !== 'admin') {
       const signinUrl = new URL('/signin', request.url);
       signinUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(signinUrl);

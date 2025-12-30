@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import DealMap from '@/components/maps/DealMap';
-import DealCard from '@/components/DealCard';
-import { mockDeals } from '@/lib/mockData';
+import DealCard, { Deal as DealCardDeal } from '@/components/DealCard';
+import { fetchDeals } from '@/lib/supabase/queries';
+import { mapDealToCard } from '@/lib/utils/dealCardMapper';
 
 type FilterView = 'sponsor' | 'cde' | 'investor';
 
@@ -16,21 +17,44 @@ export default function DealMapView() {
     minProjectCost: 0,
     maxProjectCost: 100000000,
   });
+  const [deals, setDeals] = useState<DealCardDeal[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Filter deals based on current filters
-  const filteredDeals = mockDeals.filter((deal) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      if (!deal.projectName.toLowerCase().includes(query) &&
-          !deal.location.toLowerCase().includes(query)) {
-        return false;
+  useEffect(() => {
+    async function loadDeals() {
+      setLoading(true);
+      try {
+        const fetched = await fetchDeals();
+        const mapped = fetched.map(mapDealToCard);
+        setDeals(mapped);
+      } catch (error) {
+        console.error('[DealMapView] Failed to load deals from Supabase:', error);
+      } finally {
+        setLoading(false);
       }
     }
-    if (filters.shovelReady && !deal.shovelReady) return false;
-    if (deal.projectCost < filters.minProjectCost) return false;
-    if (deal.projectCost > filters.maxProjectCost) return false;
-    return true;
-  });
+    loadDeals();
+  }, []);
+
+  const filteredDeals = useMemo(() => {
+    return deals.filter((deal) => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        if (!deal.projectName.toLowerCase().includes(query) &&
+            !deal.location.toLowerCase().includes(query)) {
+          return false;
+        }
+      }
+      if (filters.shovelReady && !deal.shovelReady) return false;
+      if (deal.projectCost < filters.minProjectCost) return false;
+      if (deal.projectCost > filters.maxProjectCost) return false;
+      if (filters.creditType !== 'all') {
+        if (filters.creditType === 'nmtc' && deal.fedNmtcReq === undefined) return false;
+        if (filters.creditType === 'htc' && deal.htc === undefined) return false;
+      }
+      return true;
+    });
+  }, [deals, filters, searchQuery]);
 
   // Stats
   const totalDeals = filteredDeals.length;
@@ -174,14 +198,17 @@ export default function DealMapView() {
             <span className="ml-2 text-sm font-normal text-gray-400">({filteredDeals.length})</span>
           </h2>
           <div className="space-y-4">
-            {filteredDeals.map((deal) => (
+            {loading && (
+              <div className="text-center text-gray-500 py-8">Loading deals...</div>
+            )}
+            {!loading && filteredDeals.map((deal) => (
               <DealCard
                 key={deal.id}
                 deal={deal}
                 onRequestMemo={handleRequestMemo}
               />
             ))}
-            {filteredDeals.length === 0 && (
+            {!loading && filteredDeals.length === 0 && (
               <p className="text-center text-gray-500 py-8">No deals match your filters.</p>
             )}
           </div>

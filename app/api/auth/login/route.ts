@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { recordAuditEvent } from '@/lib/utils/audit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
       .eq('id', data.user.id)
       .single();
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       token: data.session?.access_token,
       user: {
         id: data.user.id,
@@ -52,6 +53,32 @@ export async function POST(request: NextRequest) {
         } : null,
       },
     });
+
+    // Set secure session cookie for middleware-based auth
+    response.cookies.set({
+      name: 'tcredex_session',
+      value: JSON.stringify({
+        userId: data.user.id,
+        email: data.user.email,
+        role: profile?.role || 'sponsor',
+        orgId: profile?.organizations?.id || null,
+      }),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24, // 1 day
+      path: '/',
+    });
+
+    // Audit login activity (best-effort)
+    await recordAuditEvent({
+      action: 'login',
+      userId: data.user.id,
+      orgId: profile?.organizations?.id || null,
+      role: profile?.role || 'sponsor',
+    });
+
+    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(

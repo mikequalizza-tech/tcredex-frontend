@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useCurrentUser } from '@/lib/auth';
 import { fetchDeals } from '@/lib/supabase/queries';
+import { DealStatus } from '@/lib/data/deals';
 
 // ============================================
 // ROLE-SPECIFIC STAGE CONFIGURATIONS
@@ -75,223 +76,6 @@ interface PipelineDeal {
 }
 
 // ============================================
-// DEMO DATA BY ROLE
-// ============================================
-
-// Sponsor sees THEIR deals
-const SPONSOR_DEMO_DEALS: PipelineDeal[] = [
-  {
-    id: 'sp-1',
-    projectName: 'XS Tennis Village Phase 1',
-    sponsorName: 'XS Tennis Foundation',
-    cdeName: 'Midwest Community CDE',
-    city: 'Chicago',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 8500000,
-    stage: 'closing',
-    matchScore: 94,
-    tractType: ['SD', 'QCT'],
-    daysInStage: 15,
-    submittedDate: '2024-10-01',
-    nextAction: 'Final closing documents review',
-    nextActionDate: '2024-12-22',
-  },
-  {
-    id: 'sp-2',
-    projectName: 'XS Tennis Academy Expansion',
-    sponsorName: 'XS Tennis Foundation',
-    cdeName: 'Enterprise Community CDE',
-    city: 'Chicago',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 12000000,
-    stage: 'loi_received',
-    matchScore: 91,
-    tractType: ['SD'],
-    daysInStage: 8,
-    submittedDate: '2024-11-15',
-    nextAction: 'Review LOI terms with counsel',
-    nextActionDate: '2024-12-20',
-  },
-  {
-    id: 'sp-3',
-    projectName: 'XS Community Center',
-    sponsorName: 'XS Tennis Foundation',
-    city: 'Chicago',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 6000000,
-    stage: 'submitted',
-    matchScore: 88,
-    tractType: ['QCT'],
-    daysInStage: 3,
-    submittedDate: '2024-12-18',
-    nextAction: 'Awaiting CDE response',
-  },
-];
-
-// CDE sees deals submitted TO them
-const CDE_DEMO_DEALS: PipelineDeal[] = [
-  {
-    id: 'cde-1',
-    projectName: 'Chicago South Side Community Center',
-    sponsorName: 'Metro Development Corp',
-    city: 'Chicago',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 15000000,
-    stage: 'new',
-    matchScore: 94,
-    tractType: ['SD', 'QCT'],
-    daysInStage: 1,
-    submittedDate: '2024-12-20',
-    holdExpires: '2024-12-23',
-    nextAction: 'Initial review - 3 day hold',
-  },
-  {
-    id: 'cde-2',
-    projectName: 'Milwaukee Workforce Training Hub',
-    sponsorName: 'Badger Community Partners',
-    city: 'Milwaukee',
-    state: 'WI',
-    programType: 'NMTC',
-    allocationRequest: 8000000,
-    stage: 'reviewing',
-    matchScore: 87,
-    tractType: ['QCT'],
-    daysInStage: 5,
-    submittedDate: '2024-12-10',
-    assignedTo: 'Sarah Johnson',
-    nextAction: 'Site visit scheduled',
-    nextActionDate: '2024-12-22',
-  },
-  {
-    id: 'cde-3',
-    projectName: 'Springfield Healthcare Clinic',
-    sponsorName: 'Central IL Health Corp',
-    city: 'Springfield',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 4000000,
-    stage: 'loi_issued',
-    matchScore: 82,
-    tractType: ['LIC'],
-    daysInStage: 3,
-    submittedDate: '2024-12-01',
-    assignedTo: 'Mike Thompson',
-    nextAction: 'Awaiting sponsor acceptance',
-    nextActionDate: '2024-12-25',
-  },
-  {
-    id: 'cde-4',
-    projectName: 'St. Louis Manufacturing Expansion',
-    sponsorName: 'Gateway Industrial LLC',
-    city: 'St. Louis',
-    state: 'MO',
-    programType: 'NMTC',
-    allocationRequest: 12000000,
-    stage: 'committed',
-    matchScore: 79,
-    tractType: ['SD'],
-    daysInStage: 5,
-    submittedDate: '2024-11-15',
-    assignedTo: 'Sarah Johnson',
-    nextAction: 'Schedule closing call',
-    nextActionDate: '2024-12-23',
-  },
-  {
-    id: 'cde-5',
-    projectName: 'Indianapolis Charter School',
-    sponsorName: 'Crossroads Education Foundation',
-    city: 'Indianapolis',
-    state: 'IN',
-    programType: 'NMTC',
-    allocationRequest: 6000000,
-    stage: 'closing',
-    matchScore: 91,
-    tractType: ['SD', 'QCT'],
-    daysInStage: 8,
-    submittedDate: '2024-10-28',
-    assignedTo: 'Mike Thompson',
-    nextAction: 'Final document review',
-    nextActionDate: '2024-12-21',
-  },
-];
-
-// Investor sees deals they're considering/committed to
-const INVESTOR_DEMO_DEALS: PipelineDeal[] = [
-  {
-    id: 'inv-1',
-    projectName: 'Downtown Community Center',
-    sponsorName: 'Metro Development Corp',
-    cdeName: 'Enterprise Community CDE',
-    city: 'Chicago',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 15000000,
-    stage: 'reviewing',
-    matchScore: 94,
-    tractType: ['SD', 'QCT'],
-    daysInStage: 4,
-    submittedDate: '2024-12-15',
-    nextAction: 'Review CRA eligibility',
-    nextActionDate: '2024-12-22',
-  },
-  {
-    id: 'inv-2',
-    projectName: 'Heritage Theater Restoration',
-    sponsorName: 'Arts District Foundation',
-    cdeName: 'US Bancorp CDE',
-    city: 'Pittsburgh',
-    state: 'PA',
-    programType: 'HTC',
-    allocationRequest: 8500000,
-    stage: 'loi_issued',
-    matchScore: 89,
-    tractType: ['QCT'],
-    daysInStage: 6,
-    submittedDate: '2024-12-08',
-    nextAction: 'Finalize investment terms',
-    nextActionDate: '2024-12-23',
-  },
-  {
-    id: 'inv-3',
-    projectName: 'Rural Health Network',
-    sponsorName: 'HealthFirst Foundation',
-    cdeName: 'Capital One CDE',
-    city: 'Des Moines',
-    state: 'IA',
-    programType: 'NMTC',
-    allocationRequest: 12000000,
-    stage: 'committed',
-    matchScore: 92,
-    tractType: ['SD'],
-    daysInStage: 10,
-    submittedDate: '2024-11-20',
-    nextAction: 'Wire transfer scheduled',
-    nextActionDate: '2024-12-24',
-  },
-  {
-    id: 'inv-4',
-    projectName: 'Workforce Training Center',
-    sponsorName: 'Skills Development Corp',
-    cdeName: 'JPMorgan Chase CDE',
-    city: 'Detroit',
-    state: 'MI',
-    programType: 'NMTC',
-    allocationRequest: 9000000,
-    stage: 'closing',
-    matchScore: 87,
-    tractType: ['SD', 'QCT'],
-    daysInStage: 5,
-    submittedDate: '2024-11-01',
-    nextAction: 'Final closing call',
-    nextActionDate: '2024-12-21',
-  },
-];
-
-// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -316,6 +100,28 @@ function PipelineContent() {
   // Get role-specific configuration
   const effectiveRole = currentDemoRole === 'admin' ? 'cde' : orgType;
 
+  const mapStatusToStage = (status: DealStatus | undefined, role: typeof effectiveRole): PipelineStage => {
+    const normalized = status || 'under_review';
+    switch (role) {
+      case 'sponsor':
+        if (normalized === 'matched') return 'loi_received';
+        if (normalized === 'closing' || normalized === 'closed') return 'closing';
+        if (normalized === 'available' || normalized === 'under_review') return 'submitted';
+        return 'draft';
+      case 'cde':
+        if (normalized === 'matched') return 'loi_issued';
+        if (normalized === 'closing' || normalized === 'closed') return 'closing';
+        if (normalized === 'available') return 'new';
+        return 'reviewing';
+      case 'investor':
+        if (normalized === 'matched') return 'loi_issued';
+        if (normalized === 'closing' || normalized === 'closed') return 'closing';
+        return 'reviewing';
+      default:
+        return 'reviewing';
+    }
+  };
+
   useEffect(() => {
     async function loadSupabaseDeals() {
       setIsLoadingSupabase(true);
@@ -329,11 +135,12 @@ function PipelineContent() {
           state: d.state,
           programType: d.programType as any,
           allocationRequest: d.allocation,
-          stage: d.status as any, // Map status to stage
-          matchScore: 85, // Placeholder
+          stage: mapStatusToStage(d.status as DealStatus, effectiveRole),
+          matchScore: Math.min(99, Math.max(70, Math.round((d.povertyRate || 20) + (d.allocation || 0) / 1_000_000))),
           tractType: d.tractType,
-          daysInStage: 5, // Placeholder
+          daysInStage: Math.max(1, Math.floor((Date.now() - new Date(d.submittedDate).getTime()) / (1000 * 60 * 60 * 24))),
           submittedDate: d.submittedDate,
+          nextAction: d.status === 'matched' ? 'Finalize LOI terms' : 'Review submission',
         }));
         setSupabaseDeals(mapped);
       } catch (error) {
@@ -343,7 +150,7 @@ function PipelineContent() {
       }
     }
     loadSupabaseDeals();
-  }, []);
+  }, [effectiveRole]);
   
   const getStageConfig = (): Record<string, StageConfig> => {
     switch (effectiveRole) {
@@ -360,23 +167,6 @@ function PipelineContent() {
       case 'cde': return ['new', 'reviewing', 'loi_issued', 'committed', 'closing'];
       case 'investor': return ['reviewing', 'loi_issued', 'committed', 'closing'];
       default: return ['draft', 'submitted', 'loi_received', 'committed', 'closing'];
-    }
-  };
-
-  const getPipelineDeals = (): PipelineDeal[] => {
-    // Combine drafts and supabase deals
-    const allDeals = [...drafts, ...supabaseDeals];
-    
-    // If we have real deals, use them. Otherwise fallback to demo deals for visual completeness
-    if (supabaseDeals.length > 0) {
-      return allDeals;
-    }
-
-    switch (effectiveRole) {
-      case 'sponsor': return SPONSOR_DEMO_DEALS;
-      case 'cde': return CDE_DEMO_DEALS;
-      case 'investor': return INVESTOR_DEMO_DEALS;
-      default: return SPONSOR_DEMO_DEALS;
     }
   };
 
@@ -398,9 +188,14 @@ function PipelineContent() {
     }
   };
 
-  const stageConfig = getStageConfig();
-  const stages = getStages();
-  const pipeline = getPipelineDeals();
+  const stageConfig = useMemo(() => getStageConfig(), [effectiveRole]);
+  const stages = useMemo(() => getStages(), [effectiveRole]);
+  const pipeline = useMemo(() => {
+    if (effectiveRole === 'sponsor') {
+      return [...drafts, ...supabaseDeals];
+    }
+    return supabaseDeals;
+  }, [drafts, supabaseDeals, effectiveRole]);
 
   // Load drafts for sponsors only
   useEffect(() => {
@@ -745,7 +540,7 @@ function PipelineContent() {
             );
           })}
         </div>
-      )}
+      ) : null}
 
       {/* List View */}
       {viewMode === 'list' && !isLoadingSupabase && !isLoadingDrafts && (

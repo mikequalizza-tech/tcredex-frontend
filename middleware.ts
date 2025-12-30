@@ -98,6 +98,16 @@ const PROTECTED_PREFIXES = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Enforce HTTPS in production
+  if (process.env.NODE_ENV === 'production') {
+    const proto = request.headers.get('x-forwarded-proto');
+    if (proto && proto !== 'https') {
+      const httpsUrl = new URL(request.url);
+      httpsUrl.protocol = 'https:';
+      return NextResponse.redirect(httpsUrl.toString());
+    }
+  }
+
   // -------------------------------------------------------------------------
   // QR Code / Referral Link Handler
   // Intercepts /r/[code] paths and redirects with tracking

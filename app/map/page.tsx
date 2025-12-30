@@ -10,6 +10,7 @@ import { fetchDeals, fetchCDEs } from '@/lib/supabase/queries';
 import { calculateCDEMatchScore } from '@/lib/mockCDEData';
 import { CDEDealCard } from '@/lib/types/cde';
 import { useCurrentUser } from '@/lib/auth';
+import { mapDealToCard } from '@/lib/utils/dealCardMapper';
 
 const HomeMapWithTracts = dynamic(
   () => import('@/components/maps/HomeMapWithTracts'),
@@ -86,7 +87,7 @@ function MapContent() {
           fetchDeals(),
           fetchCDEs()
         ]);
-        setDeals(fetchedDeals);
+        setDeals(fetchedDeals.map(mapDealToCard));
         setCDEs(fetchedCDEs);
       } catch (error) {
         console.error('Failed to load data from Supabase:', error);

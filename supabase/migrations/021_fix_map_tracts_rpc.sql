@@ -5,7 +5,19 @@
 -- This version uses the tract_map_layer view (tract_geometries + master_tax_credit_sot)
 -- =============================================================================
 
-DROP FUNCTION IF EXISTS get_map_tracts_in_bbox(DECIMAL, DECIMAL, DECIMAL, DECIMAL, INTEGER);
+-- Drop ALL overloaded versions of the function
+DO $$
+DECLARE
+    func_record RECORD;
+BEGIN
+    FOR func_record IN
+        SELECT oid::regprocedure::text as func_sig
+        FROM pg_proc
+        WHERE proname = 'get_map_tracts_in_bbox'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_sig || ' CASCADE';
+    END LOOP;
+END $$;
 
 CREATE OR REPLACE FUNCTION get_map_tracts_in_bbox(
     p_min_lng DOUBLE PRECISION,
@@ -54,7 +66,19 @@ COMMENT ON FUNCTION get_map_tracts_in_bbox IS 'Get tracts in bbox using tract_ge
 -- Also fix get_simplified_tracts_in_bbox if it exists
 -- =============================================================================
 
-DROP FUNCTION IF EXISTS get_simplified_tracts_in_bbox(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION);
+-- Drop ALL overloaded versions
+DO $$
+DECLARE
+    func_record RECORD;
+BEGIN
+    FOR func_record IN
+        SELECT oid::regprocedure::text as func_sig
+        FROM pg_proc
+        WHERE proname = 'get_simplified_tracts_in_bbox'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_sig || ' CASCADE';
+    END LOOP;
+END $$;
 
 CREATE OR REPLACE FUNCTION get_simplified_tracts_in_bbox(
     p_min_lng DOUBLE PRECISION,

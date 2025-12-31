@@ -4,6 +4,20 @@
 -- This dramatically speeds up tile generation by avoiding ST_Simplify on every request
 -- =============================================================================
 
+-- Drop any existing get_vector_tile function versions
+DO $$
+DECLARE
+    func_record RECORD;
+BEGIN
+    FOR func_record IN
+        SELECT oid::regprocedure::text as func_sig
+        FROM pg_proc
+        WHERE proname = 'get_vector_tile'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_sig || ' CASCADE';
+    END LOOP;
+END $$;
+
 -- Add simplified geometry column if it doesn't exist
 DO $$
 BEGIN

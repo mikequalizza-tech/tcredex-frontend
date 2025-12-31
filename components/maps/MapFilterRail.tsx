@@ -386,19 +386,87 @@ export default function MapFilterRail({
             )}
             {tractResult && (
               <div className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
-                <div className={`px-3 py-2 border-b border-gray-700 ${tractResult.nmtcEligible ? 'bg-green-900/30' : 'bg-gray-800'}`}>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {tractResult.nmtcEligible && <span className="text-green-400 font-semibold text-sm">✓ NMTC Qualified</span>}
-                    {tractResult.severelyDistressed && <span className="text-orange-400 font-medium text-sm">• Severely Distressed</span>}
-                    {tractResult.opportunityZone && <span className="text-blue-400 font-medium text-sm">• OZ</span>}
+                {/* Eligibility Header */}
+                <div className={`px-3 py-3 border-b border-gray-700 ${tractResult.nmtcEligible || tractResult.opportunityZone ? 'bg-green-900/30' : 'bg-red-900/20'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${tractResult.nmtcEligible || tractResult.opportunityZone ? 'bg-green-500' : 'bg-red-500'}`}>
+                      <span className="text-white text-sm">{tractResult.nmtcEligible || tractResult.opportunityZone ? '✓' : '✗'}</span>
+                    </div>
+                    <span className={`font-bold text-sm ${tractResult.nmtcEligible || tractResult.opportunityZone ? 'text-green-400' : 'text-red-400'}`}>
+                      {tractResult.nmtcEligible || tractResult.opportunityZone ? 'TAX CREDIT ELIGIBLE' : 'NOT ELIGIBLE'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {tractResult.nmtcEligible && <span className="px-2 py-0.5 bg-green-800/50 text-green-300 text-xs rounded">Federal NMTC</span>}
+                    {tractResult.opportunityZone && <span className="px-2 py-0.5 bg-blue-800/50 text-blue-300 text-xs rounded">Opportunity Zone</span>}
+                    {tractResult.severelyDistressed && <span className="px-2 py-0.5 bg-orange-800/50 text-orange-300 text-xs rounded">Severely Distressed</span>}
+                    {tractResult.stateNmtc && <span className="px-2 py-0.5 bg-purple-800/50 text-purple-300 text-xs rounded">State NMTC</span>}
+                    {tractResult.stateHtc && <span className="px-2 py-0.5 bg-amber-800/50 text-amber-300 text-xs rounded">State HTC</span>}
+                    {tractResult.stateBrownfield && <span className="px-2 py-0.5 bg-teal-800/50 text-teal-300 text-xs rounded">Brownfield</span>}
                   </div>
                 </div>
-                <div className="p-3 space-y-1.5 font-mono text-xs">
-                  <div className="flex justify-between py-1 border-b border-gray-800"><span className="text-gray-500">Census Tract:</span><span className="text-white font-semibold">{tractResult.geoid}</span></div>
-                  <div className="flex justify-between py-1 border-b border-gray-800"><span className="text-gray-500">Poverty Rate:</span><span className="text-white">{tractResult.povertyRate.toFixed(1)}%</span></div>
-                  <div className="flex justify-between py-1 border-b border-gray-800"><span className="text-gray-500">Median Family:</span><span className="text-white">{tractResult.medianIncomePct.toFixed(1)}%</span></div>
-                  <div className="flex justify-between py-1"><span className="text-gray-500">Area:</span><span className="text-white">{tractResult.metroStatus}</span></div>
+
+                {/* Census Tract ID */}
+                <div className="px-3 py-2 bg-gray-900/50 border-b border-gray-700">
+                  <span className="text-gray-500 text-xs">Census Tract: </span>
+                  <span className="text-white font-mono font-semibold">{tractResult.geoid}</span>
+                  <span className="text-gray-600 text-xs ml-2">({tractResult.stateName})</span>
                 </div>
+
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-2 gap-px bg-gray-700">
+                  {/* MFI % */}
+                  <div className="bg-gray-800 p-2.5">
+                    <div className="text-[10px] text-gray-500 uppercase mb-0.5">MFI %</div>
+                    <div className={`text-lg font-bold ${tractResult.incomeQualifies ? 'text-green-400' : 'text-white'}`}>
+                      {tractResult.medianIncomePct.toFixed(1)}%
+                    </div>
+                    {tractResult.incomeQualifies && <div className="text-[9px] text-green-500">≤80% qualifies</div>}
+                  </div>
+
+                  {/* Poverty Rate */}
+                  <div className="bg-gray-800 p-2.5">
+                    <div className="text-[10px] text-gray-500 uppercase mb-0.5">Poverty Rate</div>
+                    <div className={`text-lg font-bold ${tractResult.povertyQualifies ? 'text-amber-400' : 'text-white'}`}>
+                      {tractResult.povertyRate.toFixed(1)}%
+                    </div>
+                    {tractResult.povertyQualifies && <div className="text-[9px] text-amber-500">≥20% qualifies</div>}
+                  </div>
+
+                  {/* Unemployment Rate */}
+                  <div className="bg-gray-800 p-2.5">
+                    <div className="text-[10px] text-gray-500 uppercase mb-0.5">Unemployment</div>
+                    <div className={`text-lg font-bold ${tractResult.unemploymentQualifies ? 'text-red-400' : 'text-white'}`}>
+                      {tractResult.unemploymentRate.toFixed(1)}%
+                    </div>
+                    {tractResult.unemploymentQualifies && <div className="text-[9px] text-red-500">≥1.5x national avg</div>}
+                  </div>
+
+                  {/* LIHTC Basis Boost */}
+                  <div className="bg-gray-800 p-2.5">
+                    <div className="text-[10px] text-gray-500 uppercase mb-0.5">LIHTC Boost</div>
+                    <div className={`text-lg font-bold ${tractResult.severelyDistressed ? 'text-purple-400' : 'text-gray-500'}`}>
+                      {tractResult.severelyDistressed ? '130%' : 'N/A'}
+                    </div>
+                    {tractResult.severelyDistressed && <div className="text-[9px] text-purple-500">Basis boost eligible</div>}
+                  </div>
+                </div>
+
+                {/* Area Type */}
+                <div className="px-3 py-2 border-t border-gray-700 flex justify-between items-center">
+                  <span className="text-gray-500 text-xs">Area Type:</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${tractResult.metroStatus === 'Non-Metro' ? 'bg-amber-900/50 text-amber-300' : 'bg-gray-700 text-gray-300'}`}>
+                    {tractResult.metroStatus}
+                  </span>
+                </div>
+
+                {/* Stacking Notes */}
+                {tractResult.stackingNotes && (
+                  <div className="px-3 py-2 border-t border-gray-700 bg-indigo-900/20">
+                    <div className="text-[10px] text-indigo-400 uppercase mb-1">Stacking Opportunity</div>
+                    <p className="text-xs text-gray-300">{tractResult.stackingNotes}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

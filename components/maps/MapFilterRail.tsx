@@ -27,6 +27,12 @@ interface TractData {
   unemploymentRate: number;
   unemploymentQualifies: boolean;
   nmtcEligible: boolean;
+  lihtcQct: boolean;
+  lihtcQct2025: boolean;
+  lihtcQct2026: boolean;
+  lihtcDda: boolean;
+  lihtcDda2025: boolean;
+  lihtcDda2026: boolean;
   severelyDistressed: boolean;
   metroStatus: string;
   stateName: string;
@@ -264,10 +270,17 @@ export default function MapFilterRail({
         povertyRate: eligibilityData.federal?.poverty_rate || 0, povertyQualifies: eligibilityData.federal?.poverty_qualifies || false,
         medianIncomePct: eligibilityData.federal?.median_income_pct || 0, incomeQualifies: eligibilityData.federal?.income_qualifies || false,
         unemploymentRate: eligibilityData.federal?.unemployment_rate || 0, unemploymentQualifies: eligibilityData.federal?.unemployment_qualifies || false,
-        nmtcEligible: eligibilityData.federal?.nmtc_eligible || false, severelyDistressed: eligibilityData.federal?.severely_distressed || false,
+        nmtcEligible: eligibilityData.federal?.nmtc_eligible || false,
+        lihtcQct: eligibilityData.federal?.lihtc_qct || false,
+        lihtcQct2025: eligibilityData.federal?.lihtc_qct_2025 || false,
+        lihtcQct2026: eligibilityData.federal?.lihtc_qct_2026 || false,
+        lihtcDda: eligibilityData.federal?.lihtc_dda || false,
+        lihtcDda2025: eligibilityData.federal?.lihtc_dda_2025 || false,
+        lihtcDda2026: eligibilityData.federal?.lihtc_dda_2026 || false,
+        severelyDistressed: eligibilityData.federal?.severely_distressed || false,
         metroStatus: eligibilityData.federal?.metro_status || 'N/A', stateName: eligibilityData.location?.state || tractData.state_name || '',
-        stateNmtc: eligibilityData.state?.nmtc?.available || false, stateHtc: eligibilityData.state?.htc?.available || false,
-        stateBrownfield: eligibilityData.state?.brownfield?.available || false, opportunityZone: eligibilityData.federal?.opportunity_zone || false,
+        stateNmtc: eligibilityData.state?.nmtc || false, stateHtc: eligibilityData.state?.htc || false,
+        stateBrownfield: eligibilityData.state?.brownfield || false, opportunityZone: eligibilityData.federal?.opportunity_zone || false,
         stackingNotes: eligibilityData.state?.stacking_notes, programs: eligibilityData.programs || [],
       };
       setTractResult(tract);
@@ -302,10 +315,17 @@ export default function MapFilterRail({
         povertyRate: eligibilityData.federal?.poverty_rate || 0, povertyQualifies: eligibilityData.federal?.poverty_qualifies || false,
         medianIncomePct: eligibilityData.federal?.median_income_pct || 0, incomeQualifies: eligibilityData.federal?.income_qualifies || false,
         unemploymentRate: eligibilityData.federal?.unemployment_rate || 0, unemploymentQualifies: eligibilityData.federal?.unemployment_qualifies || false,
-        nmtcEligible: eligibilityData.federal?.nmtc_eligible || false, severelyDistressed: eligibilityData.federal?.severely_distressed || false,
+        nmtcEligible: eligibilityData.federal?.nmtc_eligible || false,
+        lihtcQct: eligibilityData.federal?.lihtc_qct || false,
+        lihtcQct2025: eligibilityData.federal?.lihtc_qct_2025 || false,
+        lihtcQct2026: eligibilityData.federal?.lihtc_qct_2026 || false,
+        lihtcDda: eligibilityData.federal?.lihtc_dda || false,
+        lihtcDda2025: eligibilityData.federal?.lihtc_dda_2025 || false,
+        lihtcDda2026: eligibilityData.federal?.lihtc_dda_2026 || false,
+        severelyDistressed: eligibilityData.federal?.severely_distressed || false,
         metroStatus: eligibilityData.federal?.metro_status || 'N/A', stateName: eligibilityData.location?.state || geoData.state_name || '',
-        stateNmtc: eligibilityData.state?.nmtc?.available || false, stateHtc: eligibilityData.state?.htc?.available || false,
-        stateBrownfield: eligibilityData.state?.brownfield?.available || false, opportunityZone: eligibilityData.federal?.opportunity_zone || false,
+        stateNmtc: eligibilityData.state?.nmtc || false, stateHtc: eligibilityData.state?.htc || false,
+        stateBrownfield: eligibilityData.state?.brownfield || false, opportunityZone: eligibilityData.federal?.opportunity_zone || false,
         stackingNotes: eligibilityData.state?.stacking_notes, programs: eligibilityData.programs || [],
       };
       setTractResult(tract);
@@ -387,22 +407,39 @@ export default function MapFilterRail({
             {tractResult && (
               <div className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
                 {/* Eligibility Header */}
-                <div className={`px-3 py-3 border-b border-gray-700 ${tractResult.nmtcEligible || tractResult.opportunityZone ? 'bg-green-900/30' : 'bg-red-900/20'}`}>
+                <div className={`px-3 py-3 border-b border-gray-700 ${tractResult.nmtcEligible || tractResult.opportunityZone || tractResult.lihtcQct ? 'bg-green-900/30' : 'bg-red-900/20'}`}>
                   <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${tractResult.nmtcEligible || tractResult.opportunityZone ? 'bg-green-500' : 'bg-red-500'}`}>
-                      <span className="text-white text-sm">{tractResult.nmtcEligible || tractResult.opportunityZone ? '✓' : '✗'}</span>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${tractResult.nmtcEligible || tractResult.opportunityZone || tractResult.lihtcQct ? 'bg-green-500' : 'bg-red-500'}`}>
+                      <span className="text-white text-sm">{tractResult.nmtcEligible || tractResult.opportunityZone || tractResult.lihtcQct ? '✓' : '✗'}</span>
                     </div>
-                    <span className={`font-bold text-sm ${tractResult.nmtcEligible || tractResult.opportunityZone ? 'text-green-400' : 'text-red-400'}`}>
-                      {tractResult.nmtcEligible || tractResult.opportunityZone ? 'TAX CREDIT ELIGIBLE' : 'NOT ELIGIBLE'}
+                    <span className={`font-bold text-sm ${tractResult.nmtcEligible || tractResult.opportunityZone || tractResult.lihtcQct ? 'text-green-400' : 'text-red-400'}`}>
+                      {tractResult.nmtcEligible || tractResult.opportunityZone || tractResult.lihtcQct ? 'TAX CREDIT ELIGIBLE' : 'NOT ELIGIBLE'}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">
+                    {/* Federal NMTC + State NMTC if available */}
                     {tractResult.nmtcEligible && <span className="px-2 py-0.5 bg-green-800/50 text-green-300 text-xs rounded">Federal NMTC</span>}
+                    {tractResult.stateNmtc && <span className="px-2 py-0.5 bg-green-700/50 text-green-200 text-xs rounded">+ State NMTC</span>}
+
+                    {/* LIHTC QCT with year indicators */}
+                    {tractResult.lihtcQct && (
+                      <span className="px-2 py-0.5 bg-purple-800/50 text-purple-300 text-xs rounded">
+                        LIHTC QCT {tractResult.lihtcQct2025 && tractResult.lihtcQct2026 ? '25/26' : tractResult.lihtcQct2025 ? '2025' : '2026'}
+                      </span>
+                    )}
+
+                    {/* DDA with year indicators */}
+                    {tractResult.lihtcDda && (
+                      <span className="px-2 py-0.5 bg-indigo-800/50 text-indigo-300 text-xs rounded">
+                        DDA {tractResult.lihtcDda2025 && tractResult.lihtcDda2026 ? '25/26' : tractResult.lihtcDda2025 ? '2025' : '2026'}
+                      </span>
+                    )}
+
+                    {/* Opportunity Zone */}
                     {tractResult.opportunityZone && <span className="px-2 py-0.5 bg-blue-800/50 text-blue-300 text-xs rounded">Opportunity Zone</span>}
+
+                    {/* Severely Distressed */}
                     {tractResult.severelyDistressed && <span className="px-2 py-0.5 bg-orange-800/50 text-orange-300 text-xs rounded">Severely Distressed</span>}
-                    {tractResult.stateNmtc && <span className="px-2 py-0.5 bg-purple-800/50 text-purple-300 text-xs rounded">State NMTC</span>}
-                    {tractResult.stateHtc && <span className="px-2 py-0.5 bg-amber-800/50 text-amber-300 text-xs rounded">State HTC</span>}
-                    {tractResult.stateBrownfield && <span className="px-2 py-0.5 bg-teal-800/50 text-teal-300 text-xs rounded">State Brownfield</span>}
                   </div>
                 </div>
 

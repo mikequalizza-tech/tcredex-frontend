@@ -184,14 +184,22 @@ function formatEligibilityResponse(
     // Federal programs (normalized names for API consumers)
     federal: {
       nmtc_eligible: data.is_nmtc_eligible || false,
-      lihtc_qct: data.is_lihtc_qct_2025 || false,
-      lihtc_dda: data.is_dda_2025 || false,
+      lihtc_qct: data.is_lihtc_qct_2025 || data.is_lihtc_qct_2026 || false,
+      lihtc_qct_2025: data.is_lihtc_qct_2025 || false,
+      lihtc_qct_2026: data.is_lihtc_qct_2026 || false,
+      lihtc_dda: data.is_dda_2025 || data.is_dda_2026 || false,
+      lihtc_dda_2025: data.is_dda_2025 || false,
+      lihtc_dda_2026: data.is_dda_2026 || false,
       opportunity_zone: data.is_oz_designated || false,
       poverty_rate: data.poverty_rate,
       poverty_qualifies: data.poverty_rate ? Number(data.poverty_rate) >= 20 : false,
       median_income_pct: data.mfi_percent,
       income_qualifies: data.mfi_percent ? Number(data.mfi_percent) <= 80 : false,
-      unemployment_rate: data.unemployment_rate
+      unemployment_rate: data.unemployment_rate,
+      severely_distressed: data.is_nmtc_eligible && (
+        (data.poverty_rate && Number(data.poverty_rate) >= 30) ||
+        (data.mfi_percent && Number(data.mfi_percent) <= 60)
+      )
     },
 
     // State programs

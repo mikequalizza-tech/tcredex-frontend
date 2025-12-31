@@ -79,16 +79,10 @@ export default function HomeMapWithTracts({
   const isLoadingTracts = useRef(false);
 
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [loadingTract, setLoadingTract] = useState(false);
   const [tractCount, setTractCount] = useState(0);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
-  // Hydration guard
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Load tracts for current viewport
   // Strategy:
@@ -144,9 +138,9 @@ export default function HomeMapWithTracts({
     }
   }, []);
 
-  // Initialize map
+  // Initialize map immediately - no hydration guard needed (dynamic import handles SSR)
   useEffect(() => {
-    if (!isMounted || !mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current) return;
 
     if (!mapboxToken) {
       console.warn('Mapbox token not configured');
@@ -451,7 +445,7 @@ export default function HomeMapWithTracts({
         map.current = null;
       }
     };
-  }, [isMounted, mapboxToken, loadTractsForViewport, onTractSelect, initialDeals]);
+  }, [mapboxToken, loadTractsForViewport, onTractSelect, initialDeals]);
 
   // Add deal markers
   const addDealMarkers = useCallback((deals: Deal[]) => {

@@ -402,7 +402,7 @@ export default function MapFilterRail({
                     {tractResult.severelyDistressed && <span className="px-2 py-0.5 bg-orange-800/50 text-orange-300 text-xs rounded">Severely Distressed</span>}
                     {tractResult.stateNmtc && <span className="px-2 py-0.5 bg-purple-800/50 text-purple-300 text-xs rounded">State NMTC</span>}
                     {tractResult.stateHtc && <span className="px-2 py-0.5 bg-amber-800/50 text-amber-300 text-xs rounded">State HTC</span>}
-                    {tractResult.stateBrownfield && <span className="px-2 py-0.5 bg-teal-800/50 text-teal-300 text-xs rounded">Brownfield</span>}
+                    {tractResult.stateBrownfield && <span className="px-2 py-0.5 bg-teal-800/50 text-teal-300 text-xs rounded">State Brownfield</span>}
                   </div>
                 </div>
 

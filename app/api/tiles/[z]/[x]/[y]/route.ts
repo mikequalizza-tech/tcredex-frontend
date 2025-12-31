@@ -45,39 +45,44 @@ export async function GET(
     const client = await pool.connect();
 
     try {
-      // Generate MVT tile from PostGIS
-      // Uses ST_TileEnvelope for tile bounds and ST_AsMVT for vector tile output
-      // Simplified geometries at low zoom for performance
-      const simplifyFactor = z < 6 ? 0.01 : (z < 10 ? 0.001 : 0.0001);
+      // Try optimized RPC function first (uses pre-simplified geometries)
+      let result;
+      try {
+        result = await client.query(
+          'SELECT get_vector_tile($1, $2, $3) as mvt',
+          [z, x, y]
+        );
+      } catch (rpcError) {
+        // Fallback to inline query if RPC doesn't exist
+        console.log('[Tiles] RPC not available, using inline query');
+        const simplifyFactor = z < 6 ? 0.01 : (z < 10 ? 0.001 : 0.0001);
 
-      const result = await client.query(`
-        WITH bounds AS (
-          SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) as geom_bounds,
-                 ST_TileEnvelope($1, $2, $3) as mvt_bounds
-        )
-        SELECT ST_AsMVT(tile, 'tracts', 4096, 'geom') as mvt
-        FROM (
-          SELECT
-            g.geoid,
-            CASE WHEN COALESCE(s.has_any_tax_credit, false) THEN 1 ELSE 0 END as e,
-            COALESCE(s.stack_score, 0) as s,
-            ST_AsMVTGeom(
-              ST_Transform(
-                CASE
-                  WHEN $1 < 10 THEN ST_Simplify(g.geometry, $4)
-                  ELSE g.geometry
-                END,
-                3857
-              ),
-              (SELECT mvt_bounds FROM bounds),
-              4096, 64, true
-            ) as geom
-          FROM tract_geometries g
-          LEFT JOIN master_tax_credit_sot s ON g.geoid = s.geoid
-          WHERE ST_Intersects(g.geometry, (SELECT geom_bounds FROM bounds))
-        ) as tile
-        WHERE geom IS NOT NULL
-      `, [z, x, y, simplifyFactor]);
+        result = await client.query(`
+          WITH bounds AS (
+            SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) as geom_bounds,
+                   ST_TileEnvelope($1, $2, $3) as mvt_bounds
+          )
+          SELECT ST_AsMVT(tile, 'tracts', 4096, 'geom') as mvt
+          FROM (
+            SELECT
+              g.geoid,
+              CASE WHEN COALESCE(s.has_any_tax_credit, false) THEN 1 ELSE 0 END as e,
+              COALESCE(s.stack_score, 0) as s,
+              ST_AsMVTGeom(
+                ST_Transform(
+                  COALESCE(g.geometry_simplified, ST_Simplify(g.geometry, $4)),
+                  3857
+                ),
+                (SELECT mvt_bounds FROM bounds),
+                4096, 64, true
+              ) as geom
+            FROM tract_geometries g
+            LEFT JOIN master_tax_credit_sot s ON g.geoid = s.geoid
+            WHERE g.geometry && (SELECT geom_bounds FROM bounds)
+          ) as tile
+          WHERE geom IS NOT NULL
+        `, [z, x, y, simplifyFactor]);
+      }
 
       const mvt = result.rows[0]?.mvt;
 

@@ -497,14 +497,9 @@ export default function HomeMapWithTracts({
 
     map.current.flyTo({ center: [lng, lat], zoom: 13, duration: 1500 });
 
+    // Remove existing marker and popup
     if (searchMarkerRef.current) searchMarkerRef.current.remove();
-
-    const el = document.createElement('div');
-    el.innerHTML = `<div style="width:24px;height:24px;background:#6366f1;border:3px solid white;border-radius:50%;box-shadow:0 0 0 4px rgba(99,102,241,0.3);"></div>`;
-
-    searchMarkerRef.current = new mapboxgl.Marker(el)
-      .setLngLat([lng, lat])
-      .addTo(map.current);
+    if (popupRef.current) popupRef.current.remove();
 
     // Fetch and highlight the searched tract
     const fetchSearchedTract = async () => {
@@ -518,10 +513,112 @@ export default function HomeMapWithTracts({
         const data = await response.json();
 
         if (data.features?.length > 0 && map.current) {
+          const feature = data.features[0];
+          const props = feature.properties || {};
+          const isEligible = props.has_any_tax_credit === true || props.eligible === true;
+
+          // Update source for polygon highlight
           const source = map.current.getSource('searched-tract') as mapboxgl.GeoJSONSource;
           if (source) {
             source.setData(data);
           }
+
+          // Create marker with eligibility-based color
+          const markerColor = isEligible ? PIN_COLORS.searchEligible : PIN_COLORS.searchNotEligible;
+          const el = document.createElement('div');
+          el.innerHTML = `<div style="width:28px;height:28px;background:${markerColor};border:3px solid white;border-radius:50%;box-shadow:0 0 0 4px ${markerColor}40;"></div>`;
+
+          searchMarkerRef.current = new mapboxgl.Marker(el)
+            .setLngLat([lng, lat])
+            .addTo(map.current);
+
+          // Build programs list
+          const programs: string[] = [];
+          if (props.is_qct || props.is_lihtc_qct) programs.push('LIHTC QCT');
+          if (props.is_oz || props.is_oz_designated) programs.push('Opportunity Zone');
+          if (props.is_dda) programs.push('DDA');
+          if (props.is_nmtc_eligible || props.severely_distressed) programs.push('Federal NMTC');
+          if (props.has_state_nmtc) programs.push('State NMTC');
+          if (props.has_state_htc) programs.push('State HTC');
+          if (props.has_brownfield_credit) programs.push('Brownfield');
+
+          // Create results popup
+          popupRef.current = new mapboxgl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            offset: [0, -20],
+            maxWidth: '320px',
+          })
+            .setLngLat([lng, lat])
+            .setHTML(`
+              <div style="background: #111827; color: white; padding: 16px; border-radius: 12px; font-family: system-ui; min-width: 280px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #374151;">
+                  <div style="width: 40px; height: 40px; border-radius: 50%; background: ${isEligible ? '#22c55e' : '#ef4444'}; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 20px; color: white;">${isEligible ? '✓' : '✗'}</span>
+                  </div>
+                  <div>
+                    <div style="font-weight: 700; font-size: 16px; color: ${isEligible ? '#22c55e' : '#ef4444'};">
+                      ${isEligible ? 'TAX CREDIT ELIGIBLE' : 'NOT ELIGIBLE'}
+                    </div>
+                    <div style="font-size: 12px; color: #9ca3af; font-family: monospace;">
+                      Tract: ${props.geoid || props.GEOID || 'Unknown'}
+                    </div>
+                  </div>
+                </div>
+
+                ${isEligible && programs.length > 0 ? `
+                  <div style="margin-bottom: 12px;">
+                    <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; margin-bottom: 6px;">Available Programs</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                      ${programs.map(p => `<span style="background: #1f2937; padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #a78bfa;">${p}</span>`).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  ${props.mfi_pct !== undefined && props.mfi_pct !== null ? `
+                    <div style="background: #1f2937; padding: 8px; border-radius: 6px;">
+                      <div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">MFI %</div>
+                      <div style="font-size: 18px; font-weight: 600; color: #60a5fa;">${typeof props.mfi_pct === 'number' ? props.mfi_pct.toFixed(1) : props.mfi_pct}%</div>
+                    </div>
+                  ` : ''}
+                  ${props.poverty_rate !== undefined && props.poverty_rate !== null ? `
+                    <div style="background: #1f2937; padding: 8px; border-radius: 6px;">
+                      <div style="font-size: 10px; color: #6b7280; text-transform: uppercase;">Poverty Rate</div>
+                      <div style="font-size: 18px; font-weight: 600; color: #f59e0b;">${typeof props.poverty_rate === 'number' ? props.poverty_rate.toFixed(1) : props.poverty_rate}%</div>
+                    </div>
+                  ` : ''}
+                </div>
+
+                ${!isEligible ? `
+                  <div style="margin-top: 12px; padding: 8px; background: #7f1d1d20; border-radius: 6px; border: 1px solid #7f1d1d;">
+                    <p style="font-size: 11px; color: #fca5a5; margin: 0;">
+                      This census tract does not qualify for federal or state tax credit programs.
+                    </p>
+                  </div>
+                ` : ''}
+              </div>
+            `)
+            .addTo(map.current);
+
+          // Call onTractSelect callback with tract data
+          if (onTractSelect) {
+            onTractSelect({
+              geoid: props.geoid || props.GEOID,
+              eligible: isEligible,
+              programs: programs,
+              medianIncomePct: props.mfi_pct,
+              povertyRate: props.poverty_rate,
+            });
+          }
+        } else if (map.current) {
+          // No tract found - show error marker
+          const el = document.createElement('div');
+          el.innerHTML = `<div style="width:28px;height:28px;background:#6b7280;border:3px solid white;border-radius:50%;box-shadow:0 0 0 4px rgba(107,114,128,0.3);"></div>`;
+
+          searchMarkerRef.current = new mapboxgl.Marker(el)
+            .setLngLat([lng, lat])
+            .addTo(map.current);
         }
       } catch (e) {
         console.error('[Map] Error fetching searched tract:', e);
@@ -531,7 +628,7 @@ export default function HomeMapWithTracts({
     };
 
     fetchSearchedTract();
-  }, [searchedLocation, mapLoaded]);
+  }, [searchedLocation, mapLoaded, onTractSelect]);
 
   return (
     <div className={`relative rounded-xl overflow-hidden shadow-lg ${className}`} style={{ height }}>

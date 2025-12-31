@@ -1,6 +1,7 @@
 import "./globals.css";
 import AOSProvider from "@/components/aosprovider";
 import { Metadata, Viewport } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://tcredex.com'),
@@ -83,6 +84,7 @@ export default function RootLayout({
         <div className="flex min-h-screen flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
           <AOSProvider>{children}</AOSProvider>
         </div>
+        <SpeedInsights />
       </body>
     </html>
   );

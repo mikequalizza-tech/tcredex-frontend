@@ -5,19 +5,12 @@
 -- This version uses the tract_map_layer view (tract_geometries + master_tax_credit_sot)
 -- =============================================================================
 
--- Drop ALL overloaded versions of the function
-DO $$
-DECLARE
-    func_record RECORD;
-BEGIN
-    FOR func_record IN
-        SELECT oid::regprocedure::text as func_sig
-        FROM pg_proc
-        WHERE proname = 'get_map_tracts_in_bbox'
-    LOOP
-        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_sig || ' CASCADE';
-    END LOOP;
-END $$;
+-- Drop ALL versions by listing known signatures
+DROP FUNCTION IF EXISTS get_map_tracts_in_bbox(DECIMAL, DECIMAL, DECIMAL, DECIMAL, INTEGER) CASCADE;
+DROP FUNCTION IF EXISTS get_map_tracts_in_bbox(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, INTEGER) CASCADE;
+DROP FUNCTION IF EXISTS get_map_tracts_in_bbox(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) CASCADE;
+DROP FUNCTION IF EXISTS get_map_tracts_in_bbox(NUMERIC, NUMERIC, NUMERIC, NUMERIC, INTEGER) CASCADE;
+DROP FUNCTION IF EXISTS get_map_tracts_in_bbox(NUMERIC, NUMERIC, NUMERIC, NUMERIC) CASCADE;
 
 CREATE OR REPLACE FUNCTION get_map_tracts_in_bbox(
     p_min_lng DOUBLE PRECISION,
@@ -66,19 +59,10 @@ COMMENT ON FUNCTION get_map_tracts_in_bbox IS 'Get tracts in bbox using tract_ge
 -- Also fix get_simplified_tracts_in_bbox if it exists
 -- =============================================================================
 
--- Drop ALL overloaded versions
-DO $$
-DECLARE
-    func_record RECORD;
-BEGIN
-    FOR func_record IN
-        SELECT oid::regprocedure::text as func_sig
-        FROM pg_proc
-        WHERE proname = 'get_simplified_tracts_in_bbox'
-    LOOP
-        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_sig || ' CASCADE';
-    END LOOP;
-END $$;
+-- Drop ALL versions
+DROP FUNCTION IF EXISTS get_simplified_tracts_in_bbox(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) CASCADE;
+DROP FUNCTION IF EXISTS get_simplified_tracts_in_bbox(DECIMAL, DECIMAL, DECIMAL, DECIMAL) CASCADE;
+DROP FUNCTION IF EXISTS get_simplified_tracts_in_bbox(NUMERIC, NUMERIC, NUMERIC, NUMERIC) CASCADE;
 
 CREATE OR REPLACE FUNCTION get_simplified_tracts_in_bbox(
     p_min_lng DOUBLE PRECISION,
@@ -100,7 +84,6 @@ BEGIN
     RETURN QUERY
     SELECT
         g.geoid,
-        -- Use simplified geometry if available, otherwise simplify on the fly
         COALESCE(
             ST_AsGeoJSON(g.geometry_simplified),
             ST_AsGeoJSON(ST_Simplify(g.geometry, 0.01))

@@ -5,18 +5,7 @@
 -- =============================================================================
 
 -- Drop any existing get_vector_tile function versions
-DO $$
-DECLARE
-    func_record RECORD;
-BEGIN
-    FOR func_record IN
-        SELECT oid::regprocedure::text as func_sig
-        FROM pg_proc
-        WHERE proname = 'get_vector_tile'
-    LOOP
-        EXECUTE 'DROP FUNCTION IF EXISTS ' || func_record.func_sig || ' CASCADE';
-    END LOOP;
-END $$;
+DROP FUNCTION IF EXISTS get_vector_tile(INTEGER, INTEGER, INTEGER) CASCADE;
 
 -- Add simplified geometry column if it doesn't exist
 DO $$

@@ -11,14 +11,7 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
   
   let query = supabase
     .from('deals')
-    .select(`
-      *,
-      organizations:sponsor_organization_id (
-        name,
-        logo_url,
-        website
-      )
-    `);
+    .select('*');
 
   if (onlyVisible) {
     query = query.eq('visible', true);
@@ -40,9 +33,9 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
   return (data || []).map((deal: any) => ({
     id: deal.id,
     projectName: deal.project_name,
-    sponsorName: deal.organizations?.name || 'Unknown Sponsor',
+    sponsorName: deal.sponsor_name || 'Unknown Sponsor',
     sponsorDescription: deal.project_description,
-    website: deal.organizations?.website,
+    website: deal.website,
     programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
     programLevel: (deal.program_level) as ProgramLevel || 'federal',
     stateProgram: deal.state_program,
@@ -86,14 +79,7 @@ export async function fetchDealById(id: string): Promise<Deal | null> {
   
   const { data, error } = await supabase
     .from('deals')
-    .select(`
-      *,
-      organizations:sponsor_organization_id (
-        name,
-        logo_url,
-        website
-      )
-    `)
+    .select('*')
     .eq('id', id)
     .single();
 
@@ -110,9 +96,9 @@ export async function fetchDealById(id: string): Promise<Deal | null> {
   return {
     id: data.id,
     projectName: data.project_name,
-    sponsorName: data.organizations?.name || data.sponsor_name || 'Unknown Sponsor',
+    sponsorName: data.sponsor_name || 'Unknown Sponsor',
     sponsorDescription: data.project_description,
-    website: data.organizations?.website,
+    website: data.website,
     programType: (data.programs && data.programs[0]) as ProgramType || 'NMTC',
     programLevel: (data.program_level) as ProgramLevel || 'federal',
     stateProgram: data.state_program,
@@ -163,14 +149,7 @@ export async function fetchDealsByOrganization(orgId: string): Promise<Deal[]> {
   
   const { data, error } = await supabase
     .from('deals')
-    .select(`
-      *,
-      organizations:sponsor_organization_id (
-        name,
-        logo_url,
-        website
-      )
-    `)
+    .select('*')
     .or(`sponsor_organization_id.eq.${orgId},assigned_cde_id.eq.${orgId},investor_id.eq.${orgId}`);
 
   if (error) {
@@ -186,9 +165,9 @@ export async function fetchDealsByOrganization(orgId: string): Promise<Deal[]> {
   return (data || []).map((deal: any) => ({
     id: deal.id,
     projectName: deal.project_name,
-    sponsorName: deal.organizations?.name || deal.sponsor_name || 'Unknown Sponsor',
+    sponsorName: deal.sponsor_name || 'Unknown Sponsor',
     sponsorDescription: deal.project_description,
-    website: deal.organizations?.website,
+    website: deal.website,
     programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
     programLevel: (deal.program_level) as ProgramLevel || 'federal',
     stateProgram: deal.state_program,

@@ -893,34 +893,38 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 -- Access should be controlled at the application layer
 
 -- =============================================================================
+-- HELPER FUNCTIONS FOR RLS
+-- =============================================================================
+
+-- Get current user's organization ID
+CREATE OR REPLACE FUNCTION get_user_org_id()
+RETURNS UUID AS $$
+  SELECT organization_id FROM users WHERE id = auth.uid();
+$$ LANGUAGE SQL SECURITY DEFINER;
+
+-- =============================================================================
 -- BASIC POLICIES (Service Role bypasses RLS)
 -- =============================================================================
 
 -- Organizations: Users can read orgs they belong to
 CREATE POLICY "Users can view their organization"
   ON organizations FOR SELECT
-  USING (id IN (
-    SELECT organization_id FROM users WHERE id = auth.uid()
-  ));
+  USING (id = get_user_org_id());
 
 -- Users can view themselves
 CREATE POLICY "Users can view themselves"
   ON users FOR SELECT
   USING (id = auth.uid());
 
--- Users can view others in same org
+-- Users can view org members
 CREATE POLICY "Users can view org members"
   ON users FOR SELECT
-  USING (organization_id IN (
-    SELECT organization_id FROM users WHERE id = auth.uid()
-  ));
+  USING (organization_id = get_user_org_id());
 
 -- Deals: Complex policy based on org type and deal status
 CREATE POLICY "Sponsors can view their deals"
   ON deals FOR SELECT
-  USING (sponsor_organization_id IN (
-    SELECT organization_id FROM users WHERE id = auth.uid()
-  ));
+  USING (sponsor_organization_id = get_user_org_id());
 
 CREATE POLICY "CDEs can view available and matched deals"
   ON deals FOR SELECT
@@ -948,16 +952,6 @@ CREATE POLICY "Users can view own notifications"
 CREATE POLICY "Users can update own notifications"
   ON notifications FOR UPDATE
   USING (user_id = auth.uid());
-
--- =============================================================================
--- HELPER FUNCTIONS FOR RLS
--- =============================================================================
-
--- Get current user's organization ID
-CREATE OR REPLACE FUNCTION get_user_org_id()
-RETURNS UUID AS $$
-  SELECT organization_id FROM users WHERE id = auth.uid();
-$$ LANGUAGE SQL SECURITY DEFINER;
 
 -- Get current user's organization type
 CREATE OR REPLACE FUNCTION get_user_org_type()

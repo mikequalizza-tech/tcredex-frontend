@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { processPostSubmission } from '@/lib/intake/postSubmission';
 
 const supabase = getSupabaseAdmin();
 
@@ -103,13 +104,44 @@ export async function POST(request: NextRequest) {
       hash: generateHash(data),
     });
 
+    // ==========================================================================
+    // POST-SUBMISSION PROCESSING
+    // Run Section C Scoring + AutoMatch (only for actual submissions, not drafts)
+    // ==========================================================================
+    let postProcessing = null;
+    if (!saveOnly && data.status === 'submitted') {
+      try {
+        postProcessing = await processPostSubmission(data.id);
+        console.log('[Intake] Post-submission processing complete:', {
+          dealId: data.id,
+          scoring: postProcessing.scoring.success ? 'Score: ' + postProcessing.scoring.totalScore : 'Failed',
+          matching: postProcessing.matching.success ? postProcessing.matching.matchCount + ' matches' : 'Failed',
+        });
+      } catch (postError) {
+        console.error('[Intake] Post-submission processing error:', postError);
+        // Don't fail the request - the deal was saved successfully
+      }
+    }
+
     return NextResponse.json({
+      success: true,
+      dealId: data.id,
       deal: data,
       readiness: { score, tier, missingFields },
+      postProcessing: postProcessing ? {
+        scoring: postProcessing.scoring,
+        matching: {
+          matchCount: postProcessing.matching.matchCount,
+          topMatch: postProcessing.matching.topMatch,
+        },
+      } : null,
     }, { status: dealId ? 200 : 201 });
   } catch (error) {
     console.error('POST /api/intake error:', error);
-    return NextResponse.json({ error: 'Failed to submit intake' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to submit intake' 
+    }, { status: 500 });
   }
 }
 

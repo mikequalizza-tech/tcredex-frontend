@@ -200,22 +200,28 @@ export async function findMatches(
     projectName: dealData.project_name,
     sponsorName: dealData.sponsor_name,
     programType: dealData.program_type,
-    allocationAmount: dealData.allocation_amount || 0,
+    allocationAmount: dealData.nmtc_financing_requested || dealData.allocation_amount || 0,
     state: dealData.state,
     city: dealData.city,
     censusTract: dealData.census_tract,
     sector: dealData.project_type || 'General',
-    isQct: dealData.is_qct || false,
-    isSeverelyDistressed: dealData.is_severely_distressed || false,
-    distressScore: dealData.distress_score || 0,
+    isQct: dealData.tract_eligible || dealData.is_qct || false,
+    isSeverelyDistressed: dealData.tract_severely_distressed || dealData.is_severely_distressed || false,
+    distressScore: dealData.section_c_score || dealData.distress_score || 0,
   };
 
-  // Get all active CDEs
+  // Get all active CDEs from the cdes table (joined with organizations)
   const { data: cdeData, error: cdeError } = await supabaseAdmin
-    .from('organizations')
-    .select('*')
-    .eq('type', 'CDE')
-    .eq('is_active', true);
+    .from('cdes')
+    .select(`
+      *,
+      organizations:organization_id (
+        name,
+        slug,
+        website
+      )
+    `)
+    .eq('status', 'active');
 
   if (cdeError) {
     throw new Error('Failed to fetch CDEs');
@@ -226,15 +232,15 @@ export async function findMatches(
   for (const cdeRow of cdeData || []) {
     const cde: CDE = {
       id: cdeRow.id,
-      name: cdeRow.name,
-      states: cdeRow.service_states || [],
-      sectors: cdeRow.sectors || [],
-      minAllocation: cdeRow.min_allocation || 0,
-      maxAllocation: cdeRow.max_allocation || 100000000,
-      availableAllocation: cdeRow.available_allocation || 0,
-      prefersQct: cdeRow.prefers_qct || false,
-      prefersDistressed: cdeRow.prefers_distressed || false,
-      historicalSectors: cdeRow.historical_sectors || [],
+      name: cdeRow.organizations?.name || 'Unknown CDE',
+      states: cdeRow.primary_states || [],
+      sectors: cdeRow.target_sectors || [],
+      minAllocation: cdeRow.min_deal_size || 0,
+      maxAllocation: cdeRow.max_deal_size || 100000000,
+      availableAllocation: cdeRow.remaining_allocation || 0,
+      prefersQct: cdeRow.require_severely_distressed || false,
+      prefersDistressed: cdeRow.require_severely_distressed || false,
+      historicalSectors: cdeRow.target_sectors || [],
       contactEmail: cdeRow.contact_email || '',
       contactName: cdeRow.contact_name || '',
     };

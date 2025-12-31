@@ -1,42 +1,29 @@
-/**
- * Supabase Server Client
- * Lazy-initialized to avoid build-time errors when env vars not available
- */
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+export async function createClient() {
+  const cookieStore = await cookies()
 
-let supabaseAdmin: SupabaseClient | null = null;
-
-/**
- * Get Supabase admin client (service role)
- * Lazy-initialized to work with Next.js build process
- */
-export function getSupabaseAdmin(): SupabaseClient {
-  if (!supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!url || !key) {
-      throw new Error('Missing Supabase environment variables');
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `setAll` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
     }
-    
-    supabaseAdmin = createClient(url, key);
-  }
-  return supabaseAdmin;
+  )
 }
-
-/**
- * Shorthand for common queries
- */
-export const db = {
-  deals: () => getSupabaseAdmin().from('deals'),
-  cdes: () => getSupabaseAdmin().from('cdes'),
-  investors: () => getSupabaseAdmin().from('investors'),
-  sponsors: () => getSupabaseAdmin().from('sponsors'),
-  organizations: () => getSupabaseAdmin().from('organizations'),
-  users: () => getSupabaseAdmin().from('users'),
-  documents: () => getSupabaseAdmin().from('documents'),
-  censusTract: () => getSupabaseAdmin().from('census_tracts'),
-  commitments: () => getSupabaseAdmin().from('commitments'),
-  ledger: () => getSupabaseAdmin().from('ledger_events'),
-};

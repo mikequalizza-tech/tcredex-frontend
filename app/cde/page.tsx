@@ -7,11 +7,19 @@ export default async function CDEMapPage() {
   const deals = await fetchDeals();
   const dealCards = deals.map(mapDealToCard);
 
+  const markers = deals
+    .filter(d => d.coordinates)
+    .map(d => ({
+      latitude: d.coordinates![1],
+      longitude: d.coordinates![0],
+      name: d.projectName
+    }));
+
   return (
     <main className="relative min-h-screen bg-slate-900 text-white">
       {/* Left-side map */}
       <div className="fixed left-0 top-0 bottom-0 w-2/3 z-0">
-        <DealMap />
+        <DealMap markers={markers} />
       </div>
 
       {/* Right-side card feed */}

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useCurrentUser } from '@/lib/auth';
+import { fetchDealsByOrganization } from '@/lib/supabase/queries';
 
 type ProjectStatus = 'draft' | 'submitted' | 'matched' | 'closing' | 'closed' | 'withdrawn';
 
@@ -34,89 +35,6 @@ const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; bgCol
   withdrawn: { label: 'Withdrawn', color: 'text-red-400', bgColor: 'bg-red-900/50' },
 };
 
-const DEMO_PROJECTS: SponsorProject[] = [
-  {
-    id: 'proj-1',
-    projectName: 'Southside Community Health Center',
-    city: 'Chicago',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 15000000,
-    totalProjectCost: 38000000,
-    status: 'matched',
-    submittedDate: '2024-11-15',
-    matchedCDE: 'Midwest Impact CDE',
-    matchScore: 94,
-    tractType: ['SD', 'QCT'],
-    censusTract: '17031840100',
-    lastUpdated: '2024-12-18',
-    completionPercent: 100,
-  },
-  {
-    id: 'proj-2',
-    projectName: 'Downtown Mixed-Use Development',
-    city: 'Milwaukee',
-    state: 'WI',
-    programType: 'NMTC',
-    allocationRequest: 8000000,
-    totalProjectCost: 22000000,
-    status: 'submitted',
-    submittedDate: '2024-12-10',
-    tractType: ['QCT'],
-    censusTract: '55079185100',
-    lastUpdated: '2024-12-10',
-    completionPercent: 100,
-  },
-  {
-    id: 'proj-3',
-    projectName: 'Historic Theater Renovation',
-    city: 'St. Louis',
-    state: 'MO',
-    programType: 'HTC',
-    allocationRequest: 4500000,
-    totalProjectCost: 12000000,
-    status: 'closing',
-    submittedDate: '2024-09-20',
-    matchedCDE: 'Gateway Historic CDE',
-    matchScore: 88,
-    tractType: ['LIC'],
-    censusTract: '29510127100',
-    lastUpdated: '2024-12-15',
-    completionPercent: 100,
-  },
-  {
-    id: 'proj-4',
-    projectName: 'Workforce Training Facility',
-    city: 'Indianapolis',
-    state: 'IN',
-    programType: 'NMTC',
-    allocationRequest: 6000000,
-    totalProjectCost: 15000000,
-    status: 'draft',
-    tractType: ['SD'],
-    censusTract: '18097352200',
-    lastUpdated: '2024-12-17',
-    completionPercent: 65,
-  },
-  {
-    id: 'proj-5',
-    projectName: 'Rural Healthcare Clinic',
-    city: 'Springfield',
-    state: 'IL',
-    programType: 'NMTC',
-    allocationRequest: 3000000,
-    totalProjectCost: 8000000,
-    status: 'closed',
-    submittedDate: '2024-03-15',
-    matchedCDE: 'Central Illinois CDE',
-    matchScore: 91,
-    tractType: ['SD', 'Non-Metro'],
-    censusTract: '17167000400',
-    lastUpdated: '2024-08-30',
-    completionPercent: 100,
-  },
-];
-
 export default function ProjectsPage() {
   return (
     <ProtectedRoute>
@@ -126,10 +44,42 @@ export default function ProjectsPage() {
 }
 
 function ProjectsContent() {
-  const { orgName } = useCurrentUser();
-  const [projects] = useState<SponsorProject[]>(DEMO_PROJECTS);
+  const { orgName, organizationId } = useCurrentUser();
+  const [projects, setProjects] = useState<SponsorProject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<ProjectStatus | 'all'>('all');
   const [selectedProject, setSelectedProject] = useState<SponsorProject | null>(null);
+
+  useEffect(() => {
+    async function loadProjects() {
+      if (!organizationId) return;
+      setIsLoading(true);
+      try {
+        const deals = await fetchDealsByOrganization(organizationId);
+        const mapped: SponsorProject[] = deals.map(d => ({
+          id: d.id,
+          projectName: d.projectName,
+          city: d.city,
+          state: d.state,
+          programType: d.programType as any,
+          allocationRequest: d.allocation,
+          totalProjectCost: d.projectCost || d.allocation * 2.5,
+          status: (d.status === 'available' ? 'submitted' : d.status) as ProjectStatus,
+          submittedDate: d.submittedDate,
+          tractType: d.tractType,
+          censusTract: d.censusTract || '',
+          lastUpdated: d.submittedDate,
+          completionPercent: d.status === 'closed' ? 100 : 65,
+        }));
+        setProjects(mapped);
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadProjects();
+  }, [organizationId]);
 
   const formatCurrency = (num: number) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
@@ -143,6 +93,14 @@ function ProjectsContent() {
   const activeProjects = projects.filter(p => ['submitted', 'matched', 'closing'].includes(p.status)).length;
   const matchedProjects = projects.filter(p => ['matched', 'closing', 'closed'].includes(p.status)).length;
   const closedProjects = projects.filter(p => p.status === 'closed').length;
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

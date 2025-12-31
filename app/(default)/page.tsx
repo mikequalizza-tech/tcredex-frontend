@@ -6,6 +6,10 @@ import NoRiskSection from "@/components/NoRiskSection";
 import Cta from "@/components/cta";
 import MapSection from "@/components/MapSection";
 
+// Preload the map component on initial page load
+// This import starts loading the component module immediately
+import("@/components/maps/HomeMapWithTracts");
+
 export default function HomePage() {
   return (
     <>

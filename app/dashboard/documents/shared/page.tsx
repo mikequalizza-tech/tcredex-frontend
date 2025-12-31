@@ -1,151 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import DocumentCard from '@/components/documents/DocumentCard';
 import { Document, DocumentCategory, DOCUMENT_CATEGORIES, DOCUMENT_TAGS, DocumentTag, TAG_COLORS } from '@/lib/documents/types';
-
-// Demo shared documents
-const sharedDocuments: Document[] = [
-  {
-    id: 'doc-shared-1',
-    name: 'CDE Investment Agreement Template',
-    description: 'Standard investment agreement template for NMTC transactions',
-    category: 'legal',
-    entityType: 'organization',
-    entityId: 'o1',
-    entityName: 'Midwest CDE',
-    lock: null,
-    collaborators: [],
-    currentVersion: {
-      id: 'v1',
-      versionNumber: 2,
-      fileName: 'CDE_Investment_Agreement_v2.docx',
-      fileSize: 456789,
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      uploadedBy: { id: 'u2', name: 'Sarah Johnson', email: 'sarah@midwestcde.com' },
-      uploadedAt: '2024-12-01T10:00:00Z',
-      checksum: 'abc123',
-      storageUrl: '/documents/cde-agreement.docx',
-    },
-    versionCount: 2,
-    owner: { id: 'u2', name: 'Sarah Johnson', email: 'sarah@midwestcde.com' },
-    organizationId: 'o1',
-    shares: [
-      {
-        id: 's1',
-        sharedWith: { type: 'user', id: 'u1', name: 'John Smith' },
-        accessLevel: 'viewer',
-        sharedBy: { id: 'u2', name: 'Sarah Johnson' },
-        sharedAt: '2024-12-05T14:00:00Z',
-        canReshare: false,
-      },
-    ],
-    isPublic: false,
-    tags: ['Legal', 'CDE Agreements'],
-    status: 'approved',
-    requiredForClosing: true,
-    createdAt: '2024-11-01T09:00:00Z',
-    updatedAt: '2024-12-01T10:00:00Z',
-  },
-  {
-    id: 'doc-shared-2',
-    name: 'QALICB Certification Checklist',
-    description: 'Checklist for verifying QALICB eligibility requirements',
-    category: 'compliance',
-    entityType: 'project',
-    entityId: 'P001',
-    entityName: 'Eastside Grocery Co-Op',
-    projectId: 'P001',
-    projectName: 'Eastside Grocery Co-Op',
-    lock: null,
-    collaborators: [],
-    currentVersion: {
-      id: 'v2',
-      versionNumber: 1,
-      fileName: 'QALICB_Checklist_Eastside.pdf',
-      fileSize: 234567,
-      mimeType: 'application/pdf',
-      uploadedBy: { id: 'u3', name: 'Mike Brown', email: 'mike@example.com' },
-      uploadedAt: '2024-12-08T11:30:00Z',
-      checksum: 'def456',
-      storageUrl: '/documents/qalicb-checklist.pdf',
-    },
-    versionCount: 1,
-    owner: { id: 'u3', name: 'Mike Brown', email: 'mike@example.com' },
-    organizationId: 'org1',
-    shares: [
-      {
-        id: 's2',
-        sharedWith: { type: 'user', id: 'u1', name: 'John Smith' },
-        accessLevel: 'editor',
-        sharedBy: { id: 'u3', name: 'Mike Brown' },
-        sharedAt: '2024-12-09T09:00:00Z',
-        canReshare: true,
-      },
-    ],
-    isPublic: false,
-    tags: ['QALICB', 'Compliance'],
-    status: 'pending_review',
-    requiredForClosing: true,
-    createdAt: '2024-12-08T11:30:00Z',
-    updatedAt: '2024-12-08T11:30:00Z',
-  },
-  {
-    id: 'doc-shared-3',
-    name: 'QEI Timeline Template',
-    description: 'Template for tracking Qualified Equity Investment milestones',
-    category: 'compliance',
-    entityType: 'deal',
-    entityId: 'D001',
-    entityName: 'Eastside Grocery Deal',
-    dealId: 'D001',
-    dealName: 'Eastside Grocery Deal',
-    lock: null,
-    collaborators: [],
-    currentVersion: {
-      id: 'v3',
-      versionNumber: 3,
-      fileName: 'QEI_Timeline_Template_v3.xlsx',
-      fileSize: 89012,
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      uploadedBy: { id: 'u2', name: 'Sarah Johnson', email: 'sarah@midwestcde.com' },
-      uploadedAt: '2024-12-10T15:45:00Z',
-      changeNotes: 'Updated compliance dates',
-      checksum: 'ghi789',
-      storageUrl: '/documents/qei-timeline.xlsx',
-    },
-    versionCount: 3,
-    owner: { id: 'u2', name: 'Sarah Johnson', email: 'sarah@midwestcde.com' },
-    organizationId: 'o1',
-    shares: [
-      {
-        id: 's3',
-        sharedWith: { type: 'user', id: 'u1', name: 'John Smith' },
-        accessLevel: 'viewer',
-        sharedBy: { id: 'u2', name: 'Sarah Johnson' },
-        sharedAt: '2024-12-10T16:00:00Z',
-        expiresAt: '2025-03-10T16:00:00Z',
-        canReshare: false,
-      },
-    ],
-    isPublic: false,
-    tags: ['QEI', 'Compliance'],
-    status: 'approved',
-    requiredForClosing: false,
-    createdAt: '2024-10-15T08:00:00Z',
-    updatedAt: '2024-12-10T15:45:00Z',
-  },
-];
 
 type SortOption = 'recent' | 'name' | 'sharedDate';
 
 export default function SharedDocumentsPage() {
-  const [documents] = useState<Document[]>(sharedDocuments);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<DocumentCategory | 'all'>('all');
   const [filterTag, setFilterTag] = useState<DocumentTag | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
+
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filterCategory !== 'all') params.set('category', filterCategory);
+
+      const response = await fetch(`/api/documents/shared?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.documents) {
+        setDocuments(data.documents);
+      }
+    } catch (error) {
+      console.error('Failed to fetch shared documents:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filterCategory]);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   // Filter documents
   const filteredDocuments = documents.filter(doc => {
@@ -280,7 +169,12 @@ export default function SharedDocumentsPage() {
 
       {/* Document List */}
       <div className="space-y-4">
-        {sortedDocuments.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20 bg-gray-900 rounded-xl border border-gray-800">
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span className="ml-3 text-gray-400">Loading shared documents...</span>
+          </div>
+        ) : sortedDocuments.length > 0 ? (
           sortedDocuments.map((doc) => {
             const share = doc.shares[0]; // The share that gives current user access
             return (

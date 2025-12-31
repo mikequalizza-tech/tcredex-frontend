@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 interface CDE {
@@ -19,13 +19,6 @@ interface CDE {
   email: string;
 }
 
-const sampleCDEs: CDE[] = [
-  { id: 'CDE001', name: 'Clearwater Community Development', allocation: 75000000, deployed: 52000000, available: 23000000, activeDeals: 12, states: ['IL', 'IN', 'OH', 'MI'], sectors: ['Healthcare', 'Manufacturing', 'Retail'], minDeal: 2000000, maxDeal: 15000000, status: 'active', contact: 'Sarah Johnson', email: 'sjohnson@clearwatercde.com' },
-  { id: 'CDE002', name: 'Midwest Community Finance', allocation: 120000000, deployed: 89000000, available: 31000000, activeDeals: 18, states: ['MO', 'KS', 'NE', 'IA'], sectors: ['Community Facilities', 'Mixed-Use', 'Industrial'], minDeal: 3000000, maxDeal: 20000000, status: 'active', contact: 'James Wilson', email: 'jwilson@midwestcf.org' },
-  { id: 'CDE003', name: 'Southern Impact Partners', allocation: 50000000, deployed: 48000000, available: 2000000, activeDeals: 8, states: ['TN', 'AL', 'MS', 'GA'], sectors: ['Healthcare', 'Education', 'Childcare'], minDeal: 1500000, maxDeal: 10000000, status: 'paused', contact: 'Maria Garcia', email: 'mgarcia@southernimpact.com' },
-  { id: 'CDE004', name: 'Great Lakes Economic Corp', allocation: 95000000, deployed: 61000000, available: 34000000, activeDeals: 15, states: ['OH', 'PA', 'NY', 'MI'], sectors: ['Manufacturing', 'Technology', 'Retail'], minDeal: 5000000, maxDeal: 25000000, status: 'active', contact: 'Robert Chen', email: 'rchen@greatlakesecon.org' },
-];
-
 const formatCurrency = (amount: number) => amount >= 1000000 ? `$${(amount / 1000000).toFixed(1)}M` : `$${(amount / 1000).toFixed(0)}K`;
 
 const statusColors = {
@@ -35,17 +28,45 @@ const statusColors = {
 };
 
 export default function AdminCDEsPage() {
-  const [cdes, setCDEs] = useState<CDE[]>(sampleCDEs);
+  const [cdes, setCDEs] = useState<CDE[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCDE, setSelectedCDE] = useState<CDE | null>(null);
   const [editingCDE, setEditingCDE] = useState<CDE | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const filteredCDEs = cdes.filter((cde) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return cde.name.toLowerCase().includes(query) || cde.states.some(s => s.toLowerCase().includes(query)) || cde.sectors.some(s => s.toLowerCase().includes(query));
-  });
+  const fetchCDEs = useCallback(async (search?: string) => {
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+
+      const response = await fetch(`/api/admin/cdes?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.cdes) {
+        setCDEs(data.cdes);
+      }
+    } catch (error) {
+      console.error('Failed to fetch CDEs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchCDEs();
+  }, [fetchCDEs]);
+
+  // Refetch when search changes (with debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchCDEs(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, fetchCDEs]);
+
+  const filteredCDEs = cdes;
 
   const totalAllocation = cdes.reduce((sum, cde) => sum + cde.allocation, 0);
   const totalAvailable = cdes.reduce((sum, cde) => sum + cde.available, 0);
@@ -108,6 +129,17 @@ export default function AdminCDEsPage() {
       <div className="flex">
         {/* Table */}
         <div className="flex-1 overflow-x-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-gray-400">Loading CDEs...</span>
+            </div>
+          ) : filteredCDEs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <p className="text-lg">No CDEs found</p>
+              <p className="text-sm">Try adjusting your search</p>
+            </div>
+          ) : (
           <table className="w-full">
             <thead className="bg-gray-900 border-b border-gray-800">
               <tr>
@@ -154,6 +186,7 @@ export default function AdminCDEsPage() {
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         {/* Preview Panel */}

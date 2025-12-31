@@ -386,3 +386,77 @@ export function getCDEStats() {
     state: DEMO_CDES.filter(c => c.serviceAreaType === 'state').length,
   };
 }
+
+// =============================================================================
+// ASYNC HELPER FUNCTIONS (USE SUPABASE)
+// These fetch from Supabase and fall back to DEMO_CDES if no data
+// =============================================================================
+
+import { fetchCDEs as fetchSupabaseCDEs } from '@/lib/supabase/queries';
+
+/**
+ * Get all CDEs - tries Supabase first, falls back to demo data
+ */
+export async function getCDEs(): Promise<CDE[]> {
+  try {
+    const supabaseCDEs = await fetchSupabaseCDEs();
+    if (supabaseCDEs.length > 0) {
+      return supabaseCDEs.map(cde => ({
+        id: cde.id,
+        name: cde.organizationName,
+        slug: cde.id,
+        description: cde.missionSnippet,
+        totalAllocation: cde.remainingAllocation * 2,
+        availableAllocation: cde.remainingAllocation,
+        allocationYear: new Date().getFullYear(),
+        serviceArea: cde.primaryStates.length > 0 ? cde.primaryStates : ['ALL'],
+        serviceAreaType: cde.primaryStates.length === 0 ? 'national' : cde.primaryStates.length === 1 ? 'state' : 'regional',
+        headquartersCity: '',
+        headquartersState: cde.primaryStates[0] || '',
+        missionFocus: [] as MissionFocus[],
+        projectTypes: ['new_construction', 'rehabilitation'] as ProjectType[],
+        minDealSize: cde.dealSizeRange.min,
+        maxDealSize: cde.dealSizeRange.max,
+        projectsClosed: 0,
+        totalDeployed: 0,
+        avgDealSize: (cde.dealSizeRange.min + cde.dealSizeRange.max) / 2,
+        primaryContact: '',
+        contactEmail: '',
+        contactPhone: '',
+        website: '',
+        acceptingApplications: cde.remainingAllocation > 0,
+        responseTime: 'standard' as const,
+      }));
+    }
+  } catch (e) {
+    console.error('Error fetching CDEs from Supabase, using demo data', e);
+  }
+  return DEMO_CDES;
+}
+
+export async function getCDEBySlugAsync(slug: string): Promise<CDE | undefined> {
+  const cdes = await getCDEs();
+  return cdes.find(cde => cde.slug === slug || cde.id === slug);
+}
+
+export async function getCDEsByStateAsync(state: string): Promise<CDE[]> {
+  const cdes = await getCDEs();
+  return cdes.filter(cde => cde.serviceArea.includes('ALL') || cde.serviceArea.includes(state));
+}
+
+export async function getCDEsAcceptingApplicationsAsync(): Promise<CDE[]> {
+  const cdes = await getCDEs();
+  return cdes.filter(cde => cde.acceptingApplications);
+}
+
+export async function getCDEStatsAsync() {
+  const cdes = await getCDEs();
+  return {
+    total: cdes.length,
+    accepting: cdes.filter(c => c.acceptingApplications).length,
+    totalAvailable: cdes.reduce((sum, c) => sum + c.availableAllocation, 0),
+    national: cdes.filter(c => c.serviceAreaType === 'national').length,
+    regional: cdes.filter(c => c.serviceAreaType === 'regional').length,
+    state: cdes.filter(c => c.serviceAreaType === 'state').length,
+  };
+}

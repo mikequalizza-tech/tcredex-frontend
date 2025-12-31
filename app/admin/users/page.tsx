@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 interface User {
@@ -13,14 +13,6 @@ interface User {
   lastActive: string;
   dealsCount: number;
 }
-
-const sampleUsers: User[] = [
-  { id: 'U001', name: 'Mike Qualizza', email: 'mqualizza@americanimpactventures.com', role: 'admin', status: 'active', organization: 'tCredex', lastActive: '2024-01-15', dealsCount: 24 },
-  { id: 'U002', name: 'Sarah Johnson', email: 'sarah@clearwatercde.com', role: 'cde', status: 'active', organization: 'Clearwater CDE', lastActive: '2024-01-14', dealsCount: 18 },
-  { id: 'U003', name: 'Robert Chen', email: 'rchen@capitalpartners.com', role: 'investor', status: 'active', organization: 'Capital Partners LLC', lastActive: '2024-01-13', dealsCount: 12 },
-  { id: 'U004', name: 'Maria Garcia', email: 'mgarcia@communityfirst.org', role: 'sponsor', status: 'pending', organization: 'Community First Development', lastActive: '2024-01-10', dealsCount: 3 },
-  { id: 'U005', name: 'James Wilson', email: 'jwilson@midwestcde.com', role: 'cde', status: 'active', organization: 'Midwest Community CDE', lastActive: '2024-01-15', dealsCount: 31 },
-];
 
 const roleColors = {
   admin: 'bg-purple-500/20 text-purple-400',
@@ -36,21 +28,49 @@ const statusColors = {
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>(sampleUsers);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUsers = useCallback(async (role?: string, search?: string) => {
+    try {
+      const params = new URLSearchParams();
+      if (role && role !== 'all') params.set('role', role);
+      if (search) params.set('search', search);
+
+      const response = await fetch(`/api/admin/users?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.users) {
+        setUsers(data.users);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch = !searchQuery || 
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.organization.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
+  // Initial load
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Refetch when filters change (with debounce for search)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchUsers(roleFilter, searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [roleFilter, searchQuery, fetchUsers]);
+
+  // Client-side filtering as backup (API also filters)
+  const filteredUsers = users;
 
   const handleEditUser = (user: User, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -131,6 +151,17 @@ export default function AdminUsersPage() {
       <div className="flex">
         {/* Table */}
         <div className={`flex-1 overflow-x-auto transition-all ${selectedUser ? 'pr-0' : ''}`}>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-gray-400">Loading users...</span>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <p className="text-lg">No users found</p>
+              <p className="text-sm">Try adjusting your search or filters</p>
+            </div>
+          ) : (
           <table className="w-full">
             <thead className="bg-gray-900 border-b border-gray-800">
               <tr>
@@ -181,6 +212,7 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         {/* Preview Panel */}

@@ -1,11 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { lookupTract, STATE_FIPS } from '@/lib/tracts/tractData';
-
 /**
+ * Tract Lookup API - SOURCE OF TRUTH
+ * ===================================
+ * Uses: master_tax_credit_sot table
+ *
  * GET /api/tracts/lookup?geoid=17031010100
- * 
- * Look up NMTC eligibility data for a census tract by GEOID
  */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const geoid = searchParams.get('geoid');
@@ -19,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   // Normalize GEOID (pad to 11 chars if needed)
   const normalizedGeoid = geoid.replace(/\D/g, '').padStart(11, '0');
-  
+
   if (normalizedGeoid.length !== 11) {
     return NextResponse.json(
       { error: 'Invalid GEOID format. Must be 11 digits (state + county + tract)', geoid: normalizedGeoid },
@@ -28,47 +33,66 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Look up in our eligibility database
-    const tractData = await lookupTract(normalizedGeoid);
-    
-    if (tractData) {
-      // Found in eligible tracts database
+    const supabase = getSupabaseAdmin();
+
+    const { data, error } = await supabase
+      .from('master_tax_credit_sot')
+      .select('*')
+      .eq('geoid', normalizedGeoid)
+      .single();
+
+    if (error || !data) {
+      // Not found in database
+      const stateFips = normalizedGeoid.substring(0, 2);
+
       return NextResponse.json({
-        geoid: tractData.geoid,
-        state: tractData.state,
-        stateAbbr: tractData.stateAbbr,
-        county: tractData.county,
-        poverty: tractData.poverty,
-        income: tractData.income,
-        unemployment: tractData.unemployment,
-        povertyQualifies: tractData.povertyQualifies,
-        incomeQualifies: tractData.incomeQualifies,
-        eligible: tractData.eligible,
-        severelyDistressed: tractData.severelyDistressed,
-        classification: tractData.classification
+        geoid: normalizedGeoid,
+        state_fips: stateFips,
+        found: false,
+        eligible: false,
+        has_any_tax_credit: false,
+        programs: [],
+        _note: 'Tract not found in master_tax_credit_sot table',
+        source: 'master_tax_credit_sot'
       });
     }
-    
-    // Not in eligible tracts - return not eligible
-    const stateFips = normalizedGeoid.substring(0, 2);
-    const stateName = STATE_FIPS[stateFips] || 'Unknown';
-    
+
+    // Build programs array (using actual column names from SOT)
+    const programs: string[] = [];
+    if (data.is_nmtc_eligible) programs.push('Federal NMTC');
+    if (data.is_lihtc_qct_2025) programs.push('LIHTC QCT');
+    if (data.is_oz_designated) programs.push('Opportunity Zone');
+    if (data.is_dda_2025) programs.push('DDA');
+    if (data.has_state_nmtc) programs.push('State NMTC');
+    if (data.has_state_htc) programs.push('State HTC');
+    if (data.has_brownfield_credit) programs.push('Brownfield');
+
     return NextResponse.json({
-      geoid: normalizedGeoid,
-      state: stateName,
-      stateAbbr: stateFips,
-      county: 'Unknown',
-      poverty: null,
-      income: null,
-      unemployment: null,
-      povertyQualifies: false,
-      incomeQualifies: false,
-      eligible: false,
-      severelyDistressed: false,
-      classification: 'Neither',
-      _note: 'Tract not found in NMTC eligible tracts database'
+      geoid: data.geoid,
+      state_fips: data.geoid?.substring(0, 2),
+      found: true,
+      // Tax credit flags (normalized names for API consumers)
+      eligible: data.has_any_tax_credit,
+      has_any_tax_credit: data.has_any_tax_credit,
+      is_nmtc_eligible: data.is_nmtc_eligible,
+      is_qct: data.is_lihtc_qct_2025,
+      is_oz: data.is_oz_designated,
+      is_dda: data.is_dda_2025,
+      has_state_nmtc: data.has_state_nmtc,
+      has_state_htc: data.has_state_htc,
+      has_brownfield_credit: data.has_brownfield_credit,
+      // Metrics
+      poverty_rate: data.poverty_rate,
+      mfi_pct: data.mfi_percent,
+      unemployment_rate: data.unemployment_rate,
+      stack_score: data.stack_score,
+      // Programs
+      programs,
+      program_count: programs.length,
+      // Source
+      source: 'master_tax_credit_sot'
     });
-    
+
   } catch (error) {
     console.error('[TractLookup] Error:', error);
     return NextResponse.json(

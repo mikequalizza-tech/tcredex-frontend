@@ -1,13 +1,97 @@
+/**
+ * Batch Tract Lookup API - SOURCE OF TRUTH
+ * =========================================
+ * Uses: master_tax_credit_sot table
+ *
+ * POST /api/tracts/batch - Body: { geoids: ["17031010100", ...] }
+ * GET /api/tracts/batch?geoids=17031010100,17031010201
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { lookupTracts } from '@/lib/tracts/tractData';
+import { getSupabaseAdmin } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
+
+// Actual column names from master_tax_credit_sot
+interface TractResult {
+  geoid: string;
+  has_any_tax_credit: boolean;
+  is_nmtc_eligible: boolean;
+  is_lihtc_qct_2025: boolean;
+  is_oz_designated: boolean;
+  is_dda_2025: boolean;
+  has_state_nmtc: boolean;
+  has_state_htc: boolean;
+  has_brownfield_credit: boolean;
+  poverty_rate: number | null;
+  mfi_percent: number | null;
+  unemployment_rate: number | null;
+  stack_score: number;
+}
+
+function buildPrograms(tract: TractResult): string[] {
+  const programs: string[] = [];
+  if (tract.is_nmtc_eligible) programs.push('Federal NMTC');
+  if (tract.is_lihtc_qct_2025) programs.push('LIHTC QCT');
+  if (tract.is_oz_designated) programs.push('Opportunity Zone');
+  if (tract.is_dda_2025) programs.push('DDA');
+  if (tract.has_state_nmtc) programs.push('State NMTC');
+  if (tract.has_state_htc) programs.push('State HTC');
+  if (tract.has_brownfield_credit) programs.push('Brownfield');
+  return programs;
+}
+
+async function batchLookup(geoids: string[]) {
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from('master_tax_credit_sot')
+    .select('geoid, has_any_tax_credit, is_nmtc_eligible, is_lihtc_qct_2025, is_oz_designated, is_dda_2025, has_state_nmtc, has_state_htc, has_brownfield_credit, poverty_rate, mfi_percent, unemployment_rate, stack_score')
+    .in('geoid', geoids);
+
+  if (error) {
+    console.error('[TractBatch] Query error:', error);
+    throw error;
+  }
+
+  // Build results map
+  const found: Record<string, object> = {};
+  const foundGeoids = new Set<string>();
+
+  for (const tract of (data || []) as TractResult[]) {
+    foundGeoids.add(tract.geoid);
+    const programs = buildPrograms(tract);
+
+    found[tract.geoid] = {
+      geoid: tract.geoid,
+      state_fips: tract.geoid?.substring(0, 2),
+      has_any_tax_credit: tract.has_any_tax_credit,
+      is_nmtc_eligible: tract.is_nmtc_eligible,
+      is_qct: tract.is_lihtc_qct_2025,
+      is_oz: tract.is_oz_designated,
+      is_dda: tract.is_dda_2025,
+      has_state_nmtc: tract.has_state_nmtc,
+      has_state_htc: tract.has_state_htc,
+      has_brownfield_credit: tract.has_brownfield_credit,
+      poverty_rate: tract.poverty_rate,
+      mfi_pct: tract.mfi_percent,
+      unemployment_rate: tract.unemployment_rate,
+      stack_score: tract.stack_score,
+      programs,
+      program_count: programs.length,
+      // Legacy aliases
+      eligible: tract.has_any_tax_credit
+    };
+  }
+
+  const notFound = geoids.filter(g => !foundGeoids.has(g));
+
+  return { found, notFound };
+}
 
 /**
  * POST /api/tracts/batch
- * 
- * Look up multiple tracts by GEOID in a single request
- * 
- * Request body: { geoids: ["17031010100", "17031010201", ...] }
- * Response: { results: { "17031010100": {...}, ... }, notFound: ["..."] }
+ * Body: { geoids: ["17031010100", "17031010201", ...] }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -29,43 +113,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Normalize GEOIDs
-    const normalizedGeoids = geoids.map((g: string) => 
+    const normalizedGeoids = geoids.map((g: string) =>
       String(g).replace(/\D/g, '').padStart(11, '0')
     );
 
-    // Batch lookup
-    const results = await lookupTracts(normalizedGeoids);
-
-    // Build response
-    const found: Record<string, object> = {};
-    const notFound: string[] = [];
-
-    for (const geoid of normalizedGeoids) {
-      const tract = results.get(geoid);
-      if (tract) {
-        found[geoid] = {
-          state: tract.state,
-          stateAbbr: tract.stateAbbr,
-          county: tract.county,
-          poverty: tract.poverty,
-          income: tract.income,
-          unemployment: tract.unemployment,
-          povertyQualifies: tract.povertyQualifies,
-          incomeQualifies: tract.incomeQualifies,
-          eligible: tract.eligible,
-          severelyDistressed: tract.severelyDistressed,
-          classification: tract.classification
-        };
-      } else {
-        notFound.push(geoid);
-      }
-    }
+    const { found, notFound } = await batchLookup(normalizedGeoids);
 
     return NextResponse.json({
       requested: normalizedGeoids.length,
       found: Object.keys(found).length,
       results: found,
-      notFound: notFound.length > 0 ? notFound : undefined
+      notFound: notFound.length > 0 ? notFound : undefined,
+      source: 'master_tax_credit_sot'
     });
 
   } catch (error) {
@@ -79,8 +138,6 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/tracts/batch?geoids=17031010100,17031010201
- * 
- * Alternative GET method for smaller batch lookups
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -102,36 +159,24 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Normalize and lookup
-  const normalizedGeoids = geoids.map(g => g.replace(/\D/g, '').padStart(11, '0'));
-  const results = await lookupTracts(normalizedGeoids);
+  try {
+    // Normalize and lookup
+    const normalizedGeoids = geoids.map(g => g.replace(/\D/g, '').padStart(11, '0'));
+    const { found, notFound } = await batchLookup(normalizedGeoids);
 
-  const found: Record<string, object> = {};
-  const notFound: string[] = [];
+    return NextResponse.json({
+      requested: normalizedGeoids.length,
+      found: Object.keys(found).length,
+      results: found,
+      notFound: notFound.length > 0 ? notFound : undefined,
+      source: 'master_tax_credit_sot'
+    });
 
-  for (const geoid of normalizedGeoids) {
-    const tract = results.get(geoid);
-    if (tract) {
-      found[geoid] = {
-        state: tract.state,
-        stateAbbr: tract.stateAbbr,
-        county: tract.county,
-        poverty: tract.poverty,
-        income: tract.income,
-        unemployment: tract.unemployment,
-        eligible: tract.eligible,
-        severelyDistressed: tract.severelyDistressed,
-        classification: tract.classification
-      };
-    } else {
-      notFound.push(geoid);
-    }
+  } catch (error) {
+    console.error('[TractBatch] Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({
-    requested: normalizedGeoids.length,
-    found: Object.keys(found).length,
-    results: found,
-    notFound: notFound.length > 0 ? notFound : undefined
-  });
 }

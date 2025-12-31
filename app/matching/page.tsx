@@ -29,7 +29,7 @@ type CreditType = 'all' | 'nmtc' | 'htc' | 'lihtc';
 
 export default function MatchingPage() {
   const router = useRouter();
-  const [allDeals, setAllDeals] = useState<DealCardFormat[]>([]);
+  const [allDeals, setAllDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [creditFilter, setCreditFilter] = useState<CreditType>('all');
   const [shovelReadyOnly, setShovelReadyOnly] = useState(false);
@@ -41,26 +41,7 @@ export default function MatchingPage() {
       setLoading(true);
       try {
         const deals = await getMarketplaceDeals();
-        const formattedDeals = deals.slice(0, 10).map(deal => ({
-          id: deal.id,
-          projectName: deal.projectName,
-          location: `${deal.city}, ${deal.state}`,
-          parent: deal.sponsorName,
-          address: '',
-          censusTract: '',
-          povertyRate: deal.povertyRate || 0,
-          medianIncome: deal.medianIncome || 0,
-          unemployment: 0,
-          projectCost: deal.allocation * 5,  // Estimate: allocation is ~20% of project cost
-          fedNmtcReq: deal.programType === 'NMTC' && deal.programLevel === 'federal' ? deal.allocation : undefined,
-          stateNmtcReq: deal.programType === 'NMTC' && deal.programLevel === 'state' ? deal.allocation : undefined,
-          htc: deal.programType === 'HTC' ? deal.allocation : undefined,
-          lihtc: deal.programType === 'LIHTC' ? deal.allocation : undefined,
-          shovelReady: deal.status === 'available',
-          completionDate: deal.submittedDate,
-          financingGap: deal.allocation,
-        }));
-        setAllDeals(formattedDeals);
+        setAllDeals(deals);
       } catch (error) {
         console.error('Failed to load deals:', error);
       } finally {
@@ -71,17 +52,17 @@ export default function MatchingPage() {
   }, []);
 
   const filteredDeals = allDeals.filter((deal) => {
-    if (creditFilter === 'nmtc' && !deal.fedNmtcReq && !deal.stateNmtcReq) return false;
-    if (creditFilter === 'htc' && !deal.htc) return false;
-    if (creditFilter === 'lihtc' && !deal.lihtc) return false;
-    if (shovelReadyOnly && !deal.shovelReady) return false;
+    if (creditFilter === 'nmtc' && deal.programType !== 'NMTC') return false;
+    if (creditFilter === 'htc' && deal.programType !== 'HTC') return false;
+    if (creditFilter === 'lihtc' && deal.programType !== 'LIHTC') return false;
+    if (shovelReadyOnly && deal.status !== 'available') return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
         deal.projectName.toLowerCase().includes(query) ||
-        deal.location.toLowerCase().includes(query) ||
-        (deal.parent?.toLowerCase().includes(query) ?? false) ||
-        (deal.censusTract?.includes(query) ?? false)
+        deal.city.toLowerCase().includes(query) ||
+        deal.state.toLowerCase().includes(query) ||
+        (deal.sponsorName?.toLowerCase().includes(query) ?? false)
       );
     }
     return true;

@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import DealCard, { Deal } from '@/components/DealCard';
+import DealCard from '@/components/DealCard';
+import { Deal } from '@/lib/data/deals';
 import CDECard from '@/components/CDECard';
 import MapFilterRail, { FilterState, defaultFilters } from '@/components/maps/MapFilterRail';
 import { fetchDeals, fetchCDEs } from '@/lib/supabase/queries';
@@ -12,6 +13,7 @@ import { CDEDealCard } from '@/lib/types/cde';
 import { useCurrentUser } from '@/lib/auth';
 import { mapDealToCard } from '@/lib/utils/dealCardMapper';
 
+// Dynamic import of the map to avoid SSR issues
 const HomeMapWithTracts = dynamic(
   () => import('@/components/maps/HomeMapWithTracts'),
   { 
@@ -29,6 +31,7 @@ const HomeMapWithTracts = dynamic(
 
 type ViewMode = 'sponsor' | 'cde' | 'investor';
 
+// Fallback coordinates if none exist
 const DEAL_COORDINATES: Record<string, [number, number]> = {
   'D12345': [-89.6501, 39.7817],
   'D12346': [-83.0458, 42.3314],
@@ -37,6 +40,11 @@ const DEAL_COORDINATES: Record<string, [number, number]> = {
   'D12349': [-90.0490, 35.1495],
   'D12350': [-90.1994, 38.6270],
 };
+
+interface SearchedTract {
+  coordinates: [number, number];
+  geoid: string;
+}
 
 export default function MapPlatformPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -57,11 +65,6 @@ export default function MapPlatformPage() {
   return <MapContent />;
 }
 
-interface SearchedTract {
-  coordinates: [number, number];
-  geoid: string;
-}
-
 function MapContent() {
   const { isAuthenticated, orgType, isLoading: authLoading } = useCurrentUser();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -78,7 +81,21 @@ function MapContent() {
   const cardListRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  // Fetch data from Supabase
+  // === FIX: ALL HOOKS MUST BE BEFORE ANY RETURN STATEMENT ===
+
+  // 1. Move useCallback UP here
+  const handleTractFound = useCallback((tract: { geoid: string }, coordinates: [number, number]) => {
+    setSearchedTract({ coordinates, geoid: tract.geoid });
+  }, []);
+
+  // 2. Move useEffect (scroll) UP here
+  useEffect(() => {
+    if (selectedId && cardRefs.current.has(selectedId)) {
+      cardRefs.current.get(selectedId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [selectedId]);
+
+  // 3. Move useEffect (data fetch) UP here
   useEffect(() => {
     async function loadData() {
       setDataLoading(true);
@@ -98,9 +115,12 @@ function MapContent() {
     loadData();
   }, []);
 
+  // ==========================================================
+
   // VIEW MODE IS LOCKED TO USER TYPE - No switcher!
   const viewMode: ViewMode = orgType === 'cde' ? 'cde' : orgType === 'investor' ? 'investor' : 'sponsor';
 
+  // CONDITIONAL RETURN: Safe to return now because all hooks are registered above
   if (authLoading || dataLoading) {
     return (
       <div className="h-screen w-screen bg-gray-950 flex items-center justify-center">
@@ -113,11 +133,8 @@ function MapContent() {
   }
 
   // ============================================
-  // DATA BASED ON VIEW MODE (User Type)
+  // DATA PREPARATION (Runs only after loading is done)
   // ============================================
-  // SPONSORS → See CDE cards (who has allocation for my project?)
-  // CDEs → See Project cards (what projects need allocation?)
-  // INVESTORS → See Project cards (what deals are closing?)
   
   const mapDeals = deals.map(deal => ({
     ...deal,
@@ -126,7 +143,8 @@ function MapContent() {
 
   const filteredDeals = mapDeals.filter(deal => {
     if (filters.shovelReadyOnly && !deal.shovelReady) return false;
-    if (deal.projectCost < filters.minProjectCost || deal.projectCost > filters.maxProjectCost) return false;
+    const cost = deal.projectCost || 0;
+    if (cost < filters.minProjectCost || cost > filters.maxProjectCost) return false;
     return true;
   });
 
@@ -156,16 +174,6 @@ function MapContent() {
       return b.remainingAllocation - a.remainingAllocation;
     });
 
-  const handleTractFound = useCallback((tract: { geoid: string }, coordinates: [number, number]) => {
-    setSearchedTract({ coordinates, geoid: tract.geoid });
-  }, []);
-
-  useEffect(() => {
-    if (selectedId && cardRefs.current.has(selectedId)) {
-      cardRefs.current.get(selectedId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [selectedId]);
-
   const handleSelectCard = (id: string | null) => setSelectedId(id);
 
   const handleRequestMemo = (dealId: string) => {
@@ -178,7 +186,7 @@ function MapContent() {
     if (cde) alert(`Project Submission Request!\n\nCDE: ${cde.organizationName}\n\nRedirecting to project submission...`);
   };
 
-  const totalProjectValue = filteredDeals.reduce((sum, d) => sum + d.projectCost, 0);
+  const totalProjectValue = filteredDeals.reduce((sum, d) => sum + (d.projectCost || 0), 0);
   const totalCDEAllocation = filteredCDEs.reduce((sum, c) => sum + c.remainingAllocation, 0);
   const shovelReadyCount = filteredDeals.filter(d => d.shovelReady).length;
   const activeCDECount = filteredCDEs.length;
@@ -258,6 +266,12 @@ function MapContent() {
           <HomeMapWithTracts
             height="100%"
             className="w-full h-full"
+            
+            // LOGIC: If Sponsor, hide deals, show Allocation Money.
+            // If CDE/Investor, show Deal Pins.
+            deals={viewMode === 'sponsor' ? [] : mapDeals}
+            allocations={viewMode === 'sponsor' ? filteredCDEs : []}
+            
             searchedLocation={searchedTract ? { lat: searchedTract.coordinates[1], lng: searchedTract.coordinates[0], tract: searchedTract.geoid } : null}
           />
           

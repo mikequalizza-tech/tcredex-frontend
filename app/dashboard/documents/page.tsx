@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 type DocumentCategory = 'all' | 'corporate' | 'project' | 'financial' | 'real_estate' | 'legal' | 'qalicb' | 'insurance' | 'closing';
@@ -21,140 +21,12 @@ interface Document {
   fileUrl?: string;
 }
 
-const DEMO_DOCUMENTS: Document[] = [
-  {
-    id: 'doc-001',
-    name: 'Certificate of Formation.pdf',
-    category: 'corporate',
-    status: 'approved',
-    projectName: 'Downtown Community Center',
-    projectId: 'deal-001',
-    uploadedBy: 'John Smith',
-    uploadedDate: '2024-11-15',
-    size: '1.2 MB',
-    version: 1,
-    fileUrl: '/documents/sample.pdf',
-  },
-  {
-    id: 'doc-002',
-    name: 'Operating Agreement.pdf',
-    category: 'corporate',
-    status: 'approved',
-    projectName: 'Downtown Community Center',
-    projectId: 'deal-001',
-    uploadedBy: 'John Smith',
-    uploadedDate: '2024-11-15',
-    size: '3.4 MB',
-    version: 2,
-    fileUrl: '/documents/sample.pdf',
-  },
-  {
-    id: 'doc-003',
-    name: 'Phase I Environmental.pdf',
-    category: 'real_estate',
-    status: 'under_review',
-    projectName: 'Downtown Community Center',
-    projectId: 'deal-001',
-    uploadedBy: 'Jane Doe',
-    uploadedDate: '2024-12-01',
-    size: '8.7 MB',
-    version: 1,
-    aiFlags: ['Report date is more than 6 months old'],
-    fileUrl: '/documents/sample.pdf',
-  },
-  {
-    id: 'doc-004',
-    name: 'Appraisal Report.pdf',
-    category: 'real_estate',
-    status: 'approved',
-    projectName: 'Downtown Community Center',
-    projectId: 'deal-001',
-    uploadedBy: 'Jane Doe',
-    uploadedDate: '2024-11-20',
-    size: '5.2 MB',
-    version: 1,
-    fileUrl: '/documents/sample.pdf',
-  },
-  {
-    id: 'doc-005',
-    name: 'Pro Forma Financial Model.xlsx',
-    category: 'financial',
-    status: 'under_review',
-    projectName: 'Heritage Theater Restoration',
-    projectId: 'deal-002',
-    uploadedBy: 'Mike Johnson',
-    uploadedDate: '2024-12-05',
-    size: '2.1 MB',
-    version: 3,
-    aiFlags: ['Interest rate assumptions may be outdated'],
-    fileUrl: '/documents/sample.xlsx',
-  },
-  {
-    id: 'doc-006',
-    name: 'Construction Budget.xlsx',
-    category: 'financial',
-    status: 'pending',
-    projectName: 'Heritage Theater Restoration',
-    projectId: 'deal-002',
-    uploadedBy: '',
-    uploadedDate: '',
-    size: '',
-    version: 0,
-  },
-  {
-    id: 'doc-007',
-    name: 'Title Insurance Commitment.pdf',
-    category: 'real_estate',
-    status: 'uploaded',
-    projectName: 'Heritage Theater Restoration',
-    projectId: 'deal-002',
-    uploadedBy: 'Sarah Williams',
-    uploadedDate: '2024-12-08',
-    size: '4.3 MB',
-    version: 1,
-    fileUrl: '/documents/sample.pdf',
-  },
-  {
-    id: 'doc-008',
-    name: 'QALICB Certification.pdf',
-    category: 'qalicb',
-    status: 'approved',
-    projectName: 'Downtown Community Center',
-    projectId: 'deal-001',
-    uploadedBy: 'Legal Team',
-    uploadedDate: '2024-11-25',
-    size: '1.8 MB',
-    version: 1,
-    fileUrl: '/documents/sample.pdf',
-  },
-  {
-    id: 'doc-009',
-    name: 'General Liability Insurance.pdf',
-    category: 'insurance',
-    status: 'expired',
-    projectName: 'Downtown Community Center',
-    projectId: 'deal-001',
-    uploadedBy: 'Insurance Dept',
-    uploadedDate: '2024-06-01',
-    size: '0.9 MB',
-    version: 1,
-    aiFlags: ['Policy expired - renewal required'],
-    fileUrl: '/documents/sample.pdf',
-  },
-  {
-    id: 'doc-010',
-    name: 'Term Sheet - Executed.pdf',
-    category: 'legal',
-    status: 'approved',
-    projectName: 'Heritage Theater Restoration',
-    projectId: 'deal-002',
-    uploadedBy: 'Legal Team',
-    uploadedDate: '2024-11-10',
-    size: '0.5 MB',
-    version: 2,
-    fileUrl: '/documents/sample.pdf',
-  },
-];
+function formatFileSize(bytes: number): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const CATEGORY_LABELS: Record<DocumentCategory, string> = {
   all: 'All Categories',
@@ -189,27 +61,84 @@ const STATUS_LABELS: Record<DocumentStatus, string> = {
 };
 
 export default function DocumentsPage() {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<DocumentCategory>('all');
   const [statusFilter, setStatusFilter] = useState<DocumentStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
 
-  const filteredDocs = DEMO_DOCUMENTS.filter((doc) => {
-    if (categoryFilter !== 'all' && doc.category !== categoryFilter) return false;
-    if (statusFilter !== 'all' && doc.status !== statusFilter) return false;
-    if (searchQuery && !doc.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (categoryFilter !== 'all') params.set('category', categoryFilter);
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+
+      const response = await fetch(`/api/documents?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.documents) {
+        const mapped: Document[] = data.documents.map((doc: any) => ({
+          id: doc.id,
+          name: doc.name || 'Untitled',
+          category: mapCategory(doc.category),
+          status: mapStatus(doc.status),
+          projectName: doc.deal?.project_name || doc.deal_name || 'Unknown Project',
+          projectId: doc.deal_id || '',
+          uploadedBy: doc.uploaded_by_name || doc.uploaded_by || '',
+          uploadedDate: doc.created_at ? new Date(doc.created_at).toISOString().split('T')[0] : '',
+          size: formatFileSize(doc.file_size),
+          version: doc.version || 1,
+          aiFlags: doc.ai_flags || [],
+          fileUrl: doc.file_url,
+        }));
+        setDocuments(mapped);
+      }
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [categoryFilter, statusFilter]);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  // Client-side search filtering
+  const filteredDocs = documents.filter((doc) => {
+    if (searchQuery && !doc.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !doc.projectName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
   const stats = {
-    total: DEMO_DOCUMENTS.length,
-    pending: DEMO_DOCUMENTS.filter(d => d.status === 'pending').length,
-    underReview: DEMO_DOCUMENTS.filter(d => d.status === 'under_review').length,
-    approved: DEMO_DOCUMENTS.filter(d => d.status === 'approved').length,
-    aiFlags: DEMO_DOCUMENTS.filter(d => d.aiFlags && d.aiFlags.length > 0).length,
+    total: documents.length,
+    pending: documents.filter(d => d.status === 'pending').length,
+    underReview: documents.filter(d => d.status === 'under_review').length,
+    approved: documents.filter(d => d.status === 'approved').length,
+    aiFlags: documents.filter(d => d.aiFlags && d.aiFlags.length > 0).length,
   };
+
+  function mapCategory(cat: string): DocumentCategory {
+    const valid: DocumentCategory[] = ['corporate', 'project', 'financial', 'real_estate', 'legal', 'qalicb', 'insurance', 'closing'];
+    return valid.includes(cat as DocumentCategory) ? cat as DocumentCategory : 'project';
+  }
+
+  function mapStatus(status: string): DocumentStatus {
+    const statusMap: Record<string, DocumentStatus> = {
+      'pending': 'pending',
+      'uploaded': 'uploaded',
+      'under_review': 'under_review',
+      'approved': 'approved',
+      'rejected': 'rejected',
+      'expired': 'expired',
+      'draft': 'pending',
+      'pending_review': 'under_review',
+    };
+    return statusMap[status] || 'pending';
+  }
 
   const handlePreview = (doc: Document) => {
     setPreviewDoc(doc);
@@ -318,6 +247,13 @@ export default function DocumentsPage() {
 
       {/* Documents Table */}
       <div className="bg-gray-900 rounded-xl border border-gray-800">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span className="ml-3 text-gray-400">Loading documents...</span>
+          </div>
+        ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-800/50">
@@ -431,6 +367,8 @@ export default function DocumentsPage() {
             </svg>
             <p className="text-gray-400">No documents found matching your filters.</p>
           </div>
+        )}
+        </>
         )}
       </div>
 

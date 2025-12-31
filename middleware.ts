@@ -57,24 +57,26 @@ const PUBLIC_ROUTES = [
 ];
 
 const PUBLIC_PREFIXES = [
-  '/api/auth/', // Auth APIs are public
-  '/api/register', // Registration API
-  '/api/contact', // Contact form API
-  '/api/eligibility', // Census tract eligibility lookup
-  '/api/geo/', // Geo/tract resolution APIs
-  '/api/tracts/', // Tract data APIs
-  '/api/pricing', // Pricing calculator
-  '/api/founders/', // Founders registration
-  '/api/deals', // Marketplace deals - public read
-  '/api/cdes', // CDE directory - public read
-  '/api/investors', // Investor directory - public read
+  '/api/auth/',        // Auth APIs are public
+  '/api/register',     // Registration API
+  '/api/contact',      // Contact form API
+  '/api/eligibility',  // Census tract eligibility lookup
+  '/api/geo/',         // Geo/tract resolution APIs
+  '/api/tracts/',      // Tract data APIs
+  '/api/map/',         // Map tracts API - Source of Truth map
+  '/api/tiles/',       // <--- ADD THIS LINE (Public Map Tiles)
+  '/api/pricing',      // Pricing calculator
+  '/api/founders/',    // Founders registration
+  '/api/deals',        // Marketplace deals - public read
+  '/api/cdes',         // CDE directory - public read
+  '/api/investors',    // Investor directory - public read
   '/_next',
   '/favicon',
   '/images',
   '/fonts',
   '/icons',
   '/blog/',
-  '/r/', // QR/referral redirects
+  '/r/',               // QR/referral redirects
 ];
 
 // Protected route prefixes that always need auth

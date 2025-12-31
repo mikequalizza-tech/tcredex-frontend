@@ -26,21 +26,41 @@ export function getSupabase(): SupabaseClient {
 
 /**
  * Get server-side Supabase (uses service role key for full access)
+ *
+ * NOTE: In the new architecture, admin operations should go through the backend API.
+ * This function is kept for backward compatibility during migration.
  */
 export function getSupabaseAdmin(): SupabaseClient {
   if (!_supabaseAdmin) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      // During build, return a dummy client that will fail at runtime
-      // This prevents build errors while ensuring runtime checks work
-      if (process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
+    }
+
+    // Warn if falling back to anon key (operations may fail)
+    if (!serviceKey && anonKey) {
+      console.warn(
+        '[DEPRECATION] Using anon key for admin operations. ' +
+        'For production, admin operations should go through tcredex-backend API. ' +
+        'See lib/api/client.ts for the new architecture.'
+      );
+      _supabaseAdmin = createClient(url, anonKey);
+    } else if (serviceKey) {
+      _supabaseAdmin = createClient(url, serviceKey);
+    } else {
+      // During build, return a dummy client
+      if (typeof window === 'undefined') {
         console.warn('Supabase admin env vars not available during build');
         return createClient('https://placeholder.supabase.co', 'placeholder-key');
       }
-      throw new Error('Missing Supabase admin environment variables');
+      throw new Error(
+        'Missing Supabase credentials. ' +
+        'Set SUPABASE_SERVICE_ROLE_KEY or use backend API for admin operations.'
+      );
     }
-    _supabaseAdmin = createClient(url, key);
   }
   return _supabaseAdmin;
 }

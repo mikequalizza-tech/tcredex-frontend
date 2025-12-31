@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Deal } from '@/components/DealCard';
+import { Deal } from '@/lib/data/deals';
 
 interface DealMapViewProps {
   deals: Deal[];
@@ -132,11 +132,11 @@ export default function DealMapView({ deals, selectedDealId, onSelectDeal }: Dea
           <p class="text-xs text-indigo-400">${deal.location}</p>
           <div class="mt-2 text-xs">
             <span class="text-gray-400">Cost:</span> 
-            <span class="text-white">$${(deal.projectCost / 1000000).toFixed(1)}M</span>
+            <span class="text-white">$${((deal.projectCost || 0) / 1000000).toFixed(1)}M</span>
           </div>
           <div class="text-xs">
             <span class="text-gray-400">Gap:</span> 
-            <span class="text-orange-400">$${(deal.financingGap / 1000000).toFixed(2)}M</span>
+            <span class="text-orange-400">$${((deal.financingGap || 0) / 1000000).toFixed(2)}M</span>
           </div>
         </div>
       `);

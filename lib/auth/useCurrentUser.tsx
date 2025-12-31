@@ -13,62 +13,8 @@ function deleteCookie(name: string) {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
 }
 
-// Demo users for different roles
-const DEMO_USERS: Record<string, User> = {
-  cde: {
-    id: 'u1', email: 'sarah@midwestcde.com', name: 'Sarah Chen', role: Role.ORG_ADMIN,
-    organizationId: 'org1',
-    organization: { id: 'org1', name: 'Midwest Community CDE', slug: 'midwest-cde', type: 'cde' },
-    projectAssignments: [
-      { projectId: 'P001', projectName: 'Eastside Grocery Co-Op', role: 'admin' },
-      { projectId: 'P002', projectName: 'Northgate Health Center', role: 'admin' },
-    ],
-    createdAt: '2024-01-15T09:00:00Z', lastLoginAt: new Date().toISOString(),
-  },
-  sponsor: {
-    id: 'u2', email: 'john@eastsidefood.org', name: 'John Martinez', role: Role.ORG_ADMIN,
-    organizationId: 'org2',
-    organization: { id: 'org2', name: 'Eastside Food Collective', slug: 'eastside-food', type: 'sponsor' },
-    projectAssignments: [{ projectId: 'P001', projectName: 'Eastside Grocery Co-Op', role: 'admin' }],
-    createdAt: '2024-03-10T09:00:00Z', lastLoginAt: new Date().toISOString(),
-  },
-  investor: {
-    id: 'u3', email: 'michael@greatlakes.bank', name: 'Michael Thompson', role: Role.ORG_ADMIN,
-    organizationId: 'org3',
-    organization: { id: 'org3', name: 'Great Lakes Bank', slug: 'greatlakes-bank', type: 'investor' },
-    projectAssignments: [{ projectId: 'P001', projectName: 'Eastside Grocery Co-Op', role: 'viewer' }],
-    createdAt: '2024-02-20T09:00:00Z', lastLoginAt: new Date().toISOString(),
-  },
-  admin: {
-    id: 'u4', email: 'admin@tcredex.com', name: 'Platform Admin', role: Role.ORG_ADMIN,
-    organizationId: 'org0',
-    organization: { id: 'org0', name: 'tCredex Platform', slug: 'tcredex', type: 'cde' },
-    projectAssignments: [],
-    createdAt: '2023-01-01T09:00:00Z', lastLoginAt: new Date().toISOString(),
-  },
-};
-
-// Demo credentials - REMOVED FOR SECURITY
-// Use environment variables for demo accounts in development
-const DEMO_CREDENTIALS: Record<string, { password: string; role: string }> = 
-  process.env.NODE_ENV === 'development' ? {
-    [process.env.DEMO_CDE_EMAIL || 'sarah@midwestcde.com']: { 
-      password: process.env.DEMO_PASSWORD || 'demo123', 
-      role: 'cde' 
-    },
-    [process.env.DEMO_SPONSOR_EMAIL || 'john@eastsidefood.org']: { 
-      password: process.env.DEMO_PASSWORD || 'demo123', 
-      role: 'sponsor' 
-    },
-    [process.env.DEMO_INVESTOR_EMAIL || 'michael@greatlakes.bank']: { 
-      password: process.env.DEMO_PASSWORD || 'demo123', 
-      role: 'investor' 
-    },
-    [process.env.DEMO_ADMIN_EMAIL || 'admin@tcredex.com']: { 
-      password: process.env.DEMO_ADMIN_PASSWORD || 'admin123', 
-      role: 'admin' 
-    },
-  } : {};
+// User cache for session restoration (populated from API)
+let userCache: Record<string, User> = {};
 
 export interface ExtendedAuthContext extends AuthContext {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -78,6 +24,7 @@ export interface ExtendedAuthContext extends AuthContext {
   orgType: 'cde' | 'sponsor' | 'investor' | undefined;
   orgName: string;
   orgLogo?: string;
+  organizationId: string | undefined;
   userName: string;
   userEmail: string;
 }
@@ -85,26 +32,44 @@ export interface ExtendedAuthContext extends AuthContext {
 const AuthContextValue = createContext<ExtendedAuthContext | undefined>(undefined);
 
 function createUserFromSession(session: any): User {
-  // Check if this is a registered user (has name/orgName) vs demo login
-  const isRegisteredUser = session.name && session.orgName;
-  
-  // If it's a demo user login (no custom name), return demo user
-  if (!isRegisteredUser && DEMO_USERS[session.role]) {
-    return DEMO_USERS[session.role];
+  // If we have cached user data from API, use it
+  if (session.email && userCache[session.email]) {
+    return userCache[session.email];
   }
 
-  // Create user from registered session data
+  // If session has full user data (from API response), use it
+  if (session.user) {
+    const apiUser = session.user;
+    return {
+      id: apiUser.id || 'u-' + Date.now(),
+      email: apiUser.email,
+      name: apiUser.name || 'User',
+      role: apiUser.role === 'ORG_ADMIN' ? Role.ORG_ADMIN : Role.MEMBER,
+      organizationId: apiUser.organizationId || 'org-temp',
+      organization: apiUser.organization || {
+        id: 'org-temp',
+        name: 'Organization',
+        slug: 'org',
+        type: apiUser.userType || 'cde',
+      },
+      projectAssignments: [],
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+  }
+
+  // Fallback for legacy session data
   return {
     id: 'u-' + Date.now(),
-    email: session.email,
+    email: session.email || '',
     name: session.name || 'User',
     role: Role.ORG_ADMIN,
-    organizationId: 'org-custom',
-    organization: {
-      id: 'org-custom',
+    organizationId: session.organizationId || 'org-temp',
+    organization: session.organization || {
+      id: 'org-temp',
       name: session.orgName || 'My Organization',
       slug: session.orgName?.toLowerCase().replace(/\s+/g, '-') || 'my-org',
-      type: session.role as 'sponsor' | 'cde' | 'investor',
+      type: (session.userType || session.role || 'cde') as 'sponsor' | 'cde' | 'investor',
     },
     projectAssignments: [],
     createdAt: session.registeredAt || new Date().toISOString(),
@@ -143,51 +108,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     const normalizedEmail = email.toLowerCase().trim();
-    
-    // Check demo credentials first
-    const demoCred = DEMO_CREDENTIALS[normalizedEmail];
-    if (demoCred && demoCred.password === password) {
-      const role = demoCred.role as 'sponsor' | 'cde' | 'investor' | 'admin';
-      const demoUser = DEMO_USERS[role];
-      setCurrentDemoRole(role);
-      setUser(demoUser);
-      
-      if (typeof window !== 'undefined') {
-        const sessionData = { 
-          role, 
-          email: normalizedEmail,
-          orgRole: demoUser.role // ORG_ADMIN, PROJECT_ADMIN, etc.
-        };
-        localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
-        // Set cookie for middleware
-        setCookie('tcredex_session', JSON.stringify(sessionData));
-      }
-      return { success: true };
-    }
 
-    // Check registered user
-    if (typeof window !== 'undefined') {
-      const registeredUser = localStorage.getItem('tcredex_registered_user');
-      if (registeredUser) {
-        const userData = JSON.parse(registeredUser);
-        if (userData.email === normalizedEmail && userData.password === password) {
-          setCurrentDemoRole(userData.role);
-          setUser(createUserFromSession(userData));
-          const sessionData = { ...userData, orgRole: Role.ORG_ADMIN };
+    try {
+      // Call the demo login API to authenticate against Supabase tables
+      const response = await fetch('/api/auth/demo-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success && data.user) {
+        // Create user from API response
+        const apiUser = data.user;
+        const role = apiUser.userType as 'sponsor' | 'cde' | 'investor' | 'admin';
+
+        const userData: User = {
+          id: apiUser.id,
+          email: apiUser.email,
+          name: apiUser.name,
+          role: apiUser.role === 'ORG_ADMIN' ? Role.ORG_ADMIN : Role.MEMBER,
+          organizationId: apiUser.organizationId || '',
+          organization: apiUser.organization || {
+            id: 'org-' + Date.now(),
+            name: 'Organization',
+            slug: 'org',
+            type: role,
+          },
+          projectAssignments: [],
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        };
+
+        // Cache the user for session restoration
+        userCache[normalizedEmail] = userData;
+
+        setCurrentDemoRole(role);
+        setUser(userData);
+
+        if (typeof window !== 'undefined') {
+          const sessionData = {
+            role,
+            email: normalizedEmail,
+            userType: role,
+            user: apiUser,
+            orgRole: apiUser.role,
+          };
           localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
-          // Set cookie for middleware
           setCookie('tcredex_session', JSON.stringify(sessionData));
-          return { success: true };
+        }
+        return { success: true };
+      }
+
+      // API returned an error
+      return { success: false, error: data.error || 'Login failed' };
+
+    } catch (error) {
+      console.error('[Login] API error:', error);
+
+      // Fallback: Check localStorage for registered users
+      if (typeof window !== 'undefined') {
+        const registeredUser = localStorage.getItem('tcredex_registered_user');
+        if (registeredUser) {
+          try {
+            const userData = JSON.parse(registeredUser);
+            if (userData.email === normalizedEmail && userData.password === password) {
+              setCurrentDemoRole(userData.role);
+              setUser(createUserFromSession(userData));
+              const sessionData = { ...userData, orgRole: Role.ORG_ADMIN };
+              localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
+              setCookie('tcredex_session', JSON.stringify(sessionData));
+              return { success: true };
+            }
+          } catch (e) {
+            console.error('Error parsing registered user data:', e);
+            localStorage.removeItem('tcredex_registered_user');
+          }
         }
       }
-    }
 
-    // Check if email exists but wrong password
-    if (demoCred) {
-      return { success: false, error: 'Invalid password' };
+      return { success: false, error: 'Login failed. Please check your credentials.' };
     }
-    
-    return { success: false, error: 'No account found with this email. Please register first.' };
   }, []);
 
   const logout = useCallback(() => {
@@ -203,17 +205,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const switchRole = useCallback((role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
     if (!user) return;
-    const demoUser = DEMO_USERS[role];
+    // Role switching is deprecated - users should log in as a different user
+    // Just update the displayed role without changing user data
     setCurrentDemoRole(role);
-    setUser(demoUser);
     if (typeof window !== 'undefined') {
-      const sessionData = { 
-        role, 
-        email: demoUser.email,
-        orgRole: demoUser.role 
-      };
-      localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
-      setCookie('tcredex_session', JSON.stringify(sessionData));
+      const savedSession = localStorage.getItem('tcredex_session');
+      if (savedSession) {
+        try {
+          const session = JSON.parse(savedSession);
+          session.role = role;
+          session.userType = role;
+          localStorage.setItem('tcredex_session', JSON.stringify(session));
+          setCookie('tcredex_session', JSON.stringify(session));
+        } catch { /* ignore */ }
+      }
     }
   }, [user]);
 
@@ -285,6 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     orgType: user?.organization.type,
     orgName: user?.organization.name || '',
     orgLogo: user?.organization.logo,
+    organizationId: user?.organizationId,
     userName: user?.name || '',
     userEmail: user?.email || '',
   };

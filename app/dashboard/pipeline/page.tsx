@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useCurrentUser } from '@/lib/auth';
-import { fetchDeals } from '@/lib/supabase/queries';
+import { fetchDeals, fetchDealsByOrganization } from '@/lib/supabase/queries';
 import { DealStatus } from '@/lib/data/deals';
 
 // ============================================
@@ -89,7 +89,7 @@ export default function PipelinePage() {
 
 function PipelineContent() {
   const router = useRouter();
-  const { orgType, orgName, currentDemoRole } = useCurrentUser();
+  const { orgType, orgName, currentDemoRole, organizationId } = useCurrentUser();
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [selectedDeal, setSelectedDeal] = useState<PipelineDeal | null>(null);
   const [drafts, setDrafts] = useState<PipelineDeal[]>([]);
@@ -136,7 +136,10 @@ function PipelineContent() {
     async function loadSupabaseDeals() {
       setIsLoadingSupabase(true);
       try {
-        const fetched = await fetchDeals();
+        const fetched = organizationId
+          ? await fetchDealsByOrganization(organizationId)
+          : await fetchDeals();
+
         const mapped: PipelineDeal[] = fetched.map(d => ({
           id: d.id,
           projectName: d.projectName,
@@ -171,8 +174,8 @@ function PipelineContent() {
       }
     }
     loadSupabaseDeals();
-  }, [effectiveRole]);
-  
+  }, [effectiveRole, organizationId]);
+
   const getStageConfig = (): Record<string, StageConfig> => {
     switch (effectiveRole) {
       case 'sponsor': return SPONSOR_STAGES;
@@ -189,6 +192,10 @@ function PipelineContent() {
       case 'investor': return ['reviewing', 'loi_issued', 'committed', 'closing'];
       default: return ['draft', 'submitted', 'loi_received', 'committed', 'closing'];
     }
+  };
+
+  const getPipelineDeals = (): PipelineDeal[] => {
+    return [...drafts, ...supabaseDeals];
   };
 
   const getPageTitle = (): string => {
@@ -235,7 +242,7 @@ function PipelineContent() {
       try {
         const response = await fetch(`/api/drafts?email=${encodeURIComponent(userEmail)}`);
         const result = await response.json();
-        
+
         if (result.draft) {
           const draftDeal: PipelineDeal = {
             id: result.draft.id,
@@ -265,7 +272,7 @@ function PipelineContent() {
     loadDrafts();
   }, [effectiveRole]);
 
-  const formatCurrency = (num: number) => 
+  const formatCurrency = (num: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
 
   const getStageDeals = (stage: PipelineStage) => {
@@ -382,11 +389,11 @@ function PipelineContent() {
           {stages.map(stage => {
             const config = stageConfig[stage];
             if (!config) return null;
-            
+
             const stageDeals = getStageDeals(stage);
             const stageTotal = stageDeals.reduce((sum, d) => sum + d.allocationRequest, 0);
             const isDraftColumn = stage === 'draft';
-            
+
             return (
               <div key={stage} className="flex-shrink-0 w-72">
                 {/* Column Header */}
@@ -407,7 +414,7 @@ function PipelineContent() {
                     <div className="text-xs text-gray-400 mt-1">{formatCurrency(stageTotal)}</div>
                   )}
                 </div>
-                
+
                 {/* Cards */}
                 <div className={`rounded-b-lg p-2 border border-gray-800 border-t-0 min-h-[400px] space-y-2 ${isDraftColumn ? 'bg-gray-800/20' : 'bg-gray-900/50'}`}>
                   {/* Empty draft state */}
@@ -443,8 +450,8 @@ function PipelineContent() {
                       key={deal.id}
                       onClick={() => handleDealClick(deal)}
                       className={`rounded-lg p-3 border cursor-pointer transition-colors ${
-                        deal.isDraft 
-                          ? 'bg-gray-800/50 border-dashed border-gray-600 hover:border-indigo-500' 
+                        deal.isDraft
+                          ? 'bg-gray-800/50 border-dashed border-gray-600 hover:border-indigo-500'
                           : 'bg-gray-900 border-gray-800 hover:border-indigo-500'
                       }`}
                     >
@@ -463,7 +470,7 @@ function PipelineContent() {
                               </svg>
                             </button>
                           </div>
-                          
+
                           {/* Progress bar */}
                           <div className="mb-3">
                             <div className="flex justify-between text-xs mb-1">
@@ -471,13 +478,13 @@ function PipelineContent() {
                               <span className="text-indigo-400">{deal.readinessScore || 0}%</span>
                             </div>
                             <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                              <div 
+                              <div
                                 className="h-full bg-indigo-500 rounded-full transition-all"
                                 style={{ width: `${deal.readinessScore || 0}%` }}
                               />
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-gray-500">{deal.daysInStage}d ago</span>
                             <span className="text-indigo-400 font-medium flex items-center gap-1">
@@ -497,14 +504,14 @@ function PipelineContent() {
                               {deal.matchScore}
                             </span>
                           </div>
-                          
+
                           {/* Show different info based on role */}
                           <p className="text-xs text-gray-500 mb-2">
                             {effectiveRole === 'sponsor' && deal.cdeName && `CDE: ${deal.cdeName}`}
                             {effectiveRole === 'cde' && `Sponsor: ${deal.sponsorName}`}
                             {effectiveRole === 'investor' && deal.cdeName && `via ${deal.cdeName}`}
                           </p>
-                          
+
                           {/* 3-day hold indicator for CDE */}
                           {effectiveRole === 'cde' && deal.stage === 'new' && deal.holdExpires && (
                             <div className="mb-2">
@@ -512,13 +519,13 @@ function PipelineContent() {
                                 const holdStatus = getHoldStatus(deal);
                                 return holdStatus && (
                                   <span className={`text-xs px-2 py-0.5 rounded-full bg-gray-800 ${holdStatus.color}`}>
-                                    ⏱ {holdStatus.text}
+                                    {holdStatus.text}
                                   </span>
                                 );
                               })()}
                             </div>
                           )}
-                          
+
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-indigo-400">
                               {formatCurrency(deal.allocationRequest)}
@@ -536,7 +543,7 @@ function PipelineContent() {
                               ))}
                             </div>
                           </div>
-                          
+
                           {deal.nextAction && (
                             <div className="mt-2 pt-2 border-t border-gray-800">
                               <p className="text-xs text-gray-400 line-clamp-1">{deal.nextAction}</p>
@@ -547,7 +554,7 @@ function PipelineContent() {
                               )}
                             </div>
                           )}
-                          
+
                           <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800">
                             <span className="text-xs text-gray-500">{deal.city}, {deal.state}</span>
                             <span className="text-xs text-gray-500">{deal.daysInStage}d in stage</span>
@@ -584,8 +591,8 @@ function PipelineContent() {
             <tbody className="divide-y divide-gray-800">
               {/* Drafts first (sponsors only) */}
               {effectiveRole === 'sponsor' && drafts.map(draft => (
-                <tr 
-                  key={draft.id} 
+                <tr
+                  key={draft.id}
                   className="hover:bg-gray-800/50 cursor-pointer bg-gray-800/20"
                   onClick={() => router.push('/intake')}
                 >
@@ -599,7 +606,7 @@ function PipelineContent() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-indigo-500 rounded-full"
                           style={{ width: `${draft.readinessScore || 0}%` }}
                         />
@@ -616,7 +623,7 @@ function PipelineContent() {
                   </td>
                 </tr>
               ))}
-              
+
               {/* Active deals */}
               {pipeline.map(deal => {
                 const config = stageConfig[deal.stage];

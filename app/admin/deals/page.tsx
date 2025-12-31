@@ -1,127 +1,40 @@
 ﻿'use client';
 
-import { useState } from 'react';
-import DealCard, { Deal } from '@/components/DealCard';
-
-// Sample deals
-const allDeals: Deal[] = [
-  {
-    id: 'D12345',
-    projectName: 'Eastside Grocery Co-Op',
-    location: 'Springfield, IL',
-    parent: 'Local Roots Foundation',
-    address: '1234 Market St',
-    censusTract: '17031010100',
-    povertyRate: 32,
-    medianIncome: 28500,
-    unemployment: 11.4,
-    projectCost: 7200000,
-    fedNmtcReq: 5000000,
-    stateNmtcReq: 1500000,
-    htc: 450000,
-    shovelReady: true,
-    completionDate: 'Dec 2025',
-    financingGap: 400000,
-  },
-  {
-    id: 'D12346',
-    projectName: 'Northgate Health Center',
-    location: 'Detroit, MI',
-    parent: 'Community Health Partners',
-    address: '500 Woodward Ave',
-    censusTract: '26163520100',
-    povertyRate: 38,
-    medianIncome: 24200,
-    unemployment: 14.2,
-    projectCost: 12500000,
-    fedNmtcReq: 8000000,
-    stateNmtcReq: 2000000,
-    shovelReady: true,
-    completionDate: 'Mar 2026',
-    financingGap: 750000,
-  },
-  {
-    id: 'D12347',
-    projectName: 'Heritage Arts Center',
-    location: 'Baltimore, MD',
-    parent: 'Baltimore Cultural Trust',
-    address: '221 Pratt St',
-    censusTract: '24510030100',
-    povertyRate: 28,
-    medianIncome: 31500,
-    unemployment: 9.8,
-    projectCost: 4800000,
-    fedNmtcReq: 3000000,
-    htc: 1200000,
-    shovelReady: false,
-    completionDate: 'Jun 2026',
-    financingGap: 280000,
-  },
-  {
-    id: 'D12348',
-    projectName: 'Riverfront Manufacturing Hub',
-    location: 'Cleveland, OH',
-    parent: 'Great Lakes Economic Corp',
-    address: '800 Lakeside Ave',
-    censusTract: '39035108100',
-    povertyRate: 41,
-    medianIncome: 22100,
-    unemployment: 15.6,
-    projectCost: 18500000,
-    fedNmtcReq: 12000000,
-    stateNmtcReq: 3000000,
-    shovelReady: true,
-    completionDate: 'Sep 2026',
-    financingGap: 1200000,
-  },
-  {
-    id: 'D12349',
-    projectName: 'Downtown Child Care Center',
-    location: 'Memphis, TN',
-    parent: 'Memphis Family Services',
-    address: '345 Union Ave',
-    censusTract: '47157003900',
-    povertyRate: 35,
-    medianIncome: 26800,
-    unemployment: 12.1,
-    projectCost: 3200000,
-    fedNmtcReq: 2000000,
-    shovelReady: true,
-    completionDate: 'Aug 2025',
-    financingGap: 180000,
-  },
-  {
-    id: 'D12350',
-    projectName: 'Historic Hotel Restoration',
-    location: 'St. Louis, MO',
-    parent: 'Gateway Preservation LLC',
-    address: '100 Washington Ave',
-    censusTract: '29510101100',
-    povertyRate: 29,
-    medianIncome: 29500,
-    unemployment: 10.2,
-    projectCost: 24000000,
-    fedNmtcReq: 10000000,
-    htc: 8500000,
-    shovelReady: false,
-    completionDate: 'Dec 2026',
-    financingGap: 2100000,
-  },
-];
-
-const formatCurrency = (amount: number) => {
-  if (amount >= 1000000) {
-    return `$${(amount / 1000000).toFixed(1)}M`;
-  }
-  return `$${(amount / 1000).toFixed(0)}K`;
-};
+import { useState, useEffect } from 'react';
+import DealCard from '@/components/DealCard';
+import { Deal } from '@/lib/data/deals';
+import { fetchDeals } from '@/lib/supabase/queries';
 
 type DealStatus = 'all' | 'active' | 'pending' | 'closed';
 
 export default function AdminDealsPage() {
+  const [allDeals, setAllDeals] = useState<Deal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [statusFilter, setStatusFilter] = useState<DealStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    async function loadDeals() {
+      setIsLoading(true);
+      try {
+        const deals = await fetchDeals();
+        setAllDeals(deals);
+      } catch (error) {
+        console.error('Failed to fetch deals:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadDeals();
+  }, []);
+
+  const formatCurrency = (amount: number) => {
+    if (amount >= 1000000) {
+      return `$${(amount / 1000000).toFixed(1)}M`;
+    }
+    return `$${(amount / 1000).toFixed(0)}K`;
+  };
 
   const filteredDeals = allDeals.filter((deal) => {
     if (!searchQuery) return true;
@@ -129,7 +42,8 @@ export default function AdminDealsPage() {
     return (
       deal.projectName.toLowerCase().includes(query) ||
       deal.id.toLowerCase().includes(query) ||
-      deal.location.toLowerCase().includes(query)
+      deal.city.toLowerCase().includes(query) ||
+      deal.state.toLowerCase().includes(query)
     );
   });
 
@@ -180,50 +94,56 @@ export default function AdminDealsPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-900 border-b border-gray-800">
-              <tr>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Deal ID</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Project Name</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Project Cost</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {filteredDeals.map((deal) => (
-                <tr 
-                  key={deal.id} 
-                  className={`hover:bg-gray-900/50 cursor-pointer ${selectedDeal?.id === deal.id ? 'bg-gray-900' : ''}`}
-                  onClick={() => setSelectedDeal(deal)}
-                >
-                  <td className="px-6 py-4 text-sm font-mono text-gray-400">{deal.id}</td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-100">{deal.projectName}</div>
-                    <div className="text-xs text-gray-500">{deal.parent}</div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-300">{deal.location}</td>
-                  <td className="px-6 py-4 text-sm text-indigo-400 font-medium">{formatCurrency(deal.projectCost)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      deal.shovelReady 
-                        ? 'bg-green-500/20 text-green-400' 
-                        : 'bg-yellow-500/20 text-yellow-400'
-                    }`}>
-                      {deal.shovelReady ? 'Active' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      <button className="text-xs text-indigo-400 hover:text-indigo-300">Edit</button>
-                      <button className="text-xs text-gray-400 hover:text-gray-300">Archive</button>
-                    </div>
-                  </td>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-900 border-b border-gray-800">
+                <tr>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Deal ID</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Project Name</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Allocation</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {filteredDeals.map((deal) => (
+                  <tr 
+                    key={deal.id} 
+                    className={`hover:bg-gray-900/50 cursor-pointer ${selectedDeal?.id === deal.id ? 'bg-gray-900' : ''}`}
+                    onClick={() => setSelectedDeal(deal)}
+                  >
+                    <td className="px-6 py-4 text-sm font-mono text-gray-400">{deal.id.slice(0, 8)}...</td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-100">{deal.projectName}</div>
+                      <div className="text-xs text-gray-500">{deal.sponsorName}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-300">{deal.city}, {deal.state}</td>
+                    <td className="px-6 py-4 text-sm text-indigo-400 font-medium">{formatCurrency(deal.allocation)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        deal.status === 'available' 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {deal.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        <button className="text-xs text-indigo-400 hover:text-indigo-300">Edit</button>
+                        <button className="text-xs text-gray-400 hover:text-gray-300">Archive</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

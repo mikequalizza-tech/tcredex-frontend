@@ -30,34 +30,66 @@ export interface FullTractData extends TractResolution, TractEligibility {}
  * Resolve an address to its census tract ID
  */
 export async function resolveCensusTract(address: string): Promise<TractResolution> {
-  const res = await fetch(
-    `/api/geo/resolve-tract?address=${encodeURIComponent(address)}`
-  );
-  if (!res.ok) {
-    throw new Error("Unable to resolve census tract");
+  try {
+    const res = await fetch(
+      `/api/geo/resolve-tract?address=${encodeURIComponent(address)}`
+    );
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unknown error');
+      throw new Error(`Unable to resolve census tract: ${errorText}`);
+    }
+    return await res.json() as TractResolution;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Network error resolving census tract');
   }
-  return res.json() as Promise<TractResolution>;
 }
 
 /**
  * Get eligibility data for a census tract
  */
 export async function getTractEligibility(tractId: string): Promise<TractEligibility> {
-  const res = await fetch(`/api/eligibility?tract=${encodeURIComponent(tractId)}`);
-  if (!res.ok) {
-    throw new Error("Unable to fetch tract eligibility");
+  try {
+    const res = await fetch(`/api/eligibility?tract=${encodeURIComponent(tractId)}`);
+    if (!res.ok) {
+      // Return default non-eligible data instead of throwing
+      return {
+        tract_id: tractId,
+        eligible: false,
+        poverty_rate: null,
+        median_income_pct: null,
+        unemployment: null,
+        severely_distressed: false,
+        programs: [],
+        classification: 'Unknown'
+      };
+    }
+    const data = await res.json();
+    return {
+      tract_id: tractId,
+      eligible: data.eligible,
+      poverty_rate: data.povertyRate,
+      median_income_pct: data.medianIncomePct,
+      unemployment: data.unemployment,
+      severely_distressed: data.programs?.includes('Severely Distressed') || false,
+      programs: data.programs || [],
+      classification: data.details?.classification || 'Unknown'
+    };
+  } catch (error) {
+    console.error('Error fetching tract eligibility:', error);
+    return {
+      tract_id: tractId,
+      eligible: false,
+      poverty_rate: null,
+      median_income_pct: null,
+      unemployment: null,
+      severely_distressed: false,
+      programs: [],
+      classification: 'Unknown'
+    };
   }
-  const data = await res.json();
-  return {
-    tract_id: tractId,
-    eligible: data.eligible,
-    poverty_rate: data.povertyRate,
-    median_income_pct: data.medianIncomePct,
-    unemployment: data.unemployment,
-    severely_distressed: data.programs?.includes('Severely Distressed') || false,
-    programs: data.programs || [],
-    classification: data.details?.classification || 'Unknown'
-  };
 }
 
 /**
@@ -80,13 +112,18 @@ export async function resolveAddressToEligibility(address: string): Promise<Full
  * Resolve coordinates to census tract (for map clicks)
  */
 export async function resolveCoordinatesToTract(lat: number, lng: number): Promise<TractResolution> {
-  const res = await fetch(
-    `/api/geo/resolve-tract?lat=${lat}&lng=${lng}`
-  );
-  if (!res.ok) {
-    throw new Error("Unable to resolve coordinates to census tract");
+  try {
+    const res = await fetch(
+      `/api/geo/resolve-tract?lat=${lat}&lng=${lng}`
+    );
+    if (!res.ok) {
+      throw new Error("Unable to resolve coordinates to census tract");
+    }
+    return await res.json() as TractResolution;
+  } catch (error) {
+    console.error('Error resolving coordinates:', error);
+    throw error;
   }
-  return res.json() as Promise<TractResolution>;
 }
 
 /**

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import DealMap from '@/components/maps/DealMap';
-import DealCard, { Deal as DealCardDeal } from '@/components/DealCard';
+import DealCard from '@/components/DealCard';
+import { Deal } from '@/lib/data/deals';
 import { fetchDeals } from '@/lib/supabase/queries';
 import { mapDealToCard } from '@/lib/utils/dealCardMapper';
 
@@ -17,7 +18,7 @@ export default function DealMapView() {
     minProjectCost: 0,
     maxProjectCost: 100000000,
   });
-  const [deals, setDeals] = useState<DealCardDeal[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,16 +42,21 @@ export default function DealMapView() {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         if (!deal.projectName.toLowerCase().includes(query) &&
-            !deal.location.toLowerCase().includes(query)) {
+            !(deal.location || '').toLowerCase().includes(query) &&
+            !deal.city.toLowerCase().includes(query) &&
+            !deal.state.toLowerCase().includes(query)) {
           return false;
         }
       }
       if (filters.shovelReady && !deal.shovelReady) return false;
-      if (deal.projectCost < filters.minProjectCost) return false;
-      if (deal.projectCost > filters.maxProjectCost) return false;
+      const projectCost = deal.projectCost || deal.allocation || 0;
+      if (projectCost < filters.minProjectCost) return false;
+      if (projectCost > filters.maxProjectCost) return false;
       if (filters.creditType !== 'all') {
-        if (filters.creditType === 'nmtc' && deal.fedNmtcReq === undefined) return false;
-        if (filters.creditType === 'htc' && deal.htc === undefined) return false;
+        if (filters.creditType === 'nmtc' && deal.programType !== 'NMTC') return false;
+        if (filters.creditType === 'htc' && deal.programType !== 'HTC') return false;
+        if (filters.creditType === 'lihtc' && deal.programType !== 'LIHTC') return false;
+        if (filters.creditType === 'oz' && deal.programType !== 'OZ') return false;
       }
       return true;
     });
@@ -58,7 +64,7 @@ export default function DealMapView() {
 
   // Stats
   const totalDeals = filteredDeals.length;
-  const totalProjectCost = filteredDeals.reduce((sum, d) => sum + d.projectCost, 0);
+  const totalProjectCost = filteredDeals.reduce((sum, d) => sum + (d.projectCost || d.allocation || 0), 0);
 
   const handleRequestMemo = (dealId: string) => {
     console.log('Requesting memo for:', dealId);
@@ -74,7 +80,7 @@ export default function DealMapView() {
             <h1 className="text-xl font-bold text-indigo-300">tCredex</h1>
             <span className="text-sm text-gray-400">Deal Map</span>
           </div>
-          
+
           {/* View Toggle */}
           <div className="flex gap-2">
             {(['sponsor', 'cde', 'investor'] as FilterView[]).map((view) => (
@@ -107,7 +113,7 @@ export default function DealMapView() {
           zoom={4}
           height="100%"
         />
-        
+
         {/* Map Stats Overlay */}
         <div className="absolute bottom-4 left-4 bg-slate-900/90 rounded-lg p-3 border border-gray-700">
           <p className="text-sm text-gray-400">Total Deals: <span className="text-green-400 font-semibold">{totalDeals}</span></p>

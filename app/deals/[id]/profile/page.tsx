@@ -7,12 +7,15 @@ import { getDealById, TRACT_LABELS, Deal } from '@/lib/data/deals';
 
 // Extended profile data generator
 function generateProfileData(deal: Deal) {
-  const totalProjectCost = deal.allocation * 2.5;
-  const financingGap = deal.allocation * 0.2;
+  const totalProjectCost = deal.projectCost || deal.allocation * 2.5;
+  const financingGap = deal.financingGap || deal.allocation * 0.2;
   
-  // Generate mock census tract from state and deal ID
-  const stateCode = deal.state === 'IL' ? '17' : deal.state === 'WI' ? '55' : deal.state === 'MI' ? '26' : deal.state === 'MO' ? '29' : deal.state === 'IN' ? '18' : deal.state === 'AL' ? '01' : '99';
-  const censusTract = `${stateCode}031${deal.id.replace(/\D/g, '').padStart(6, '0').slice(0, 6)}`;
+  // Use real census tract if available, otherwise generate mock
+  let censusTract = deal.censusTract;
+  if (!censusTract) {
+    const stateCode = deal.state === 'IL' ? '17' : deal.state === 'WI' ? '55' : deal.state === 'MI' ? '26' : deal.state === 'MO' ? '29' : deal.state === 'IN' ? '18' : deal.state === 'AL' ? '01' : '99';
+    censusTract = `${stateCode}031${deal.id.replace(/\D/g, '').padStart(6, '0').slice(0, 6)}`;
+  }
   
   return {
     // Header
@@ -27,15 +30,15 @@ function generateProfileData(deal: Deal) {
     status: deal.tractType.includes('SD') ? 'Severely Distressed' : 
             deal.tractType.includes('QCT') ? 'Qualified Census Tract' : 'Low-Income Community',
     povertyRate: deal.povertyRate || 28.5,
-    medianIncome: '41.98%', // MFI percentage
-    unemployment: 8.2,
+    medianIncome: deal.medianIncome ? `${deal.medianIncome}%` : '41.98%', // MFI percentage
+    unemployment: deal.unemployment || 8.2,
     projectCost: totalProjectCost,
     financingGap: financingGap,
     nmtcRequest: deal.allocation,
     lihtcAvail: 'N/A',
-    shovelReady: 'Yes',
-    completion: 'Q2 2026',
-    dealId: `TC-${deal.id.toUpperCase()}`,
+    shovelReady: deal.shovelReady ? 'Yes' : 'No',
+    completion: deal.completionDate || 'Q2 2026',
+    dealId: `TC-${deal.id.toUpperCase().slice(0, 8)}`,
     
     // Contact
     contactName: 'Michael Qualizza',
@@ -52,10 +55,12 @@ function generateProfileData(deal: Deal) {
       { name: 'NMTC Gap', amount: financingGap },
       { name: 'Public Capital', amount: totalProjectCost * 0.02 },
     ],
-    uses: [
-      { name: 'Construction', amount: totalProjectCost * 0.85 },
-      { name: 'Soft Costs', amount: totalProjectCost * 0.15 },
-    ],
+    uses: deal.useOfFunds && deal.useOfFunds.length > 0 
+      ? deal.useOfFunds.map(u => ({ name: u.category, amount: u.amount }))
+      : [
+          { name: 'Construction', amount: totalProjectCost * 0.85 },
+          { name: 'Soft Costs', amount: totalProjectCost * 0.15 },
+        ],
     totalSources: totalProjectCost,
     totalUses: totalProjectCost,
   };

@@ -4,7 +4,10 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef, useState } from "react";
 
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
+// Set Mapbox token only if available
+if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+  mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+}
 
 interface TractProperties {
   geoid: string;
@@ -32,7 +35,7 @@ export default function TractMap() {
     
     setLoading(true);
     try {
-      const res = await fetch(`/api/tracts/geojson?bbox=${bbox}&limit=1000`);
+      const res = await fetch(`/api/tracts/geojson?bbox=${bbox}`);
       const geojson = await res.json();
       
       const source = map.getSource("tracts") as mapboxgl.GeoJSONSource;
@@ -47,6 +50,10 @@ export default function TractMap() {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    if (!process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+      console.warn('TractMap: NEXT_PUBLIC_MAPBOX_TOKEN not set');
+      return;
+    }
 
     const map = new mapboxgl.Map({
       container: containerRef.current,

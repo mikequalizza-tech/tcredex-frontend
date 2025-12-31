@@ -4,10 +4,28 @@ import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import AddressAutocomplete from '@/components/forms/AddressAutocomplete';
 
-// Dynamic import to avoid SSR issues
+// Preload vector tiles for initial view (centered on US)
+// This runs immediately on module load to start fetching tiles before map renders
+if (typeof window !== 'undefined') {
+  // Prefetch center tiles at zoom 4 (full US view)
+  const tilesToPrefetch = [
+    '/api/tiles/4/3/5', '/api/tiles/4/4/5', '/api/tiles/4/5/5',
+    '/api/tiles/4/3/6', '/api/tiles/4/4/6', '/api/tiles/4/5/6',
+  ];
+  tilesToPrefetch.forEach(url => {
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = url;
+    link.as = 'fetch';
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  });
+}
+
+// Dynamic import to avoid SSR issues - with priority loading
 const HomeMapWithTracts = dynamic(
   () => import('@/components/maps/HomeMapWithTracts'),
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="w-full h-[500px] bg-gray-800 rounded-xl flex items-center justify-center">

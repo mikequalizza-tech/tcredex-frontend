@@ -428,3 +428,95 @@ export function getInvestorStats() {
     },
   };
 }
+
+// =============================================================================
+// ASYNC HELPER FUNCTIONS (USE SUPABASE)
+// These fetch from Supabase and fall back to DEMO_INVESTORS if no data
+// =============================================================================
+
+import { fetchInvestors as fetchSupabaseInvestors } from '@/lib/supabase/investorQueries';
+
+/**
+ * Get all investors - tries Supabase first, falls back to demo data
+ */
+export async function getInvestors(): Promise<Investor[]> {
+  try {
+    const supabaseInvestors = await fetchSupabaseInvestors();
+    if (supabaseInvestors.length > 0) {
+      return supabaseInvestors.map(inv => ({
+        id: inv.id,
+        name: inv.name,
+        slug: inv.slug,
+        description: inv.description,
+        investorType: inv.investorType as InvestorType,
+        totalCapital: inv.totalCapital,
+        availableCapital: inv.availableCapital,
+        targetDeployment: inv.targetDeployment,
+        programs: inv.programs as ProgramInterest[],
+        minInvestment: inv.minInvestment,
+        maxInvestment: inv.maxInvestment,
+        targetReturn: inv.targetReturn,
+        geographicFocus: inv.geographicFocus,
+        focusType: inv.focusType as 'national' | 'regional' | 'state' | 'local',
+        projectPreferences: inv.projectPreferences as ProjectPreference[],
+        requiresCDE: inv.requiresCDE,
+        directInvestment: inv.directInvestment,
+        dealsCompleted: inv.dealsCompleted,
+        totalInvested: inv.totalInvested,
+        avgDealSize: inv.avgDealSize,
+        primaryContact: inv.primaryContact,
+        contactEmail: inv.contactEmail,
+        contactPhone: inv.contactPhone,
+        website: inv.website,
+        activelyInvesting: inv.activelyInvesting,
+        responseTime: inv.responseTime as 'fast' | 'standard' | 'slow',
+      }));
+    }
+  } catch (e) {
+    console.error('Error fetching investors from Supabase, using demo data', e);
+  }
+  return DEMO_INVESTORS;
+}
+
+export async function getInvestorBySlugAsync(slug: string): Promise<Investor | undefined> {
+  const investors = await getInvestors();
+  return investors.find(inv => inv.slug === slug || inv.id === slug);
+}
+
+export async function getInvestorsByProgramAsync(program: ProgramInterest): Promise<Investor[]> {
+  const investors = await getInvestors();
+  return investors.filter(inv => inv.programs.includes(program));
+}
+
+export async function getInvestorsByStateAsync(state: string): Promise<Investor[]> {
+  const investors = await getInvestors();
+  return investors.filter(inv => inv.geographicFocus.includes('ALL') || inv.geographicFocus.includes(state));
+}
+
+export async function getInvestorsAcceptingDealsAsync(): Promise<Investor[]> {
+  const investors = await getInvestors();
+  return investors.filter(inv => inv.activelyInvesting);
+}
+
+export async function getInvestorStatsAsync() {
+  const investors = await getInvestors();
+  return {
+    total: investors.length,
+    active: investors.filter(i => i.activelyInvesting).length,
+    totalAvailable: investors.reduce((sum, i) => sum + i.availableCapital, 0),
+    byProgram: {
+      NMTC: investors.filter(i => i.programs.includes('NMTC')).length,
+      HTC: investors.filter(i => i.programs.includes('HTC')).length,
+      LIHTC: investors.filter(i => i.programs.includes('LIHTC')).length,
+      OZ: investors.filter(i => i.programs.includes('OZ')).length,
+      Brownfield: investors.filter(i => i.programs.includes('Brownfield')).length,
+    },
+    byType: {
+      bank: investors.filter(i => i.investorType === 'bank').length,
+      fund: investors.filter(i => i.investorType === 'fund').length,
+      insurance: investors.filter(i => i.investorType === 'insurance').length,
+      corporate: investors.filter(i => i.investorType === 'corporate').length,
+      other: investors.filter(i => ['family_office', 'foundation', 'government'].includes(i.investorType)).length,
+    },
+  };
+}

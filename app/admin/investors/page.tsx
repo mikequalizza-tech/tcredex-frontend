@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 interface Investor {
@@ -21,14 +21,6 @@ interface Investor {
   email: string;
 }
 
-const sampleInvestors: Investor[] = [
-  { id: 'INV001', name: 'Midwest Regional Bank', type: 'bank', totalCapacity: 150000000, deployed: 95000000, available: 55000000, activeDeals: 22, targetReturn: 'CRA + 4-5%', preferredSectors: ['Healthcare', 'Community Facilities', 'Manufacturing'], preferredStates: ['IL', 'WI', 'IN', 'MI', 'OH'], minDeal: 5000000, maxDeal: 25000000, status: 'active', contact: 'Thomas Reynolds', email: 'treynolds@midwestbank.com' },
-  { id: 'INV002', name: 'National Life Insurance Co', type: 'insurance', totalCapacity: 200000000, deployed: 142000000, available: 58000000, activeDeals: 31, targetReturn: '5-6% IRR', preferredSectors: ['Healthcare', 'Senior Housing', 'Mixed-Use'], preferredStates: ['Nationwide'], minDeal: 10000000, maxDeal: 50000000, status: 'active', contact: 'Linda Park', email: 'lpark@nationallife.com' },
-  { id: 'INV003', name: 'GreenTech Industries', type: 'corporate', totalCapacity: 45000000, deployed: 32000000, available: 13000000, activeDeals: 8, targetReturn: 'ESG + Market', preferredSectors: ['Clean Energy', 'Manufacturing', 'Technology'], preferredStates: ['CA', 'TX', 'NY', 'WA'], minDeal: 3000000, maxDeal: 15000000, status: 'active', contact: 'Michael Torres', email: 'mtorres@greentech.com' },
-  { id: 'INV004', name: 'Harrison Family Office', type: 'family-office', totalCapacity: 75000000, deployed: 41000000, available: 34000000, activeDeals: 12, targetReturn: '6-7% + Impact', preferredSectors: ['Education', 'Childcare', 'Healthcare'], preferredStates: ['Northeast'], minDeal: 2000000, maxDeal: 12000000, status: 'active', contact: 'Elizabeth Harrison', email: 'eharrison@harrisonfamily.com' },
-  { id: 'INV005', name: 'Impact Capital Fund III', type: 'fund', totalCapacity: 300000000, deployed: 178000000, available: 122000000, activeDeals: 45, targetReturn: '7-9% Net IRR', preferredSectors: ['All Qualified'], preferredStates: ['Nationwide'], minDeal: 8000000, maxDeal: 40000000, status: 'active', contact: 'David Kim', email: 'dkim@impactcapital.com' },
-];
-
 const formatCurrency = (amount: number) => amount >= 1000000 ? `$${(amount / 1000000).toFixed(1)}M` : `$${(amount / 1000).toFixed(0)}K`;
 
 const typeColors = {
@@ -40,18 +32,47 @@ const typeColors = {
 };
 
 export default function AdminInvestorsPage() {
-  const [investors, setInvestors] = useState<Investor[]>(sampleInvestors);
+  const [investors, setInvestors] = useState<Investor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
   const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const filteredInvestors = investors.filter((inv) => {
-    const matchesSearch = !searchQuery || inv.name.toLowerCase().includes(searchQuery.toLowerCase()) || inv.contact.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === 'all' || inv.type === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  const fetchInvestors = useCallback(async (type?: string, search?: string) => {
+    try {
+      const params = new URLSearchParams();
+      if (type && type !== 'all') params.set('type', type);
+      if (search) params.set('search', search);
+
+      const response = await fetch(`/api/admin/investors?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.investors) {
+        setInvestors(data.investors);
+      }
+    } catch (error) {
+      console.error('Failed to fetch investors:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchInvestors();
+  }, [fetchInvestors]);
+
+  // Refetch when filters change (with debounce for search)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchInvestors(typeFilter, searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [typeFilter, searchQuery, fetchInvestors]);
+
+  const filteredInvestors = investors;
 
   const totalCapacity = investors.reduce((sum, inv) => sum + inv.totalCapacity, 0);
   const totalAvailable = investors.reduce((sum, inv) => sum + inv.available, 0);
@@ -122,6 +143,17 @@ export default function AdminInvestorsPage() {
       <div className="flex">
         {/* Table */}
         <div className="flex-1 overflow-x-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-gray-400">Loading investors...</span>
+            </div>
+          ) : filteredInvestors.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <p className="text-lg">No investors found</p>
+              <p className="text-sm">Try adjusting your search or filters</p>
+            </div>
+          ) : (
           <table className="w-full">
             <thead className="bg-gray-900 border-b border-gray-800">
               <tr>
@@ -161,6 +193,7 @@ export default function AdminInvestorsPage() {
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         {/* Preview Panel */}

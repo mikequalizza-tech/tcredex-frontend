@@ -1,33 +1,46 @@
 /**
- * Tract Geometry API
- * Fetches census tract geometries from Census Bureau TigerWeb
- * 
+ * Tract Geometries API - SOURCE OF TRUTH
+ * =======================================
+ * Uses: tract_geometries + master_tax_credit_sot (via tract_map_layer view)
+ *
+ * The census_tracts table is DEPRECATED - do not use!
+ *
  * GET /api/geo/tracts?bbox=-90.5,38.5,-89.5,39.5
- * GET /api/geo/tracts?state=29 (Missouri FIPS)
  * GET /api/geo/tracts?geoid=29189010100
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
-// Cache for tract geometries (in-memory, resets on deploy)
-const tractCache = new Map<string, { data: unknown; timestamp: number }>();
-const CACHE_TTL = 1000 * 60 * 60; // 1 hour
-
-// TigerWeb ACS 2021 - Layer 8 = Tracts
-const TIGERWEB_TRACTS_URL = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query';
+interface TractRow {
+  geoid: string;
+  geom_json: string;
+  has_any_tax_credit: boolean;
+  is_qct: boolean;
+  is_oz: boolean;
+  is_dda: boolean;
+  is_nmtc_eligible: boolean;
+  has_state_nmtc: boolean;
+  has_state_htc: boolean;
+  has_brownfield_credit: boolean;
+  stack_score: number;
+  poverty_rate?: number;
+  mfi_pct?: number;
+  unemployment_rate?: number;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const bbox = searchParams.get('bbox');
-  const state = searchParams.get('state');
   const geoid = searchParams.get('geoid');
-  const limit = parseInt(searchParams.get('limit') || '200');
 
   try {
+    const supabase = getSupabaseAdmin();
+
     // Option 1: Get by bounding box
     if (bbox) {
       const [minLng, minLat, maxLng, maxLat] = bbox.split(',').map(Number);
-      
+
       if ([minLng, minLat, maxLng, maxLat].some(isNaN)) {
         return NextResponse.json(
           { error: 'Invalid bbox format. Use: minLng,minLat,maxLng,maxLat' },
@@ -35,143 +48,45 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const cacheKey = `bbox:${bbox}`;
-      const cached = tractCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return NextResponse.json(cached.data);
-      }
-
-      // Use URL-encoded envelope format that ArcGIS expects
-      const params = new URLSearchParams({
-        geometry: `${minLng},${minLat},${maxLng},${maxLat}`,
-        geometryType: 'esriGeometryEnvelope',
-        inSR: '4326',
-        spatialRel: 'esriSpatialRelIntersects',
-        outFields: 'GEOID,NAME,STATE,COUNTY,TRACT',
-        returnGeometry: 'true',
-        outSR: '4326',
-        f: 'geojson',
-        resultRecordCount: String(limit)
+      const { data, error } = await supabase.rpc('get_tracts_in_bbox', {
+        p_min_lng: minLng,
+        p_min_lat: minLat,
+        p_max_lng: maxLng,
+        p_max_lat: maxLat
       });
 
-      const fullUrl = `${TIGERWEB_TRACTS_URL}?${params.toString()}`;
-      console.log('[GeoTracts] Fetching:', fullUrl);
-
-      const response = await fetch(fullUrl, {
-        headers: { 
-          'Accept': 'application/json',
-        },
-      });
-
-      const text = await response.text();
-      let geojson;
-      
-      try {
-        geojson = JSON.parse(text);
-      } catch {
-        console.error('[GeoTracts] Failed to parse:', text.substring(0, 500));
+      if (error) {
+        console.error('[GeoTracts] BBox error:', error);
         return NextResponse.json({ type: 'FeatureCollection', features: [] });
       }
 
-      // Check for API error
-      if (geojson.error) {
-        console.error('[GeoTracts] TigerWeb error:', geojson.error);
-        return NextResponse.json({ 
-          type: 'FeatureCollection', 
-          features: [],
-          _error: geojson.error 
-        });
-      }
-      
-      // Validate GeoJSON structure
-      if (!geojson || geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
-        console.warn('[GeoTracts] Invalid response');
-        return NextResponse.json({ type: 'FeatureCollection', features: [] });
-      }
-      
-      // Filter invalid geometries
-      geojson.features = geojson.features.filter((f: { geometry?: { type?: string; coordinates?: unknown } }) => 
-        f && f.geometry && f.geometry.type && f.geometry.coordinates
-      );
+      const features = (data || []).map((row: TractRow) => mapRowToFeature(row));
+      console.log(`[GeoTracts] Returned ${features.length} tracts`);
 
-      console.log('[GeoTracts] Returned', geojson.features.length, 'tracts');
-      
-      tractCache.set(cacheKey, { data: geojson, timestamp: Date.now() });
-      
-      return NextResponse.json(geojson);
+      return NextResponse.json({
+        type: 'FeatureCollection',
+        features,
+        source: 'tract_map_layer'
+      });
     }
 
-    // Option 2: Get by state FIPS
-    if (state) {
-      const stateFips = state.padStart(2, '0');
-      const cacheKey = `state:${stateFips}`;
-      const cached = tractCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return NextResponse.json(cached.data);
-      }
-
-      const params = new URLSearchParams({
-        where: `STATE='${stateFips}'`,
-        outFields: 'GEOID,NAME,STATE,COUNTY,TRACT',
-        returnGeometry: 'true',
-        outSR: '4326',
-        f: 'geojson',
-        resultRecordCount: String(limit)
-      });
-
-      const response = await fetch(`${TIGERWEB_TRACTS_URL}?${params.toString()}`, {
-        headers: { 'Accept': 'application/json' },
-      });
-
-      const geojson = await response.json();
-      
-      if (!geojson || geojson.type !== 'FeatureCollection' || !Array.isArray(geojson.features)) {
-        return NextResponse.json({ type: 'FeatureCollection', features: [] });
-      }
-      
-      geojson.features = geojson.features.filter((f: { geometry?: { type?: string; coordinates?: unknown } }) => 
-        f && f.geometry && f.geometry.type && f.geometry.coordinates
-      );
-      
-      tractCache.set(cacheKey, { data: geojson, timestamp: Date.now() });
-      
-      return NextResponse.json(geojson);
-    }
-
-    // Option 3: Get single tract by GEOID
+    // Option 2: Get single tract by GEOID
     if (geoid) {
-      const cleanGeoid = geoid.replace(/[-\s]/g, '');
-      const cacheKey = `geoid:${cleanGeoid}`;
-      const cached = tractCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return NextResponse.json(cached.data);
-      }
+      const cleanGeoid = geoid.replace(/[-\s]/g, '').padStart(11, '0');
 
-      const params = new URLSearchParams({
-        where: `GEOID='${cleanGeoid}'`,
-        outFields: 'GEOID,NAME,STATE,COUNTY,TRACT',
-        returnGeometry: 'true',
-        outSR: '4326',
-        f: 'geojson'
+      const { data, error } = await supabase.rpc('get_tract_with_credits', {
+        p_geoid: cleanGeoid
       });
 
-      const response = await fetch(`${TIGERWEB_TRACTS_URL}?${params.toString()}`, {
-        headers: { 'Accept': 'application/json' },
-      });
-
-      const geojsonResult = await response.json();
-      
-      if (!geojsonResult || geojsonResult.type !== 'FeatureCollection' || !Array.isArray(geojsonResult.features)) {
+      if (error || !data || data.length === 0) {
         return NextResponse.json({ type: 'FeatureCollection', features: [] });
       }
-      
-      geojsonResult.features = geojsonResult.features.filter((f: { geometry?: { type?: string; coordinates?: unknown } }) => 
-        f && f.geometry && f.geometry.type && f.geometry.coordinates
-      );
-      
-      tractCache.set(cacheKey, { data: geojsonResult, timestamp: Date.now() });
-      
-      return NextResponse.json(geojsonResult);
+
+      return NextResponse.json({
+        type: 'FeatureCollection',
+        features: [mapRowToFeature(data[0] as TractRow)],
+        source: 'tract_map_layer'
+      });
     }
 
     // No valid params
@@ -179,16 +94,62 @@ export async function GET(request: NextRequest) {
       error: 'Missing required parameter',
       usage: {
         bbox: '/api/geo/tracts?bbox=-90.5,38.5,-89.5,39.5',
-        state: '/api/geo/tracts?state=29',
         geoid: '/api/geo/tracts?geoid=29189010100'
       }
     }, { status: 400 });
 
   } catch (error) {
-    console.error('[GeoTracts API] Error:', error);
+    console.error('[GeoTracts] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch tract geometries', details: String(error) },
       { status: 500 }
     );
   }
+}
+
+function buildProgramsArray(row: Partial<TractRow>): string[] {
+  const programs: string[] = [];
+  if (row.is_nmtc_eligible) programs.push('Federal NMTC');
+  if (row.is_qct) programs.push('LIHTC QCT');
+  if (row.is_oz) programs.push('Opportunity Zone');
+  if (row.is_dda) programs.push('DDA');
+  if (row.has_state_nmtc) programs.push('State NMTC');
+  if (row.has_state_htc) programs.push('State HTC');
+  if (row.has_brownfield_credit) programs.push('Brownfield');
+  return programs;
+}
+
+function mapRowToFeature(row: TractRow) {
+  const programs = buildProgramsArray(row);
+
+  return {
+    type: 'Feature',
+    id: row.geoid,
+    properties: {
+      geoid: row.geoid,
+      GEOID: row.geoid,
+      // SOT flags
+      has_any_tax_credit: row.has_any_tax_credit,
+      is_qct: row.is_qct,
+      is_oz: row.is_oz,
+      is_dda: row.is_dda,
+      is_nmtc_eligible: row.is_nmtc_eligible,
+      has_state_nmtc: row.has_state_nmtc,
+      has_state_htc: row.has_state_htc,
+      has_brownfield_credit: row.has_brownfield_credit,
+      // Legacy aliases
+      eligible: row.has_any_tax_credit,
+      is_lihtc_qct: row.is_qct,
+      is_oz_designated: row.is_oz,
+      // Metrics
+      stack_score: row.stack_score,
+      poverty_rate: row.poverty_rate,
+      mfi_pct: row.mfi_pct,
+      povertyRate: row.poverty_rate?.toFixed(1),
+      medianIncomePct: row.mfi_pct?.toFixed(0),
+      programs: JSON.stringify(programs),
+      program_count: programs.length
+    },
+    geometry: row.geom_json ? JSON.parse(row.geom_json) : null
+  };
 }

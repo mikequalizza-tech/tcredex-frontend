@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import DealCard, { Deal } from '@/components/DealCard';
+import DealCard from '@/components/DealCard';
+import { Deal } from '@/lib/data/deals';
 import { generateDealSummary, generateDealJSON, DealCardGeneratorResult } from '@/lib/deals';
 
 interface DealCardPreviewProps {

@@ -7,7 +7,7 @@ import { useCurrentUser } from '@/lib/auth';
 import { IntakeShell, IntakeData } from '@/components/intake-v4';
 import { DealCardPreview } from '@/components/deals';
 import { generateDealFromIntake, validateForDealCard, DealCardGeneratorResult } from '@/lib/deals';
-import { Deal } from '@/components/DealCard';
+import { Deal } from '@/lib/data/deals';
 
 interface DraftInfo {
   id: string;
@@ -306,16 +306,8 @@ export default function IntakePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          projectName: deal.projectName,
-          sponsorName: currentData?.sponsorName || deal.projectName,
-          email: userEmail || 'unknown@tcredex.com',
-          address: currentData?.projectAddress,
-          censusTract: currentData?.censusTract,
-          totalCost: String(deal.projectCost),
-          requestedNMTC: currentData?.requestedFedNMTC ? String(currentData.requestedFedNMTC) : undefined,
-          requestedHTC: currentData?.requestedHTC ? String(currentData.requestedHTC) : undefined,
-          requestedLIHTC: currentData?.requestedLIHTC ? String(currentData.requestedLIHTC) : undefined,
-          shovelReady: deal.shovelReady
+          intakeData: currentData,
+          saveOnly: false
         })
       });
 

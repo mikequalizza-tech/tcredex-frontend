@@ -2,30 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-
-export interface Deal {
-  id: string;
-  projectName: string;
-  location: string;
-  parent?: string;
-  address?: string;
-  censusTract?: string;
-  povertyRate?: number;
-  medianIncome?: number;
-  unemployment?: number;
-  projectCost: number;
-  fedNmtcReq?: number;
-  stateNmtcReq?: number;
-  htc?: number;
-  lihtc?: number;
-  shovelReady?: boolean;
-  completionDate?: string;
-  financingGap: number;
-  coordinates?: [number, number]; // [lng, lat]
-  description?: string;
-  impactStatement?: string;
-  hasProfile?: boolean;
-}
+import { Deal } from '@/lib/data/deals';
 
 interface DealCardProps {
   deal: Deal;
@@ -42,6 +19,10 @@ const formatCurrency = (amount: number | undefined) => {
 };
 
 export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCardProps) {
+  // Map fields from lib/data/deals.ts Deal to what the card expects
+  const location = `${deal.city}, ${deal.state}`;
+  const financingGap = deal.allocation; // Placeholder if not available
+
   return (
     <div className="max-w-sm bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-700/50 hover:border-indigo-500/50 transition-colors">
       {/* Header row */}
@@ -50,7 +31,7 @@ export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCar
           <Link href={`/deals/${deal.id}`} className="hover:text-indigo-400 transition-colors">
             <h2 className="text-lg font-bold text-gray-100 leading-snug">{deal.projectName}</h2>
           </Link>
-          <p className="text-sm text-gray-400">{deal.location}</p>
+          <p className="text-sm text-gray-400">{location}</p>
         </div>
         <Image 
           src="/brand/tcredex_transparent_256x64.png" 
@@ -66,28 +47,24 @@ export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCar
 
       {/* Details */}
       <div className="p-4 text-sm text-gray-300 space-y-1">
-        {deal.parent && <p><span className="text-gray-500">Parent:</span> {deal.parent}</p>}
-        {deal.address && <p><span className="text-gray-500">Address:</span> {deal.address}</p>}
-        {deal.censusTract && <p><span className="text-gray-500">Census Tract:</span> {deal.censusTract}</p>}
+        {deal.sponsorName && <p><span className="text-gray-500">Sponsor:</span> {deal.sponsorName}</p>}
+        {deal.city && <p><span className="text-gray-500">City:</span> {deal.city}</p>}
+        {deal.state && <p><span className="text-gray-500">State:</span> {deal.state}</p>}
         {deal.povertyRate !== undefined && <p><span className="text-gray-500">Poverty Rate:</span> {deal.povertyRate}%</p>}
         {deal.medianIncome !== undefined && <p><span className="text-gray-500">Median Income:</span> ${deal.medianIncome.toLocaleString()}</p>}
-        {deal.unemployment !== undefined && <p><span className="text-gray-500">Unemployment:</span> {deal.unemployment}%</p>}
         
         <hr className="border-gray-800 my-2" />
         
-        <p><span className="text-gray-500">Project Cost:</span> <span className="text-indigo-400 font-medium">{formatCurrency(deal.projectCost)}</span></p>
-        {deal.fedNmtcReq !== undefined && <p><span className="text-gray-500">Fed NMTC Req:</span> {formatCurrency(deal.fedNmtcReq)}</p>}
-        {deal.stateNmtcReq !== undefined && <p><span className="text-gray-500">State NMTC Req:</span> {formatCurrency(deal.stateNmtcReq)}</p>}
-        {deal.htc !== undefined && <p><span className="text-gray-500">HTC:</span> {formatCurrency(deal.htc)}</p>}
-        {deal.lihtc !== undefined && <p><span className="text-gray-500">LIHTC:</span> {formatCurrency(deal.lihtc)}</p>}
+        <p><span className="text-gray-500">Allocation:</span> <span className="text-indigo-400 font-medium">{formatCurrency(deal.allocation)}</span></p>
+        <p><span className="text-gray-500">Program:</span> {deal.programType} ({deal.programLevel})</p>
         
         <hr className="border-gray-800 my-2" />
         
-        <p className={deal.shovelReady ? "text-green-400 font-semibold" : "text-yellow-400"}>
-          <span className="text-gray-500">Shovel Ready:</span> {deal.shovelReady ? 'Yes ✓' : 'No'}
+        <p className="text-green-400 font-semibold">
+          <span className="text-gray-500">Status:</span> {deal.status.replace('_', ' ')}
         </p>
-        {deal.completionDate && <p><span className="text-gray-500">Completion:</span> {deal.completionDate}</p>}
-        <p><span className="text-gray-500">Financing Gap:</span> <span className="text-orange-400 font-medium">{formatCurrency(deal.financingGap)}</span></p>
+        {deal.submittedDate && <p><span className="text-gray-500">Submitted:</span> {new Date(deal.submittedDate).toLocaleDateString()}</p>}
+        <p><span className="text-gray-500">Financing Gap:</span> <span className="text-orange-400 font-medium">{formatCurrency(financingGap)}</span></p>
         <p><span className="text-gray-500">Deal ID:</span> <span className="font-mono text-xs">{deal.id}</span></p>
       </div>
 

@@ -42,6 +42,22 @@ export interface Deal {
   medianIncome?: number;
   jobsCreated?: number;
   visible: boolean;
+  // Added fields for compatibility with DealCard and Intake
+  location?: string;
+  projectCost?: number;
+  financingGap?: number;
+  address?: string;
+  censusTract?: string;
+  parent?: string;
+  unemployment?: number;
+  fedNmtcReq?: number;
+  stateNmtcReq?: number;
+  htc?: number;
+  lihtc?: number;
+  shovelReady?: boolean;
+  completionDate?: string;
+  coordinates?: [number, number];
+  hasProfile?: boolean;
 }
 
 // ============================================================

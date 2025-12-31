@@ -1,86 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getTractStats, getTractsByState, searchTracts, STATE_ABBR_TO_NAME } from '@/lib/tracts/tractData';
-
-// State summary data (pre-computed from full dataset)
-const STATE_SUMMARY: Record<string, {
-  name: string;
-  totalTracts: number;
-  eligibleTracts: number;
-  avgPoverty: number;
-  avgUnemployment: number;
-}> = {
-  "AL": { "name": "Alabama", "totalTracts": 1437, "eligibleTracts": 695, "avgPoverty": 17.9, "avgUnemployment": 6.2 },
-  "AK": { "name": "Alaska", "totalTracts": 177, "eligibleTracts": 51, "avgPoverty": 10.8, "avgUnemployment": 7.8 },
-  "AZ": { "name": "Arizona", "totalTracts": 1765, "eligibleTracts": 736, "avgPoverty": 14.6, "avgUnemployment": 6.0 },
-  "AR": { "name": "Arkansas", "totalTracts": 823, "eligibleTracts": 366, "avgPoverty": 17.3, "avgUnemployment": 5.8 },
-  "CA": { "name": "California", "totalTracts": 9129, "eligibleTracts": 3762, "avgPoverty": 13.1, "avgUnemployment": 6.3 },
-  "CO": { "name": "Colorado", "totalTracts": 1447, "eligibleTracts": 553, "avgPoverty": 10.5, "avgUnemployment": 4.7 },
-  "CT": { "name": "Connecticut", "totalTracts": 883, "eligibleTracts": 316, "avgPoverty": 10.8, "avgUnemployment": 6.2 },
-  "DE": { "name": "Delaware", "totalTracts": 262, "eligibleTracts": 89, "avgPoverty": 12.1, "avgUnemployment": 5.8 },
-  "DC": { "name": "District of Columbia", "totalTracts": 206, "eligibleTracts": 92, "avgPoverty": 16.1, "avgUnemployment": 8.4 },
-  "FL": { "name": "Florida", "totalTracts": 5160, "eligibleTracts": 1930, "avgPoverty": 13.8, "avgUnemployment": 5.5 },
-  "GA": { "name": "Georgia", "totalTracts": 2796, "eligibleTracts": 1302, "avgPoverty": 15.6, "avgUnemployment": 5.8 },
-  "HI": { "name": "Hawaii", "totalTracts": 461, "eligibleTracts": 139, "avgPoverty": 9.5, "avgUnemployment": 4.3 },
-  "ID": { "name": "Idaho", "totalTracts": 456, "eligibleTracts": 143, "avgPoverty": 12.2, "avgUnemployment": 4.4 },
-  "IL": { "name": "Illinois", "totalTracts": 3265, "eligibleTracts": 1321, "avgPoverty": 13.7, "avgUnemployment": 6.7 },
-  "IN": { "name": "Indiana", "totalTracts": 1696, "eligibleTracts": 662, "avgPoverty": 14.8, "avgUnemployment": 5.1 },
-  "IA": { "name": "Iowa", "totalTracts": 896, "eligibleTracts": 267, "avgPoverty": 12.0, "avgUnemployment": 4.0 },
-  "KS": { "name": "Kansas", "totalTracts": 829, "eligibleTracts": 310, "avgPoverty": 12.5, "avgUnemployment": 4.2 },
-  "KY": { "name": "Kentucky", "totalTracts": 1306, "eligibleTracts": 645, "avgPoverty": 18.4, "avgUnemployment": 5.9 },
-  "LA": { "name": "Louisiana", "totalTracts": 1388, "eligibleTracts": 716, "avgPoverty": 20.2, "avgUnemployment": 7.0 },
-  "ME": { "name": "Maine", "totalTracts": 407, "eligibleTracts": 151, "avgPoverty": 12.0, "avgUnemployment": 4.2 },
-  "MD": { "name": "Maryland", "totalTracts": 1475, "eligibleTracts": 587, "avgPoverty": 10.1, "avgUnemployment": 5.4 },
-  "MA": { "name": "Massachusetts", "totalTracts": 1620, "eligibleTracts": 589, "avgPoverty": 11.1, "avgUnemployment": 5.3 },
-  "MI": { "name": "Michigan", "totalTracts": 3017, "eligibleTracts": 1187, "avgPoverty": 15.3, "avgUnemployment": 6.6 },
-  "MN": { "name": "Minnesota", "totalTracts": 1505, "eligibleTracts": 561, "avgPoverty": 9.9, "avgUnemployment": 4.0 },
-  "MS": { "name": "Mississippi", "totalTracts": 878, "eligibleTracts": 450, "avgPoverty": 20.9, "avgUnemployment": 7.7 },
-  "MO": { "name": "Missouri", "totalTracts": 1654, "eligibleTracts": 724, "avgPoverty": 14.3, "avgUnemployment": 4.8 },
-  "MT": { "name": "Montana", "totalTracts": 319, "eligibleTracts": 110, "avgPoverty": 13.4, "avgUnemployment": 4.4 },
-  "NE": { "name": "Nebraska", "totalTracts": 553, "eligibleTracts": 181, "avgPoverty": 11.2, "avgUnemployment": 3.4 },
-  "NV": { "name": "Nevada", "totalTracts": 779, "eligibleTracts": 270, "avgPoverty": 13.3, "avgUnemployment": 6.7 },
-  "NH": { "name": "New Hampshire", "totalTracts": 350, "eligibleTracts": 110, "avgPoverty": 7.9, "avgUnemployment": 3.7 },
-  "NJ": { "name": "New Jersey", "totalTracts": 2181, "eligibleTracts": 757, "avgPoverty": 10.5, "avgUnemployment": 6.1 },
-  "NM": { "name": "New Mexico", "totalTracts": 612, "eligibleTracts": 299, "avgPoverty": 19.6, "avgUnemployment": 6.9 },
-  "NY": { "name": "New York", "totalTracts": 5411, "eligibleTracts": 2208, "avgPoverty": 14.1, "avgUnemployment": 5.8 },
-  "NC": { "name": "North Carolina", "totalTracts": 2672, "eligibleTracts": 1150, "avgPoverty": 14.8, "avgUnemployment": 5.6 },
-  "ND": { "name": "North Dakota", "totalTracts": 228, "eligibleTracts": 59, "avgPoverty": 11.1, "avgUnemployment": 3.1 },
-  "OH": { "name": "Ohio", "totalTracts": 3168, "eligibleTracts": 1300, "avgPoverty": 15.7, "avgUnemployment": 6.1 },
-  "OK": { "name": "Oklahoma", "totalTracts": 1205, "eligibleTracts": 505, "avgPoverty": 16.4, "avgUnemployment": 5.4 },
-  "OR": { "name": "Oregon", "totalTracts": 1001, "eligibleTracts": 379, "avgPoverty": 12.8, "avgUnemployment": 5.5 },
-  "PA": { "name": "Pennsylvania", "totalTracts": 3446, "eligibleTracts": 1285, "avgPoverty": 13.0, "avgUnemployment": 5.6 },
-  "RI": { "name": "Rhode Island", "totalTracts": 250, "eligibleTracts": 77, "avgPoverty": 11.9, "avgUnemployment": 5.7 },
-  "SC": { "name": "South Carolina", "totalTracts": 1323, "eligibleTracts": 590, "avgPoverty": 16.3, "avgUnemployment": 5.9 },
-  "SD": { "name": "South Dakota", "totalTracts": 242, "eligibleTracts": 81, "avgPoverty": 13.6, "avgUnemployment": 3.9 },
-  "TN": { "name": "Tennessee", "totalTracts": 1701, "eligibleTracts": 742, "avgPoverty": 16.1, "avgUnemployment": 5.8 },
-  "TX": { "name": "Texas", "totalTracts": 6896, "eligibleTracts": 3149, "avgPoverty": 15.3, "avgUnemployment": 5.4 },
-  "UT": { "name": "Utah", "totalTracts": 716, "eligibleTracts": 206, "avgPoverty": 9.9, "avgUnemployment": 3.6 },
-  "VT": { "name": "Vermont", "totalTracts": 193, "eligibleTracts": 49, "avgPoverty": 11.0, "avgUnemployment": 3.7 },
-  "VA": { "name": "Virginia", "totalTracts": 2198, "eligibleTracts": 964, "avgPoverty": 11.0, "avgUnemployment": 4.8 },
-  "WA": { "name": "Washington", "totalTracts": 1784, "eligibleTracts": 681, "avgPoverty": 10.9, "avgUnemployment": 5.0 },
-  "WV": { "name": "West Virginia", "totalTracts": 546, "eligibleTracts": 258, "avgPoverty": 18.3, "avgUnemployment": 7.0 },
-  "WI": { "name": "Wisconsin", "totalTracts": 1542, "eligibleTracts": 512, "avgPoverty": 12.3, "avgUnemployment": 3.9 },
-  "WY": { "name": "Wyoming", "totalTracts": 160, "eligibleTracts": 44, "avgPoverty": 11.2, "avgUnemployment": 4.6 },
-  "PR": { "name": "Puerto Rico", "totalTracts": 981, "eligibleTracts": 857, "avgPoverty": 44.6, "avgUnemployment": 15.2 }
-};
-
-// National totals
-const NATIONAL_TOTALS = {
-  totalTracts: 85395,
-  eligibleTracts: 35167,
-  eligibilityRate: 41.2,
-  avgPoverty: 14.2,
-  avgUnemployment: 5.6
-};
-
 /**
- * GET /api/tracts
- * 
- * Query parameters:
- * - summary=true: Return national summary with all states
- * - state=XX: Return data for specific state (abbreviation or FIPS)
- * - stats=true: Return computed statistics from loaded data
- * - search=true: Search tracts with criteria (minPoverty, maxPoverty, minIncome, maxIncome, severelyDistressed, classification, limit)
+ * Tracts API - SOURCE OF TRUTH
+ * =============================
+ * Uses: master_tax_credit_sot table
+ *
+ * GET /api/tracts?summary=true           - National summary with all states
+ * GET /api/tracts?state=IL               - Tracts for a state
+ * GET /api/tracts?stats=true             - Aggregate statistics
+ * GET /api/tracts?search=true&minPoverty=30  - Search with criteria
  */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const state = searchParams.get('state');
@@ -89,80 +22,145 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search');
 
   try {
-    // Return computed stats from loaded data
+    const supabase = getSupabaseAdmin();
+
+    // ===============================
+    // Option 1: Aggregate statistics
+    // ===============================
     if (stats === 'true' || stats === '1') {
-      const computedStats = await getTractStats();
-      return NextResponse.json({
-        source: 'loaded_data',
-        ...computedStats
-      });
-    }
+      const { data, error } = await supabase.rpc('get_tract_statistics');
 
-    // Search tracts with criteria
-    if (search === 'true' || search === '1') {
-      const criteria = {
-        minPoverty: searchParams.get('minPoverty') ? parseFloat(searchParams.get('minPoverty')!) : undefined,
-        maxPoverty: searchParams.get('maxPoverty') ? parseFloat(searchParams.get('maxPoverty')!) : undefined,
-        minIncome: searchParams.get('minIncome') ? parseFloat(searchParams.get('minIncome')!) : undefined,
-        maxIncome: searchParams.get('maxIncome') ? parseFloat(searchParams.get('maxIncome')!) : undefined,
-        severelyDistressed: searchParams.get('severelyDistressed') === 'true' ? true : 
-                            searchParams.get('severelyDistressed') === 'false' ? false : undefined,
-        classification: searchParams.get('classification') || undefined,
-        limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100
-      };
-      
-      const results = await searchTracts(criteria);
-      return NextResponse.json({
-        criteria,
-        count: results.length,
-        tracts: results
-      });
-    }
+      if (error) {
+        console.error('[TractAPI] Stats error:', error);
+        // Fallback to direct query
+        const { data: countData } = await supabase
+          .from('master_tax_credit_sot')
+          .select('geoid', { count: 'exact', head: true });
 
-    // Return national summary
-    if (summary === 'true' || summary === '1') {
-      return NextResponse.json({
-        national: NATIONAL_TOTALS,
-        states: STATE_SUMMARY
-      });
-    }
+        const { data: eligibleData } = await supabase
+          .from('master_tax_credit_sot')
+          .select('geoid', { count: 'exact', head: true })
+          .eq('has_any_tax_credit', true);
 
-    // Return specific state data with tracts
-    if (state) {
-      const stateUpper = state.toUpperCase();
-      const stateSummary = STATE_SUMMARY[stateUpper];
-      
-      if (!stateSummary) {
-        return NextResponse.json(
-          { error: `State ${state} not found` },
-          { status: 404 }
-        );
+        return NextResponse.json({
+          source: 'master_tax_credit_sot',
+          total_tracts: countData || 0,
+          eligible_tracts: eligibleData || 0
+        });
       }
 
-      // Get all tracts for this state
-      const tracts = await getTractsByState(stateUpper);
+      return NextResponse.json({
+        source: 'master_tax_credit_sot',
+        ...data
+      });
+    }
+
+    // ===============================
+    // Option 2: Search with criteria
+    // ===============================
+    if (search === 'true' || search === '1') {
+      const minPoverty = searchParams.get('minPoverty') ? parseFloat(searchParams.get('minPoverty')!) : undefined;
+      const maxPoverty = searchParams.get('maxPoverty') ? parseFloat(searchParams.get('maxPoverty')!) : undefined;
+      const minMfi = searchParams.get('minIncome') ? parseFloat(searchParams.get('minIncome')!) : undefined;
+      const maxMfi = searchParams.get('maxIncome') ? parseFloat(searchParams.get('maxIncome')!) : undefined;
+      const nmtcOnly = searchParams.get('nmtcOnly') === 'true';
+      const qctOnly = searchParams.get('qctOnly') === 'true';
+      const ozOnly = searchParams.get('ozOnly') === 'true';
+      const limit = parseInt(searchParams.get('limit') || '100');
+
+      let query = supabase
+        .from('master_tax_credit_sot')
+        .select('geoid, state_fips, poverty_rate, mfi_pct, unemployment_rate, is_nmtc_eligible, is_qct, is_oz, is_dda, has_any_tax_credit, stack_score');
+
+      if (minPoverty !== undefined) query = query.gte('poverty_rate', minPoverty);
+      if (maxPoverty !== undefined) query = query.lte('poverty_rate', maxPoverty);
+      if (minMfi !== undefined) query = query.gte('mfi_pct', minMfi);
+      if (maxMfi !== undefined) query = query.lte('mfi_pct', maxMfi);
+      if (nmtcOnly) query = query.eq('is_nmtc_eligible', true);
+      if (qctOnly) query = query.eq('is_qct', true);
+      if (ozOnly) query = query.eq('is_oz', true);
+
+      const { data, error } = await query.limit(limit);
+
+      if (error) {
+        console.error('[TractAPI] Search error:', error);
+        return NextResponse.json({ error: 'Search failed' }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        criteria: { minPoverty, maxPoverty, minMfi, maxMfi, nmtcOnly, qctOnly, ozOnly, limit },
+        count: data?.length || 0,
+        tracts: data || [],
+        source: 'master_tax_credit_sot'
+      });
+    }
+
+    // ===============================
+    // Option 3: State summary
+    // ===============================
+    if (summary === 'true' || summary === '1') {
+      const { data, error } = await supabase.rpc('get_state_summaries');
+
+      if (error) {
+        console.error('[TractAPI] Summary error:', error);
+        return NextResponse.json({ error: 'Failed to get summaries' }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        source: 'master_tax_credit_sot',
+        states: data
+      });
+    }
+
+    // ===============================
+    // Option 4: Specific state data
+    // ===============================
+    if (state) {
+      const stateUpper = state.toUpperCase();
+      const stateFips = STATE_ABBR_TO_FIPS[stateUpper] || stateUpper.padStart(2, '0');
+
+      // No limit - return all tracts for state
+      const { data, error } = await supabase
+        .from('master_tax_credit_sot')
+        .select('geoid, poverty_rate, mfi_pct, unemployment_rate, is_nmtc_eligible, is_qct, is_oz, is_dda, has_any_tax_credit, stack_score')
+        .eq('state_fips', stateFips);
+
+      if (error) {
+        console.error('[TractAPI] State query error:', error);
+        return NextResponse.json({ error: 'State query failed' }, { status: 500 });
+      }
+
+      const eligible = data?.filter(t => t.has_any_tax_credit) || [];
 
       return NextResponse.json({
         state: stateUpper,
-        name: stateSummary.name,
-        summary: stateSummary,
-        tractCount: tracts.length,
-        tracts: tracts.slice(0, 100), // Limit to first 100 for performance
-        _note: tracts.length > 100 ? `Showing first 100 of ${tracts.length} tracts` : undefined
+        state_fips: stateFips,
+        summary: {
+          total_tracts: data?.length || 0,
+          eligible_tracts: eligible.length,
+          eligibility_rate: data?.length ? ((eligible.length / data.length) * 100).toFixed(1) : 0
+        },
+        tractCount: data?.length || 0,
+        tracts: data?.slice(0, 100) || [],
+        _note: (data?.length || 0) > 100 ? `Showing first 100 of ${data?.length} tracts` : undefined,
+        source: 'master_tax_credit_sot'
       });
     }
 
-    // Default: return national summary with all states
+    // ===============================
+    // Default: API info
+    // ===============================
     return NextResponse.json({
-      national: NATIONAL_TOTALS,
-      states: STATE_SUMMARY,
+      message: 'tCredex Tracts API - Source of Truth',
       endpoints: {
         summary: '/api/tracts?summary=true',
         state: '/api/tracts?state=IL',
         stats: '/api/tracts?stats=true',
         search: '/api/tracts?search=true&minPoverty=30&limit=50',
-        lookup: '/api/tracts/lookup?geoid=17031010100'
-      }
+        lookup: '/api/tracts/lookup?geoid=17031010100',
+        geoid: '/api/tracts/17031010100'
+      },
+      source: 'master_tax_credit_sot'
     });
 
   } catch (error) {
@@ -173,3 +171,18 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+// State abbreviation to FIPS mapping
+const STATE_ABBR_TO_FIPS: Record<string, string> = {
+  'AL': '01', 'AK': '02', 'AZ': '04', 'AR': '05', 'CA': '06',
+  'CO': '08', 'CT': '09', 'DE': '10', 'DC': '11', 'FL': '12',
+  'GA': '13', 'HI': '15', 'ID': '16', 'IL': '17', 'IN': '18',
+  'IA': '19', 'KS': '20', 'KY': '21', 'LA': '22', 'ME': '23',
+  'MD': '24', 'MA': '25', 'MI': '26', 'MN': '27', 'MS': '28',
+  'MO': '29', 'MT': '30', 'NE': '31', 'NV': '32', 'NH': '33',
+  'NJ': '34', 'NM': '35', 'NY': '36', 'NC': '37', 'ND': '38',
+  'OH': '39', 'OK': '40', 'OR': '41', 'PA': '42', 'RI': '44',
+  'SC': '45', 'SD': '46', 'TN': '47', 'TX': '48', 'UT': '49',
+  'VT': '50', 'VA': '51', 'WA': '53', 'WV': '54', 'WI': '55',
+  'WY': '56', 'PR': '72'
+};

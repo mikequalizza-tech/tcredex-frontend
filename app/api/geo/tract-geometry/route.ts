@@ -1,59 +1,32 @@
+/**
+ * Tract Geometry API - SOURCE OF TRUTH
+ * =====================================
+ * Uses: tract_geometries + master_tax_credit_sot (via RPC functions)
+ *
+ * The census_tracts table is DEPRECATED - do not use!
+ *
+ * GET /api/geo/tract-geometry?geoid=12345678901
+ * GET /api/geo/tract-geometry?lat=38.6&lng=-90.2
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
-// Census TIGERweb ACS 2023 Tracts layer (updated from 2021)
-const TIGERWEB_URLS = [
-  // Try multiple endpoints in case one is down
-  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/8/query',
-  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/8/query',
-  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8/query',
-  'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_ACS/MapServer/0/query',
-];
-
-async function fetchFromTigerWeb(queryParams: Record<string, string>): Promise<any> {
-  const queryString = new URLSearchParams(queryParams).toString();
-  
-  for (const baseUrl of TIGERWEB_URLS) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-      
-      const response = await fetch(`${baseUrl}?${queryString}`, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'tCredex/1.0',
-        },
-        signal: controller.signal,
-        next: { revalidate: 86400 }, // Cache for 24 hours
-      });
-      
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.log(`TIGERweb ${baseUrl} returned ${response.status}`);
-        continue;
-      }
-
-      const text = await response.text();
-      
-      // Check if response is actually JSON (sometimes returns HTML error pages)
-      if (text.startsWith('<') || text.startsWith('<!')) {
-        console.log(`TIGERweb ${baseUrl} returned HTML instead of JSON`);
-        continue;
-      }
-
-      const data = JSON.parse(text);
-      
-      if (data.features && data.features.length > 0) {
-        console.log(`TIGERweb success from ${baseUrl}`);
-        return data;
-      }
-    } catch (error) {
-      console.log(`TIGERweb ${baseUrl} error:`, error instanceof Error ? error.message : 'Unknown');
-      continue;
-    }
-  }
-  
-  return null;
+interface TractResult {
+  geoid: string;
+  geom_json: string;
+  has_any_tax_credit: boolean;
+  is_qct: boolean;
+  is_oz: boolean;
+  is_dda: boolean;
+  is_nmtc_eligible: boolean;
+  has_state_nmtc: boolean;
+  has_state_htc: boolean;
+  has_brownfield_credit: boolean;
+  stack_score: number;
+  poverty_rate?: number;
+  mfi_pct?: number;
+  unemployment_rate?: number;
 }
 
 export async function GET(request: NextRequest) {
@@ -62,7 +35,6 @@ export async function GET(request: NextRequest) {
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
 
-  // Either get tract by GEOID or by lat/lng point
   if (!geoid && (!lat || !lng)) {
     return NextResponse.json(
       { error: 'Either geoid or lat/lng required' },
@@ -71,86 +43,60 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let queryParams: Record<string, string>;
+    const supabase = getSupabaseAdmin();
 
+    // Option 1: Get by GEOID
     if (geoid) {
-      // Clean and validate GEOID (should be 11 digits)
-      const cleanGeoid = geoid.replace(/[-\s]/g, '');
-      
-      // Try both exact match and LIKE query
-      queryParams = {
-        where: `GEOID='${cleanGeoid}'`,
-        outFields: 'GEOID,STATE,COUNTY,TRACT,NAME,ALAND,AWATER',
-        returnGeometry: 'true',
-        geometryPrecision: '6',
-        outSR: '4326', // WGS84 for web mapping
-        f: 'geojson',
-      };
-    } else {
-      // Query by point (lat/lng)
-      queryParams = {
-        geometry: `${lng},${lat}`,
-        geometryType: 'esriGeometryPoint',
-        inSR: '4326',
-        spatialRel: 'esriSpatialRelIntersects',
-        outFields: 'GEOID,STATE,COUNTY,TRACT,NAME,ALAND,AWATER',
-        returnGeometry: 'true',
-        geometryPrecision: '6',
-        outSR: '4326',
-        f: 'geojson',
-      };
-    }
+      const cleanGeoid = geoid.replace(/[-\s]/g, '').padStart(11, '0');
 
-    console.log(`Fetching tract geometry for: ${geoid || `${lat},${lng}`}`);
-    
-    const data = await fetchFromTigerWeb(queryParams);
-
-    if (!data || !data.features || data.features.length === 0) {
-      console.log(`No tract found for ${geoid || `${lat},${lng}`}`);
-      return NextResponse.json({
-        found: false,
-        geoid: geoid || null,
-        message: 'No tract geometry found - TIGERweb may be unavailable',
-        debug: {
-          queriedGeoid: geoid,
-          queriedCoords: lat && lng ? [lng, lat] : null,
-        }
+      const { data, error } = await supabase.rpc('get_tract_with_credits', {
+        p_geoid: cleanGeoid
       });
+
+      if (error || !data || data.length === 0) {
+        return NextResponse.json({
+          found: false,
+          geoid: cleanGeoid,
+          message: 'Tract not found in database'
+        });
+      }
+
+      const tract = data[0] as TractResult;
+      return formatTractResponse(tract);
     }
 
-    const feature = data.features[0];
-    const props = feature.properties;
+    // Option 2: Get by coordinates (lat/lng)
+    if (lat && lng) {
+      const latNum = parseFloat(lat);
+      const lngNum = parseFloat(lng);
 
-    console.log(`Found tract ${props.GEOID} with geometry type: ${feature.geometry?.type}`);
+      if (isNaN(latNum) || isNaN(lngNum)) {
+        return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
+      }
 
-    return NextResponse.json({
-      found: true,
-      geoid: props.GEOID,
-      state: props.STATE,
-      county: props.COUNTY,
-      tract: props.TRACT,
-      name: props.NAME,
-      landArea: props.ALAND,
-      waterArea: props.AWATER,
-      geometry: feature.geometry,
-      // Return as full GeoJSON Feature for direct map use
-      feature: {
-        type: 'Feature',
-        id: props.GEOID,
-        properties: {
-          geoid: props.GEOID,
-          name: `Tract ${props.NAME}`,
-          state: props.STATE,
-          county: props.COUNTY,
-        },
-        geometry: feature.geometry,
-      },
-    });
+      const { data, error } = await supabase.rpc('get_tract_at_point', {
+        p_lat: latNum,
+        p_lng: lngNum
+      });
+
+      if (error || !data || data.length === 0) {
+        return NextResponse.json({
+          found: false,
+          message: 'No tract found at coordinates',
+          coordinates: { lat: latNum, lng: lngNum }
+        });
+      }
+
+      const tract = data[0] as TractResult;
+      return formatTractResponse(tract);
+    }
+
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
   } catch (error) {
-    console.error('Tract geometry fetch error:', error);
+    console.error('[TractGeometry] Error:', error);
     return NextResponse.json(
-      { 
+      {
         found: false,
         error: 'Failed to fetch tract geometry',
         message: error instanceof Error ? error.message : 'Unknown error'
@@ -158,4 +104,73 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function formatTractResponse(tract: TractResult) {
+  const geometry = tract.geom_json ? JSON.parse(tract.geom_json) : null;
+  const programs = buildProgramsArray(tract);
+
+  return NextResponse.json({
+    found: true,
+    geoid: tract.geoid,
+    geometry,
+    // SOT fields
+    has_any_tax_credit: tract.has_any_tax_credit,
+    is_qct: tract.is_qct,
+    is_oz: tract.is_oz,
+    is_dda: tract.is_dda,
+    is_nmtc_eligible: tract.is_nmtc_eligible,
+    has_state_nmtc: tract.has_state_nmtc,
+    has_state_htc: tract.has_state_htc,
+    has_brownfield_credit: tract.has_brownfield_credit,
+    stack_score: tract.stack_score,
+    // Metrics
+    poverty_rate: tract.poverty_rate,
+    mfi_pct: tract.mfi_pct,
+    unemployment_rate: tract.unemployment_rate,
+    // Legacy aliases
+    eligible: tract.has_any_tax_credit,
+    povertyRate: tract.poverty_rate,
+    mfiPct: tract.mfi_pct,
+    // Programs array
+    programs,
+    // GeoJSON feature
+    feature: {
+      type: 'Feature',
+      id: tract.geoid,
+      properties: {
+        geoid: tract.geoid,
+        GEOID: tract.geoid,
+        has_any_tax_credit: tract.has_any_tax_credit,
+        is_qct: tract.is_qct,
+        is_oz: tract.is_oz,
+        is_dda: tract.is_dda,
+        is_nmtc_eligible: tract.is_nmtc_eligible,
+        has_state_nmtc: tract.has_state_nmtc,
+        has_state_htc: tract.has_state_htc,
+        has_brownfield_credit: tract.has_brownfield_credit,
+        stack_score: tract.stack_score,
+        // Legacy
+        eligible: tract.has_any_tax_credit,
+        is_lihtc_qct: tract.is_qct,
+        is_oz_designated: tract.is_oz,
+        poverty_rate: tract.poverty_rate,
+        mfi_pct: tract.mfi_pct,
+        programs: JSON.stringify(programs)
+      },
+      geometry
+    }
+  });
+}
+
+function buildProgramsArray(tract: TractResult): string[] {
+  const programs: string[] = [];
+  if (tract.is_nmtc_eligible) programs.push('Federal NMTC');
+  if (tract.is_qct) programs.push('LIHTC QCT');
+  if (tract.is_oz) programs.push('Opportunity Zone');
+  if (tract.is_dda) programs.push('DDA');
+  if (tract.has_state_nmtc) programs.push('State NMTC');
+  if (tract.has_state_htc) programs.push('State HTC');
+  if (tract.has_brownfield_credit) programs.push('Brownfield');
+  return programs;
 }

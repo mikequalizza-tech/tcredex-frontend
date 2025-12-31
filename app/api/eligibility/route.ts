@@ -1,254 +1,223 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-
 /**
- * NMTC Eligibility Check API
+ * Eligibility Check API - SOURCE OF TRUTH
+ * ========================================
+ * Uses: master_tax_credit_sot + tract_geometries (for point-in-polygon)
  *
  * GET /api/eligibility?tract=01001020100
- * GET /api/eligibility?tract=01001020100&debug=true
- *
- * Handles both padded (11-char) and unpadded (10-char) GEOIDs
- * because Census TigerWeb uses leading zeros, Excel/imports often don't.
+ * GET /api/eligibility?lat=38.846&lng=-76.9275
+ * GET /api/eligibility?address=4600 Silver Hill Rd, Washington, DC
  */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const tract = searchParams.get('tract');
+  const lat = searchParams.get('lat');
+  const lng = searchParams.get('lng');
+  const address = searchParams.get('address');
   const debug = searchParams.get('debug') === 'true';
 
-  if (!tract) {
-    return NextResponse.json({ error: 'Census tract required' }, { status: 400 });
-  }
-
-  // Clean the tract - remove dashes/spaces
-  const inputTract = tract.replace(/[-\s]/g, '');
-
-  // Create multiple search variants to handle GEOID format mismatches
-  const variants = [
-    inputTract,                                    // As-is
-    inputTract.padStart(11, '0'),                  // Pad to 11 chars
-    inputTract.replace(/^0+/, ''),                 // Strip leading zeros
-    parseInt(inputTract, 10).toString(),           // Parse as int then back to string
-  ];
-
-  // Remove duplicates
-  const uniqueVariants = [...new Set(variants)];
-
-  const debugInfo: Record<string, unknown> = {
-    input: tract,
-    variants: uniqueVariants,
-  };
-
   try {
-    // Check table exists and get sample
-    const { count, error: countError } = await supabaseAdmin
-      .from('census_tracts')
-      .select('*', { count: 'exact', head: true });
+    const supabase = getSupabaseAdmin();
+    let eligibilityData: Record<string, unknown> | null = null;
+    let matchedAddress: string | null = null;
+    let coordinates: [number, number] | null = null;
 
-    debugInfo.tableRowCount = count;
+    // ===============================
+    // Option 1: Direct GEOID lookup
+    // ===============================
+    if (tract) {
+      const geoid = tract.replace(/[-\s]/g, '').padStart(11, '0');
 
-    if (countError) {
-      debugInfo.tableError = countError.message;
-      if (debug) {
-        return NextResponse.json({ debug: true, ...debugInfo, error: 'Table access error' });
-      }
-    }
-
-    // Get sample to see actual GEOID format in DB
-    const { data: sampleData } = await supabaseAdmin
-      .from('census_tracts')
-      .select('GEOID')
-      .limit(3);
-
-    debugInfo.sampleGeoids = sampleData?.map(d => ({
-      value: d.GEOID,
-      type: typeof d.GEOID,
-      length: String(d.GEOID).length,
-    }));
-
-    // Try each variant until we find a match
-    let tractData: Record<string, unknown> | null = null;
-    let matchedVariant: string | null = null;
-
-    for (const variant of uniqueVariants) {
-      // Try as string
-      const { data: stringResult, error: stringError } = await supabaseAdmin
-        .from('census_tracts')
+      const { data, error } = await supabase
+        .from('master_tax_credit_sot')
         .select('*')
-        .eq('GEOID', variant)
-        .maybeSingle();
+        .eq('geoid', geoid)
+        .single();
 
-      if (stringResult) {
-        tractData = stringResult;
-        matchedVariant = `string:${variant}`;
-        break;
+      if (error) {
+        console.error('[Eligibility] GEOID lookup error:', error);
       }
+      eligibilityData = data;
+    }
 
-      // Try as number (if it's a numeric GEOID stored as integer)
-      const numericVariant = parseInt(variant, 10);
-      if (!isNaN(numericVariant)) {
-        const { data: numResult } = await supabaseAdmin
-          .from('census_tracts')
+    // ===============================
+    // Option 2: Lat/Lng lookup (point-in-polygon)
+    // ===============================
+    else if (lat && lng) {
+      coordinates = [parseFloat(lng), parseFloat(lat)];
+
+      // Use RPC function for point-in-polygon
+      const { data, error } = await supabase.rpc('get_tract_at_point', {
+        p_lat: coordinates[1],
+        p_lng: coordinates[0]
+      });
+
+      if (error) {
+        console.error('[Eligibility] Point lookup error:', error);
+      } else if (data && data.length > 0) {
+        // Get full data from master_tax_credit_sot
+        const { data: sotData } = await supabase
+          .from('master_tax_credit_sot')
           .select('*')
-          .eq('GEOID', numericVariant)
-          .maybeSingle();
+          .eq('geoid', data[0].geoid)
+          .single();
 
-        if (numResult) {
-          tractData = numResult;
-          matchedVariant = `number:${numericVariant}`;
-          break;
-        }
+        eligibilityData = sotData;
       }
     }
 
-    debugInfo.matchedVariant = matchedVariant;
-    debugInfo.tractFound = !!tractData;
+    // ===============================
+    // Option 3: Address lookup (geocode then point-in-polygon)
+    // ===============================
+    else if (address) {
+      // Census Bureau geocoder (free, no API key)
+      const geocodeUrl = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(address)}&benchmark=Public_AR_Current&format=json`;
+      const geocodeResponse = await fetch(geocodeUrl);
 
-    // Debug mode - return diagnostic info
-    if (debug) {
-      return NextResponse.json({
-        debug: true,
-        ...debugInfo,
-        tractData: tractData ? {
-          GEOID: tractData.GEOID,
-          GEOID_type: typeof tractData.GEOID,
-          state_name: tractData.state_name,
-          is_nmtc_lic: tractData.is_nmtc_lic,
-          is_nmtc_lic_type: typeof tractData.is_nmtc_lic,
-          poverty_rate_pct: tractData.poverty_rate_pct,
-          poverty_qualifies: tractData.poverty_qualifies,
-          mfi_pct: tractData.mfi_pct,
-          mfi_qualifies: tractData.mfi_qualifies,
-          // Show all columns for diagnosis
-          all_columns: Object.keys(tractData),
-        } : null,
+      if (!geocodeResponse.ok) {
+        return NextResponse.json({ error: 'Geocoding service unavailable' }, { status: 503 });
+      }
+
+      const geocodeData = await geocodeResponse.json();
+      const match = geocodeData?.result?.addressMatches?.[0];
+
+      if (!match) {
+        return NextResponse.json({
+          found: false,
+          error: 'Address not found',
+          address
+        }, { status: 404 });
+      }
+
+      matchedAddress = match.matchedAddress;
+      coordinates = [match.coordinates.x, match.coordinates.y];
+
+      // Use RPC for point-in-polygon
+      const { data, error } = await supabase.rpc('get_tract_at_point', {
+        p_lat: coordinates[1],
+        p_lng: coordinates[0]
       });
+
+      if (error) {
+        console.error('[Eligibility] Address point lookup error:', error);
+      } else if (data && data.length > 0) {
+        // Get full data from master_tax_credit_sot
+        const { data: sotData } = await supabase
+          .from('master_tax_credit_sot')
+          .select('*')
+          .eq('geoid', data[0].geoid)
+          .single();
+
+        eligibilityData = sotData;
+      }
     }
 
-    // If no tract found
-    if (!tractData) {
+    else {
       return NextResponse.json({
+        error: 'Provide tract, lat/lng, or address'
+      }, { status: 400 });
+    }
+
+    // Not found
+    if (!eligibilityData) {
+      return NextResponse.json({
+        found: false,
         eligible: false,
-        tract: inputTract,
+        has_any_tax_credit: false,
         programs: [],
-        federal: null,
-        state: null,
-        reason: 'Census tract not found in database',
-        note: 'Verify at https://www.cdfifund.gov/research-data/nmtc-mapping-tool',
-        _debug: { variantsTried: uniqueVariants },
-      });
+        reason: 'Location not found in database',
+        coordinates,
+        matched_address: matchedAddress,
+        source: 'master_tax_credit_sot'
+      }, { status: 404 });
     }
 
-    // Query state_credit_matrix for state-level credits
-    const stateName = String(tractData.state_name || '').trim();
-    const { data: stateData } = await supabaseAdmin
-      .from('state_credit_matrix')
-      .select('*')
-      .eq('state_name', stateName)
-      .maybeSingle();
-
-    // ========================================================================
-    // ROBUST BOOLEAN PARSING
-    // Handle: 'YES', 'Yes', 'yes', 'Y', 1, true, 'TRUE', 'true', etc.
-    // ========================================================================
-    function isYes(val: unknown): boolean {
-      if (val === true || val === 1) return true;
-      if (typeof val === 'string') {
-        const upper = val.toUpperCase().trim();
-        return upper === 'YES' || upper === 'Y' || upper === 'TRUE' || upper === '1';
-      }
-      return false;
-    }
-
-    const isNmtcEligible = isYes(tractData.is_nmtc_lic);
-    const povertyRate = parseFloat(String(tractData.poverty_rate_pct)) || 0;
-    const medianIncomePct = parseFloat(String(tractData.mfi_pct)) || 0;
-    const unemploymentRate = parseFloat(String(tractData.unemployment_rate_pct)) || 0;
-    
-    const povertyQualifies = isYes(tractData.poverty_qualifies);
-    const incomeQualifies = isYes(tractData.mfi_qualifies);
-    const unemploymentQualifies = isYes(tractData.unemployment_ratio_qualifies);
-    const isSeverelyDistressed = povertyQualifies || incomeQualifies || unemploymentQualifies;
-    const isOzDesignated = isYes(tractData.oz_designated);
-    const isLihtcQct = isYes(tractData.lihtc_qct) || isYes(tractData.is_lihtc_qct);
-
-    // Build programs list
-    const programs: string[] = [];
-    
-    if (isNmtcEligible) {
-      programs.push('Federal NMTC');
-      if (isSeverelyDistressed) {
-        programs.push('Severely Distressed');
-      }
-    }
-    
-    if (isLihtcQct) programs.push('LIHTC QCT');
-
-    if (stateData?.is_state_nmtc) programs.push('State NMTC');
-    if (stateData?.is_state_htc) programs.push('State HTC');
-    if (stateData?.is_state_brownfield) programs.push('Brownfield Credit');
-    if (isOzDesignated) programs.push('Opportunity Zone');
-
-    return NextResponse.json({
-      eligible: isNmtcEligible,
-      tract: inputTract,
-      programs,
-      federal: {
-        nmtc_eligible: isNmtcEligible,
-        lihtc_qct: isLihtcQct,
-        poverty_rate: povertyRate,
-        poverty_qualifies: povertyQualifies,
-        median_income_pct: medianIncomePct,
-        income_qualifies: incomeQualifies,
-        unemployment_rate: unemploymentRate,
-        unemployment_qualifies: unemploymentQualifies,
-        severely_distressed: isSeverelyDistressed,
-        metro_status: tractData.metro_status || tractData.omb_metro_non_metro,
-        opportunity_zone: isOzDesignated
-      },
-      state: stateData ? {
-        state_name: stateData.state_name,
-        nmtc: {
-          available: isYes(stateData.is_state_nmtc),
-          transferable: stateData.is_state_nmtc_transferable,
-          refundable: stateData.is_state_nmtc_refundable,
-          notes: stateData.state_nmtc_notes_url
-        },
-        htc: {
-          available: isYes(stateData.is_state_htc),
-          transferable: stateData.is_state_htc_transferable,
-          refundable: stateData.is_state_htc_refundable,
-          notes: stateData.state_htc_notes_url
-        },
-        brownfield: {
-          available: isYes(stateData.is_state_brownfield),
-          transferable: stateData.is_state_brownfield_transferable,
-          refundable: stateData.is_state_brownfield_refundable,
-          notes: stateData.state_brownfield_notes_url
-        },
-        stacking_notes: stateData.stacking_notes,
-        credit_tags: stateData.state_credit_tags
-      } : null,
-      location: {
-        state: stateName,
-        county: tractData.county_name || 'Unknown'
-      },
-      reason: isNmtcEligible 
-        ? 'Qualifies as NMTC Low-Income Community'
-        : 'Does not meet NMTC Low-Income Community criteria'
-    });
+    // Build response
+    return NextResponse.json(formatEligibilityResponse(eligibilityData, coordinates, matchedAddress, debug));
 
   } catch (error) {
-    console.error('Eligibility check error:', error);
+    console.error('[Eligibility] Error:', error);
     return NextResponse.json({
-      eligible: false,
-      tract: inputTract,
-      programs: [],
-      federal: null,
-      state: null,
-      reason: 'Error checking eligibility',
-      note: 'Please try again or verify at cdfifund.gov',
-      _debug: debug ? { error: String(error), ...debugInfo } : undefined,
+      error: 'Eligibility check failed',
+      details: String(error)
     }, { status: 500 });
   }
+}
+
+function formatEligibilityResponse(
+  data: Record<string, unknown>,
+  coordinates: [number, number] | null,
+  matchedAddress: string | null,
+  debug: boolean
+) {
+  // Build programs array (using actual SOT column names)
+  const programs: string[] = [];
+  if (data.is_nmtc_eligible) programs.push('Federal NMTC');
+  if (data.is_lihtc_qct_2025) programs.push('LIHTC QCT');
+  if (data.is_oz_designated) programs.push('Opportunity Zone');
+  if (data.is_dda_2025) programs.push('DDA');
+  if (data.has_state_nmtc) programs.push('State NMTC');
+  if (data.has_state_htc) programs.push('State HTC');
+  if (data.has_brownfield_credit) programs.push('Brownfield');
+
+  const geoid = data.geoid as string;
+
+  const response: Record<string, unknown> = {
+    found: true,
+    tract: geoid,
+    state_fips: geoid?.substring(0, 2),
+
+    // Primary eligibility flag
+    eligible: data.has_any_tax_credit || false,
+    has_any_tax_credit: data.has_any_tax_credit || false,
+
+    // All programs
+    programs,
+    program_count: programs.length,
+    stack_score: data.stack_score,
+
+    // Federal programs (normalized names for API consumers)
+    federal: {
+      nmtc_eligible: data.is_nmtc_eligible || false,
+      lihtc_qct: data.is_lihtc_qct_2025 || false,
+      lihtc_dda: data.is_dda_2025 || false,
+      opportunity_zone: data.is_oz_designated || false,
+      poverty_rate: data.poverty_rate,
+      poverty_qualifies: data.poverty_rate ? Number(data.poverty_rate) >= 20 : false,
+      median_income_pct: data.mfi_percent,
+      income_qualifies: data.mfi_percent ? Number(data.mfi_percent) <= 80 : false,
+      unemployment_rate: data.unemployment_rate
+    },
+
+    // State programs
+    state: {
+      nmtc: data.has_state_nmtc || false,
+      htc: data.has_state_htc || false,
+      brownfield: data.has_brownfield_credit || false
+    },
+
+    // Reason
+    reason: data.has_any_tax_credit
+      ? 'Qualifies for one or more tax credit programs'
+      : 'Does not qualify for any tax credit programs',
+
+    source: 'master_tax_credit_sot'
+  };
+
+  if (coordinates) response.coordinates = coordinates;
+  if (matchedAddress) response.matched_address = matchedAddress;
+
+  if (debug) {
+    response._debug = {
+      raw_data: data,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  return response;
 }

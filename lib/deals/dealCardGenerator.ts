@@ -4,7 +4,7 @@
  */
 
 import { IntakeData } from '@/types/intake';
-import { Deal } from '@/components/DealCard';
+import { Deal } from '@/lib/data/deals';
 
 // =============================================================================
 // TRANSFORMER
@@ -112,7 +112,7 @@ export function generateDealFromIntake(
     id: dealId || `DEAL-${Date.now()}`,
     projectName: intake.projectName || 'Untitled Project',
     location,
-    parent: intake.sponsorName,
+    sponsorName: intake.sponsorName || '',
     address: intake.address,
     censusTract: intake.censusTract,
     povertyRate: intake.tractPovertyRate,
@@ -130,8 +130,19 @@ export function generateDealFromIntake(
       ? [intake.longitude, intake.latitude] 
       : undefined,
     description: intake.projectDescription,
-    impactStatement: intake.communityImpact,
+    communityImpact: intake.communityImpact,
     hasProfile: tier >= 2,
+    // Required fields from lib/data/deals.ts
+    programType: (intake.programs && intake.programs[0]) as any || 'NMTC',
+    programLevel: 'federal',
+    allocation: intake.requestedAllocation || intake.financingGap || 0,
+    creditPrice: 0.76,
+    state: intake.state || '',
+    city: intake.city || '',
+    tractType: [],
+    status: 'available',
+    submittedDate: new Date().toISOString(),
+    visible: true,
   };
 
   return {
@@ -210,9 +221,9 @@ export function validateForDealCard(intake: IntakeData): ValidationResult {
 export function generateDealSummary(deal: Deal): string {
   const lines: string[] = [
     `📋 ${deal.projectName}`,
-    `📍 ${deal.location}`,
-    `💰 Project Cost: $${(deal.projectCost / 1000000).toFixed(1)}M`,
-    `📊 Financing Gap: $${(deal.financingGap / 1000000).toFixed(2)}M`,
+    `📍 ${deal.location || 'Unknown Location'}`,
+    `💰 Project Cost: $${((deal.projectCost || 0) / 1000000).toFixed(1)}M`,
+    `📊 Financing Gap: $${((deal.financingGap || 0) / 1000000).toFixed(2)}M`,
   ];
 
   if (deal.censusTract) {

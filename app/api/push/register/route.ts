@@ -4,11 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
     
     // Verify auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         token,
         platform,
         updated_at: new Date().toISOString(),
-      }, {
+      } as never, {
         onConflict: 'user_id,token',
       });
 

@@ -3,7 +3,24 @@
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getDealById, PROGRAM_COLORS, TRACT_LABELS, Deal } from '@/lib/data/deals';
+import { fetchDealById } from '@/lib/supabase/queries';
+import { Deal } from '@/lib/data/deals';
+
+// Program colors for display
+const PROGRAM_COLORS: Record<string, { gradient: string; bg: string; text: string; border: string }> = {
+  NMTC: { gradient: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-900/30', text: 'text-emerald-300', border: 'border-emerald-500/30' },
+  HTC: { gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-900/30', text: 'text-blue-300', border: 'border-blue-500/30' },
+  LIHTC: { gradient: 'from-purple-500 to-pink-600', bg: 'bg-purple-900/30', text: 'text-purple-300', border: 'border-purple-500/30' },
+  OZ: { gradient: 'from-amber-500 to-orange-600', bg: 'bg-amber-900/30', text: 'text-amber-300', border: 'border-amber-500/30' },
+};
+
+// Tract type labels
+const TRACT_LABELS: Record<string, string> = {
+  QCT: 'Qualified Census Tract',
+  SD: 'Severely Distressed',
+  LIC: 'Low-Income Community',
+  DDA: 'Difficult Development Area',
+};
 
 export default function DealCardPage() {
   const params = useParams();
@@ -16,7 +33,7 @@ export default function DealCardPage() {
     async function loadDeal() {
       setLoading(true);
       try {
-        const fetchedDeal = await getDealById(dealId);
+        const fetchedDeal = await fetchDealById(dealId);
         setDeal(fetchedDeal || null);
       } catch (error) {
         console.error('Failed to load deal:', error);

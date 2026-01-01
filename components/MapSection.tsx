@@ -51,9 +51,9 @@ export default function MapSection(props: MapSectionProps) {
 }
 
 // Actual content - only rendered after client-side mount
-function MapSectionContent({ 
+function MapSectionContent({
   title = "Free Census Tract Check",
-  description = "Search any U.S. address to determine NMTC, LIHTC, and HTC eligibility instantly. No login required.",
+  description = "Search any U.S. address to determine NMTC, LIHTC, DDA, and Opportunity Zone eligibility instantly. No login required.",
   showSearch = true,
 }: MapSectionProps) {
   const [searchAddress, setSearchAddress] = useState('');

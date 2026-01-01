@@ -5,10 +5,10 @@ import Link from 'next/link';
 import MarketplaceFooter from '@/components/layout/MarketplaceFooter';
 import { fetchMarketplaceDeals } from '@/lib/supabase/queries';
 
-// Types
+// Types - Unified with lib/db/types.ts
 type ProgramType = 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
 type ProgramLevel = 'federal' | 'state';
-type DealStatus = 'available' | 'under_review' | 'matched' | 'closing' | 'closed';
+type DealStatus = 'draft' | 'submitted' | 'under_review' | 'available' | 'seeking_capital' | 'matched' | 'closing' | 'closed' | 'withdrawn';
 type TractType = 'QCT' | 'SD' | 'LIC' | 'DDA';
 type EntityView = 'investors' | 'cdes' | 'deals' | 'sponsors';
 
@@ -48,19 +48,27 @@ const LEVEL_COLORS: Record<ProgramLevel, string> = {
 };
 
 const STATUS_COLORS: Record<DealStatus, string> = {
-  available: 'bg-green-900/50 text-green-400',
+  draft: 'bg-gray-700 text-gray-400',
+  submitted: 'bg-blue-900/50 text-blue-400',
   under_review: 'bg-amber-900/50 text-amber-400',
+  available: 'bg-green-900/50 text-green-400',
+  seeking_capital: 'bg-indigo-900/50 text-indigo-400',
   matched: 'bg-purple-900/50 text-purple-400',
-  closing: 'bg-blue-900/50 text-blue-400',
-  closed: 'bg-gray-800 text-gray-400',
+  closing: 'bg-teal-900/50 text-teal-400',
+  closed: 'bg-emerald-900/50 text-emerald-400',
+  withdrawn: 'bg-gray-800 text-gray-400',
 };
 
 const STATUS_LABELS: Record<DealStatus, string> = {
-  available: 'Available',
+  draft: 'Draft',
+  submitted: 'Submitted',
   under_review: 'Under Review',
+  available: 'Available',
+  seeking_capital: 'Seeking Capital',
   matched: 'Matched',
   closing: 'Closing',
   closed: 'Closed',
+  withdrawn: 'Withdrawn',
 };
 
 const TRACT_LABELS: Record<TractType, string> = {
@@ -142,17 +150,8 @@ export default function MarketplacePage() {
     return result;
   }, [deals, searchQuery, programFilter, levelFilter, statusFilter, stateFilter, sortField, sortDirection]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-gray-400">Loading Marketplace...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // IMPORTANT: All hooks must be called before any early returns
+  // This useMemo must be before the loading check to satisfy React's rules of hooks
   const programStats = useMemo(() => {
     return {
       nmtc: deals.filter(d => d.programType === 'NMTC').length,
@@ -163,6 +162,18 @@ export default function MarketplacePage() {
       state: deals.filter(d => d.programLevel === 'state').length,
     };
   }, [deals]);
+
+  // Loading state - AFTER all hooks
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm text-gray-400">Loading Marketplace...</p>
+        </div>
+      </div>
+    );
+  }
 
   const totalPages = Math.ceil(filteredDeals.length / itemsPerPage);
   const paginatedDeals = filteredDeals.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);

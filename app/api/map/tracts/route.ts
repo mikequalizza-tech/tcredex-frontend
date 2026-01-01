@@ -27,6 +27,7 @@ interface TractRow {
   is_oz?: boolean;
   is_dda?: boolean;
   is_nmtc_eligible?: boolean;
+  is_nmtc_high_migration?: boolean;
   // Old column names (from get_map_tracts_in_bbox RPC)
   is_lihtc_qct?: boolean;
   is_oz_designated?: boolean;
@@ -36,8 +37,7 @@ interface TractRow {
   county_name?: string;
   // Common columns
   has_state_nmtc?: boolean;
-  has_state_htc?: boolean;
-  has_brownfield_credit?: boolean;
+  has_state_lihtc?: boolean;
   stack_score?: number;
   poverty_rate?: number;
   mfi_pct?: number;
@@ -60,9 +60,11 @@ export async function GET(request: NextRequest) {
     if (geoid) {
       const cleanGeoid = geoid.replace(/[-\s]/g, '').padStart(11, '0');
 
-      const { data, error } = await supabase.rpc('get_tract_with_credits', {
+      const { data, error } = await supabase.rpc('get_tract_with_credits' as never, {
         p_geoid: cleanGeoid
-      });
+      } as never);
+
+      const rpcData = data as TractRow[] | null;
 
       if (error) {
         console.error('[MapTracts] GEOID lookup error:', error);
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
         return await directGeoidQuery(supabase, cleanGeoid);
       }
 
-      if (!data || data.length === 0) {
+      if (!rpcData || rpcData.length === 0) {
         return NextResponse.json({
           type: 'FeatureCollection',
           features: [],
@@ -80,7 +82,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         type: 'FeatureCollection',
-        features: [mapRowToFeature(data[0] as TractRow)],
+        features: [mapRowToFeature(rpcData[0])],
         source: 'tract_map_layer'
       });
     }
@@ -96,10 +98,12 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
       }
 
-      const { data, error } = await supabase.rpc('get_tract_at_point', {
+      const { data: pointData, error } = await supabase.rpc('get_tract_at_point' as never, {
         p_lat: latNum,
         p_lng: lngNum
-      });
+      } as never);
+
+      const pointRpcData = pointData as TractRow[] | null;
 
       if (error) {
         console.error('[MapTracts] Coordinate lookup error:', error);
@@ -110,7 +114,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      if (!data || data.length === 0) {
+      if (!pointRpcData || pointRpcData.length === 0) {
         return NextResponse.json({
           type: 'FeatureCollection',
           features: [],
@@ -120,7 +124,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         type: 'FeatureCollection',
-        features: [mapRowToFeature(data[0] as TractRow)],
+        features: [mapRowToFeature(pointRpcData[0])],
         source: 'tract_map_layer'
       });
     }
@@ -144,12 +148,14 @@ export async function GET(request: NextRequest) {
       const rpcFunction = simplified ? 'get_simplified_tracts_in_bbox' : 'get_map_tracts_in_bbox';
       console.log(`[MapTracts] Using ${rpcFunction} for bbox query`);
 
-      const { data, error } = await supabase.rpc(rpcFunction, {
+      const { data: bboxData, error } = await supabase.rpc(rpcFunction as never, {
         p_min_lng: minLng,
         p_min_lat: minLat,
         p_max_lng: maxLng,
         p_max_lat: maxLat
-      });
+      } as never);
+
+      const bboxRpcData = bboxData as TractRow[] | null;
 
       if (error) {
         console.error(`[MapTracts] ${rpcFunction} error:`, error);
@@ -159,23 +165,25 @@ export async function GET(request: NextRequest) {
 
       // For centroids mode, return simplified point features
       if (centroids) {
-        const centroidFeatures = (data || []).map((row: TractRow) => ({
-          type: 'Feature',
-          id: row.geoid,
-          properties: {
-            geoid: row.geoid,
-            has_any_tax_credit: row.has_any_tax_credit ?? (
-              row.is_lihtc_qct || row.is_oz_designated ||
-              row.has_state_nmtc || row.has_state_htc || row.has_brownfield_credit
-            ),
-            eligible: row.has_any_tax_credit ?? (
-              row.is_lihtc_qct || row.is_oz_designated ||
-              row.has_state_nmtc || row.has_state_htc || row.has_brownfield_credit
-            )
-          },
-          // Return centroid instead of full geometry
-          geometry: row.geom_json ? getCentroid(JSON.parse(row.geom_json)) : null
-        }));
+        const centroidFeatures = (bboxRpcData || []).map((row: TractRow) => {
+          // Federal programs only - State programs are bonuses
+          // NOTE: DDA is NOT a standalone qualifier - only a 30% boost if LIHTC QCT eligible
+          const eligible = row.has_any_tax_credit ?? (
+            row.is_lihtc_qct || row.is_oz_designated || row.is_qct || row.is_oz ||
+            row.is_nmtc_eligible || row.is_nmtc_high_migration
+          );
+          return {
+            type: 'Feature',
+            id: row.geoid,
+            properties: {
+              geoid: row.geoid,
+              has_any_tax_credit: eligible,
+              eligible: eligible
+            },
+            // Return centroid instead of full geometry
+            geometry: row.geom_json ? getCentroid(JSON.parse(row.geom_json)) : null
+          };
+        });
 
         return NextResponse.json({
           type: 'FeatureCollection',
@@ -186,7 +194,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const features = (data || []).map((row: TractRow) => mapRowToFeature(row));
+      const features = (bboxRpcData || []).map((row: TractRow) => mapRowToFeature(row));
       console.log(`[MapTracts] Returned ${features.length} tracts for bbox (${simplified ? 'simplified' : 'full'})`);
 
       return NextResponse.json({
@@ -226,10 +234,12 @@ function normalizeRow(row: TractRow) {
   const is_nmtc_eligible = row.is_nmtc_eligible ?? row.severely_distressed ?? false;
   const mfi_pct = row.mfi_pct ?? row.median_family_income_pct;
 
-  // Calculate has_any_tax_credit if not provided
+  // Calculate has_any_tax_credit - Federal programs only (State programs are bonuses)
+  // NMTC (LIC or High Migration), LIHTC QCT, OZ
+  // NOTE: DDA is NOT a standalone qualifier - only a 30% boost if LIHTC QCT eligible
+  const is_nmtc_high_migration = row.is_nmtc_high_migration ?? false;
   const has_any_tax_credit = row.has_any_tax_credit ?? (
-    is_qct || is_oz || is_dda || is_nmtc_eligible ||
-    row.has_state_nmtc || row.has_state_htc || row.has_brownfield_credit
+    is_qct || is_oz || is_nmtc_eligible || is_nmtc_high_migration
   );
 
   return {
@@ -244,14 +254,27 @@ function normalizeRow(row: TractRow) {
 }
 
 function buildProgramsArray(row: ReturnType<typeof normalizeRow>): string[] {
+  // NOTE: NO HTC or Brownfield - we don't have logic for those yet
   const programs: string[] = [];
-  if (row.is_qct) programs.push('LIHTC QCT');
+
+  // NMTC: Federal first, then State if applicable
+  if (row.is_nmtc_eligible) {
+    programs.push('Federal NMTC');
+    if (row.has_state_nmtc) {
+      programs.push('State NMTC');
+    }
+  }
+
+  // LIHTC QCT
+  if (row.is_qct) {
+    programs.push('LIHTC QCT');
+    // DDA is ONLY a 30% basis boost - only show if LIHTC QCT eligible
+    if (row.is_dda) programs.push('DDA (30% Boost)');
+  }
+
+  // Opportunity Zone
   if (row.is_oz) programs.push('Opportunity Zone');
-  if (row.is_dda) programs.push('DDA');
-  if (row.is_nmtc_eligible) programs.push('Federal NMTC');
-  if (row.has_state_nmtc) programs.push('State NMTC');
-  if (row.has_state_htc) programs.push('State HTC');
-  if (row.has_brownfield_credit) programs.push('Brownfield');
+
   return programs;
 }
 
@@ -268,15 +291,13 @@ function mapRowToFeature(rawRow: TractRow) {
       // Location
       state_name: row.state_name,
       county_name: row.county_name,
-      // Tax credit flags (normalized)
+      // Tax credit flags (normalized) - NO HTC or Brownfield
       has_any_tax_credit: row.has_any_tax_credit,
       is_qct: row.is_qct,
       is_oz: row.is_oz,
       is_dda: row.is_dda,
       is_nmtc_eligible: row.is_nmtc_eligible,
       has_state_nmtc: row.has_state_nmtc ?? false,
-      has_state_htc: row.has_state_htc ?? false,
-      has_brownfield_credit: row.has_brownfield_credit ?? false,
       severely_distressed: row.severely_distressed ?? false,
       // Legacy aliases for backwards compatibility with frontend
       is_lihtc_qct: row.is_qct,

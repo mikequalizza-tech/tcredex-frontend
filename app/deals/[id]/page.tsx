@@ -3,7 +3,29 @@
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getDealById, PROGRAM_COLORS, STATUS_CONFIG, Deal } from '@/lib/data/deals';
+import { fetchDealById } from '@/lib/supabase/queries';
+import { Deal } from '@/lib/data/deals';
+
+// Program colors for display
+const PROGRAM_COLORS: Record<string, { gradient: string; bg: string; text: string; border: string }> = {
+  NMTC: { gradient: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-900/30', text: 'text-emerald-300', border: 'border-emerald-500/30' },
+  HTC: { gradient: 'from-blue-500 to-indigo-600', bg: 'bg-blue-900/30', text: 'text-blue-300', border: 'border-blue-500/30' },
+  LIHTC: { gradient: 'from-purple-500 to-pink-600', bg: 'bg-purple-900/30', text: 'text-purple-300', border: 'border-purple-500/30' },
+  OZ: { gradient: 'from-amber-500 to-orange-600', bg: 'bg-amber-900/30', text: 'text-amber-300', border: 'border-amber-500/30' },
+};
+
+// Status display config
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  draft: { label: 'Draft', color: 'bg-gray-700 text-gray-400' },
+  submitted: { label: 'Submitted', color: 'bg-blue-900/50 text-blue-400' },
+  under_review: { label: 'Under Review', color: 'bg-amber-900/50 text-amber-400' },
+  available: { label: 'Available', color: 'bg-green-900/50 text-green-400' },
+  seeking_capital: { label: 'Seeking Capital', color: 'bg-indigo-900/50 text-indigo-400' },
+  matched: { label: 'Matched', color: 'bg-purple-900/50 text-purple-400' },
+  closing: { label: 'Closing', color: 'bg-teal-900/50 text-teal-400' },
+  closed: { label: 'Closed', color: 'bg-emerald-900/50 text-emerald-400' },
+  withdrawn: { label: 'Withdrawn', color: 'bg-gray-800 text-gray-400' },
+};
 import { useCurrentUser } from '@/lib/auth';
 
 interface DealPageProps {
@@ -21,8 +43,8 @@ export default function DealDetailPage({ params }: DealPageProps) {
     async function loadDeal() {
       setDealLoading(true);
       try {
-        const fetchedDeal = await getDealById(id);
-        setDeal(fetchedDeal);
+        const fetchedDeal = await fetchDealById(id);
+        setDeal(fetchedDeal || undefined);
       } catch (error) {
         console.error('Failed to load deal:', error);
       } finally {

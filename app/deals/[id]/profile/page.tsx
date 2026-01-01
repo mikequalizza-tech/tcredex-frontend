@@ -3,7 +3,16 @@
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getDealById, TRACT_LABELS, Deal } from '@/lib/data/deals';
+import { fetchDealById } from '@/lib/supabase/queries';
+import { Deal } from '@/lib/data/deals';
+
+// Tract type labels
+const TRACT_LABELS: Record<string, string> = {
+  QCT: 'Qualified Census Tract',
+  SD: 'Severely Distressed',
+  LIC: 'Low-Income Community',
+  DDA: 'Difficult Development Area',
+};
 
 // Extended profile data generator
 function generateProfileData(deal: Deal) {
@@ -77,7 +86,7 @@ export default function ProjectProfilePage() {
     async function loadDeal() {
       setLoading(true);
       try {
-        const fetchedDeal = await getDealById(dealId);
+        const fetchedDeal = await fetchDealById(dealId);
         setDeal(fetchedDeal || null);
       } catch (error) {
         console.error('Failed to load deal:', error);

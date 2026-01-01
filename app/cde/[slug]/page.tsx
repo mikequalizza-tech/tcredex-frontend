@@ -1,10 +1,24 @@
 'use client';
 
-import { use, useEffect } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getCDEBySlug, MISSION_LABELS, type CDE } from '@/lib/data/cdes';
+import { fetchCDEBySlug, CDEDetail } from '@/lib/supabase/queries';
 import { useCurrentUser } from '@/lib/auth';
+
+// Mission focus labels
+const MISSION_LABELS: Record<string, string> = {
+  healthcare: 'Healthcare',
+  education: 'Education',
+  community_facility: 'Community Facilities',
+  manufacturing: 'Manufacturing',
+  retail: 'Retail',
+  mixed_use: 'Mixed Use',
+  affordable_housing: 'Affordable Housing',
+  food_access: 'Food Access',
+  childcare: 'Childcare',
+  workforce: 'Workforce Development',
+};
 
 interface CDEPageProps {
   params: Promise<{ slug: string }>;
@@ -13,8 +27,24 @@ interface CDEPageProps {
 export default function CDEDetailPage({ params }: CDEPageProps) {
   const { slug } = use(params);
   const router = useRouter();
-  const cde = getCDEBySlug(slug);
+  const [cde, setCDE] = useState<CDEDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const { isAuthenticated, isLoading, orgType } = useCurrentUser();
+
+  useEffect(() => {
+    async function loadCDE() {
+      setLoading(true);
+      try {
+        const fetchedCDE = await fetchCDEBySlug(slug);
+        setCDE(fetchedCDE);
+      } catch (error) {
+        console.error('Failed to load CDE:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCDE();
+  }, [slug]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -22,7 +52,7 @@ export default function CDEDetailPage({ params }: CDEPageProps) {
     }
   }, [isLoading, isAuthenticated, router, slug]);
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || loading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
@@ -58,7 +88,7 @@ export default function CDEDetailPage({ params }: CDEPageProps) {
             </svg>
             Back to Marketplace
           </Link>
-          
+
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-3">
@@ -72,7 +102,7 @@ export default function CDEDetailPage({ params }: CDEPageProps) {
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{cde.name}</h1>
               <p className="text-xl text-white/80">{cde.headquartersCity}, {cde.headquartersState}</p>
             </div>
-            
+
             {orgType === 'sponsor' && cde.acceptingApplications && (
               <button className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100">
                 Request Allocation
@@ -89,38 +119,44 @@ export default function CDEDetailPage({ params }: CDEPageProps) {
           <div className="lg:col-span-2 space-y-8">
             <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
               <h2 className="text-xl font-semibold text-white mb-4">About</h2>
-              <p className="text-gray-300 leading-relaxed">{cde.description}</p>
+              <p className="text-gray-300 leading-relaxed">{cde.description || 'No description available.'}</p>
             </section>
 
-            <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Mission Focus</h2>
-              <div className="flex flex-wrap gap-2">
-                {cde.missionFocus.map(m => (
-                  <span key={m} className="px-3 py-1.5 bg-indigo-900/30 text-indigo-300 rounded-lg text-sm">
-                    {MISSION_LABELS[m]}
-                  </span>
-                ))}
-              </div>
-            </section>
+            {cde.missionFocus.length > 0 && (
+              <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Mission Focus</h2>
+                <div className="flex flex-wrap gap-2">
+                  {cde.missionFocus.map(m => (
+                    <span key={m} className="px-3 py-1.5 bg-indigo-900/30 text-indigo-300 rounded-lg text-sm">
+                      {MISSION_LABELS[m] || m}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
 
-            <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Project Types</h2>
-              <div className="flex flex-wrap gap-2">
-                {cde.projectTypes.map(t => (
-                  <span key={t} className="px-3 py-1.5 bg-gray-800 text-gray-300 rounded-lg text-sm">{t}</span>
-                ))}
-              </div>
-            </section>
+            {cde.projectTypes.length > 0 && (
+              <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Project Types</h2>
+                <div className="flex flex-wrap gap-2">
+                  {cde.projectTypes.map(t => (
+                    <span key={t} className="px-3 py-1.5 bg-gray-800 text-gray-300 rounded-lg text-sm">{t}</span>
+                  ))}
+                </div>
+              </section>
+            )}
 
-            <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Service Area</h2>
-              <p className="text-gray-400 text-sm mb-3">{cde.serviceAreaType}</p>
-              <div className="flex flex-wrap gap-2">
-                {cde.serviceArea.map(s => (
-                  <span key={s} className="px-3 py-1 bg-gray-800 text-gray-300 rounded text-sm">{s}</span>
-                ))}
-              </div>
-            </section>
+            {cde.serviceArea.length > 0 && (
+              <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Service Area</h2>
+                <p className="text-gray-400 text-sm mb-3">{cde.serviceAreaType}</p>
+                <div className="flex flex-wrap gap-2">
+                  {cde.serviceArea.map(s => (
+                    <span key={s} className="px-3 py-1 bg-gray-800 text-gray-300 rounded text-sm">{s}</span>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
               <h2 className="text-xl font-semibold text-white mb-4">Track Record</h2>
@@ -145,7 +181,7 @@ export default function CDEDetailPage({ params }: CDEPageProps) {
           <div className="space-y-6">
             <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 sticky top-6">
               <h3 className="text-lg font-semibold text-white mb-4">Allocation Summary</h3>
-              
+
               <div className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b border-gray-800">
                   <span className="text-gray-400">Available</span>
@@ -176,9 +212,9 @@ export default function CDEDetailPage({ params }: CDEPageProps) {
                   </button>
                 )}
                 {cde.website && (
-                  <a 
-                    href={`https://${cde.website}`} 
-                    target="_blank" 
+                  <a
+                    href={cde.website.startsWith('http') ? cde.website : `https://${cde.website}`}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center rounded-lg"
                   >
@@ -187,12 +223,14 @@ export default function CDEDetailPage({ params }: CDEPageProps) {
                 )}
               </div>
 
-              <div className="mt-6 pt-6 border-t border-gray-800">
-                <h4 className="text-sm font-medium text-gray-400 mb-3">Contact</h4>
-                <p className="text-white font-medium">{cde.primaryContact}</p>
-                <p className="text-gray-400 text-sm">{cde.contactEmail}</p>
-                <p className="text-gray-400 text-sm">{cde.contactPhone}</p>
-              </div>
+              {(cde.primaryContact || cde.contactEmail) && (
+                <div className="mt-6 pt-6 border-t border-gray-800">
+                  <h4 className="text-sm font-medium text-gray-400 mb-3">Contact</h4>
+                  {cde.primaryContact && <p className="text-white font-medium">{cde.primaryContact}</p>}
+                  {cde.contactEmail && <p className="text-gray-400 text-sm">{cde.contactEmail}</p>}
+                  {cde.contactPhone && <p className="text-gray-400 text-sm">{cde.contactPhone}</p>}
+                </div>
+              )}
             </div>
           </div>
         </div>

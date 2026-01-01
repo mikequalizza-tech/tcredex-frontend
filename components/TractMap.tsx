@@ -17,7 +17,7 @@ interface TractProperties {
   lihtc_qct: boolean;
   oz: boolean;
   state_nmtc: string | null;
-  state_htc: string | null;
+  state_lihtc: string | null;
   stackability: string | null;
   stack_count: number;
 }
@@ -152,7 +152,7 @@ export default function TractMap() {
           lihtc_qct: props?.lihtc_qct === true || props?.lihtc_qct === "true",
           oz: props?.oz === true || props?.oz === "true",
           state_nmtc: props?.state_nmtc || null,
-          state_htc: props?.state_htc || null,
+          state_lihtc: props?.state_lihtc || null,
           stackability: props?.stackability || null,
           stack_count: Number(props?.stack_count) || 0,
         };
@@ -248,10 +248,10 @@ export default function TractMap() {
               <span>State NMTC</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className={selectedTract.state_htc === "Y" ? "text-green-600" : "text-gray-400"}>
-                {selectedTract.state_htc === "Y" ? "✓" : "✗"}
+              <span className={selectedTract.state_lihtc === "Y" ? "text-green-600" : "text-gray-400"}>
+                {selectedTract.state_lihtc === "Y" ? "✓" : "✗"}
               </span>
-              <span>State HTC</span>
+              <span>State LIHTC</span>
             </div>
             
             {selectedTract.stackability && (

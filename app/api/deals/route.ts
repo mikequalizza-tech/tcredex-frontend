@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         visible: false,
         readiness_score: 0,
         tier: 1,
-      })
+      } as never)
       .select()
       .single();
 
@@ -115,11 +115,11 @@ export async function POST(request: NextRequest) {
       actor_type: 'human',
       actor_id: body.created_by || 'unknown',
       entity_type: 'application',
-      entity_id: data.id,
+      entity_id: (data as { id: string }).id,
       action: 'application_created',
       payload_json: { project_name: body.project_name },
-      hash: generateHash(data),
-    });
+      hash: generateHash(data as Record<string, unknown>),
+    } as never);
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

@@ -49,11 +49,13 @@ export async function GET(request: NextRequest) {
     if (geoid) {
       const cleanGeoid = geoid.replace(/[-\s]/g, '').padStart(11, '0');
 
-      const { data, error } = await supabase.rpc('get_tract_with_credits', {
+      const { data, error } = await supabase.rpc('get_tract_with_credits' as never, {
         p_geoid: cleanGeoid
-      });
+      } as never);
 
-      if (error || !data || data.length === 0) {
+      const rpcData = data as TractResult[] | null;
+
+      if (error || !rpcData || rpcData.length === 0) {
         return NextResponse.json({
           found: false,
           geoid: cleanGeoid,
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const tract = data[0] as TractResult;
+      const tract = rpcData[0];
       return formatTractResponse(tract);
     }
 
@@ -74,12 +76,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid coordinates' }, { status: 400 });
       }
 
-      const { data, error } = await supabase.rpc('get_tract_at_point', {
+      const { data: pointData, error } = await supabase.rpc('get_tract_at_point' as never, {
         p_lat: latNum,
         p_lng: lngNum
-      });
+      } as never);
 
-      if (error || !data || data.length === 0) {
+      const pointRpcData = pointData as TractResult[] | null;
+
+      if (error || !pointRpcData || pointRpcData.length === 0) {
         return NextResponse.json({
           found: false,
           message: 'No tract found at coordinates',
@@ -87,7 +91,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const tract = data[0] as TractResult;
+      const tract = pointRpcData[0];
       return formatTractResponse(tract);
     }
 

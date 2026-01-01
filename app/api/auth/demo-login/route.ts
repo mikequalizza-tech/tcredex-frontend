@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     // ===================================================================
 
     // 1. Check investors table
-    const { data: investor } = await supabase
+    const { data: investorData } = await supabase
       .from('investors')
       .select(`
         *,
@@ -54,6 +54,15 @@ export async function POST(request: NextRequest) {
       `)
       .eq('primary_contact_email', normalizedEmail)
       .single();
+
+    type OrgData = { id: string; name: string; slug: string; type: string };
+    type InvestorData = {
+      id: string;
+      primary_contact_name: string | null;
+      organization_id: string | null;
+      organization: OrgData | null;
+    };
+    const investor = investorData as InvestorData | null;
 
     if (investor) {
       return NextResponse.json({
@@ -76,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Check sponsors table
-    const { data: sponsor } = await supabase
+    const { data: sponsorData } = await supabase
       .from('sponsors')
       .select(`
         *,
@@ -84,6 +93,14 @@ export async function POST(request: NextRequest) {
       `)
       .eq('primary_contact_email', normalizedEmail)
       .single();
+
+    type SponsorData = {
+      id: string;
+      primary_contact_name: string | null;
+      organization_id: string | null;
+      organization: OrgData | null;
+    };
+    const sponsor = sponsorData as SponsorData | null;
 
     if (sponsor) {
       return NextResponse.json({
@@ -106,7 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Check users table (for CDEs and admins)
-    const { data: user } = await supabase
+    const { data: userData } = await supabase
       .from('users')
       .select(`
         *,
@@ -114,6 +131,16 @@ export async function POST(request: NextRequest) {
       `)
       .eq('email', normalizedEmail)
       .single();
+
+    type UserData = {
+      id: string;
+      email: string;
+      name: string | null;
+      role: string | null;
+      organization_id: string | null;
+      organization: OrgData | null;
+    };
+    const user = userData as UserData | null;
 
     if (user) {
       const orgType = user.organization?.type || 'cde';

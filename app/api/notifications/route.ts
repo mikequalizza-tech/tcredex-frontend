@@ -5,11 +5,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
     
     // Verify auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -20,12 +20,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: notifications, error } = await supabase
+    const { data: notificationsData, error } = await supabase
       .from('notifications')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
+
+    type NotificationRow = {
+      id: string;
+      type: string | null;
+      title: string;
+      body: string;
+      deal_id: string | null;
+      read: boolean | null;
+      created_at: string;
+    };
+    const notifications = notificationsData as NotificationRow[] | null;
 
     if (error) {
       console.error('Notifications query error:', error);
@@ -53,7 +64,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
     
     // Verify auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -67,7 +78,7 @@ export async function POST(request: NextRequest) {
     // Mark all as read
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true })
+      .update({ read: true } as never)
       .eq('user_id', user.id)
       .eq('read', false);
 

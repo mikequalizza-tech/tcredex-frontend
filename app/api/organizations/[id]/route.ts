@@ -61,7 +61,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     
     const { data, error } = await supabase
       .from('organizations')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id)
       .select()
       .single();

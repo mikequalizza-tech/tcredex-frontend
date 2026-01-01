@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     
     const { data, error } = await supabase
       .from('cde_allocations')
-      .insert(allocationData)
+      .insert(allocationData as never)
       .select()
       .single();
     
@@ -95,16 +95,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 // =============================================================================
 
 async function updateCDETotals(cdeId: string, supabase: ReturnType<typeof getSupabaseAdmin>) {
-  const { data: allocations } = await supabase
+  const { data: allocationsData } = await supabase
     .from('cde_allocations')
     .select('awarded_amount, available_on_platform, deployment_deadline')
     .eq('cde_id', cdeId);
-  
+
+  type AllocationRow = {
+    awarded_amount: number | null;
+    available_on_platform: number | null;
+    deployment_deadline: string | null;
+  };
+  const allocations = allocationsData as AllocationRow[] | null;
+
   if (!allocations || allocations.length === 0) return;
-  
+
   const totalAllocation = allocations.reduce((sum, a) => sum + (a.awarded_amount || 0), 0);
   const remainingAllocation = allocations.reduce((sum, a) => sum + (a.available_on_platform || 0), 0);
-  
+
   // Find earliest deadline
   const deadlines = allocations
     .filter(a => a.deployment_deadline)
@@ -119,6 +126,6 @@ async function updateCDETotals(cdeId: string, supabase: ReturnType<typeof getSup
       total_allocation: totalAllocation,
       remaining_allocation: remainingAllocation,
       deployment_deadline: earliestDeadline,
-    })
+    } as never)
     .eq('id', cdeId);
 }

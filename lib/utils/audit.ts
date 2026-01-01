@@ -17,7 +17,7 @@ export async function recordAuditEvent(event: AuditEvent) {
       role: event.role || null,
       project_id: event.projectId || null,
       action: event.action,
-    });
+    } as never);
   } catch (error) {
     console.error('[Audit] Failed to record event', error);
   }

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')?.toLowerCase();
 
     // Fetch from cdes table
-    const { data: cdes, error: cdesError } = await supabase
+    const { data: cdesData, error: cdesError } = await supabase
       .from('cdes')
       .select(`
         id,
@@ -54,9 +54,26 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false });
 
+    const cdes = cdesData as Array<{
+      id: string;
+      name: string | null;
+      total_allocation: number | null;
+      deployed_allocation: number | null;
+      remaining_allocation: number | null;
+      primary_states: string[] | null;
+      target_sectors: string[] | null;
+      min_deal_size: number | null;
+      max_deal_size: number | null;
+      status: string | null;
+      primary_contact_name: string | null;
+      primary_contact_email: string | null;
+      organization_id: string | null;
+      organization: { name: string } | null;
+    }> | null;
+
     if (!cdesError && cdes) {
       for (const cde of cdes) {
-        const cdeName = cde.name || (cde.organization as any)?.name || 'Unknown CDE';
+        const cdeName = cde.name || cde.organization?.name || 'Unknown CDE';
 
         // Apply search filter
         if (search && !cdeName.toLowerCase().includes(search)) continue;
@@ -81,7 +98,7 @@ export async function GET(request: NextRequest) {
           sectors: cde.target_sectors || [],
           minDeal: Number(cde.min_deal_size) || 0,
           maxDeal: Number(cde.max_deal_size) || 0,
-          status: (cde.status as any) || 'active',
+          status: (cde.status as 'active' | 'pending' | 'paused') || 'active',
           contact: cde.primary_contact_name || '',
           email: cde.primary_contact_email || '',
         });

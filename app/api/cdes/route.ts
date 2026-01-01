@@ -69,12 +69,12 @@ export async function POST(request: NextRequest) {
           website: body.website,
           city: body.city,
           state: body.state,
-        })
+        } as never)
         .select()
         .single();
 
       if (orgError) throw orgError;
-      organizationId = org.id;
+      organizationId = (org as { id: string }).id;
     }
 
     // Create CDE profile
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         nmtc_experience: body.nmtc_experience ?? true,
         htc_experience: body.htc_experience || false,
         status: 'active',
-      })
+      } as never)
       .select()
       .single();
 
@@ -110,8 +110,9 @@ export async function POST(request: NextRequest) {
 
     // Create allocations if provided
     if (body.allocations && body.allocations.length > 0) {
+      const typedData = data as { id: string };
       const allocationsToInsert = body.allocations.map((a: Record<string, unknown>) => ({
-        cde_id: data.id,
+        cde_id: typedData.id,
         type: a.type,
         year: a.year,
         state_code: a.state_code,
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
         deployment_deadline: a.deployment_deadline,
       }));
 
-      await supabase.from('cde_allocations').insert(allocationsToInsert);
+      await supabase.from('cde_allocations').insert(allocationsToInsert as never);
     }
 
     return NextResponse.json(data, { status: 201 });

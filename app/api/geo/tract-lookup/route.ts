@@ -54,19 +54,21 @@ export async function GET(request: NextRequest) {
       }
 
       // Use get_tract_at_point RPC for point-in-polygon lookup
-      const { data, error } = await supabase.rpc('get_tract_at_point', {
+      const { data, error } = await supabase.rpc('get_tract_at_point' as never, {
         p_lat: match.coordinates.y,
         p_lng: match.coordinates.x
-      });
+      } as never);
 
-      if (error || !data || data.length === 0) {
+      const rpcData = data as TractResult[] | null;
+
+      if (error || !rpcData || rpcData.length === 0) {
         return NextResponse.json({
           error: 'Census tract not found for this location',
           coordinates: [match.coordinates.x, match.coordinates.y]
         }, { status: 404 });
       }
 
-      const tract = data[0] as TractResult;
+      const tract = rpcData[0];
       return NextResponse.json({
         geoid: tract.geoid,
         tract_id: tract.geoid,
@@ -91,24 +93,26 @@ export async function GET(request: NextRequest) {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
 
-    const { data, error } = await supabase.rpc('get_tract_at_point', {
+    const { data: coordData, error } = await supabase.rpc('get_tract_at_point' as never, {
       p_lat: latNum,
       p_lng: lngNum
-    });
+    } as never);
+
+    const coordRpcData = coordData as TractResult[] | null;
 
     if (error) {
       console.error('[TractLookup] Database error:', error);
       return NextResponse.json({ error: 'Database lookup failed' }, { status: 500 });
     }
 
-    if (!data || data.length === 0) {
+    if (!coordRpcData || coordRpcData.length === 0) {
       return NextResponse.json({
         error: 'No census tract found at this location',
         coordinates: [lngNum, latNum]
       }, { status: 404 });
     }
 
-    const tract = data[0] as TractResult;
+    const tract = coordRpcData[0];
     return NextResponse.json({
       geoid: tract.geoid,
       tract_id: tract.geoid,

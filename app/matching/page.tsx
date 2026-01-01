@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DealCard from '@/components/DealCard';
-import { getMarketplaceDeals, Deal } from '@/lib/data/deals';
+import { Deal } from '@/lib/data/deals';
+import { fetchMarketplaceDeals } from '@/lib/supabase/queries';
 
 interface DealCardFormat {
   id: string;
@@ -40,7 +41,7 @@ export default function MatchingPage() {
     async function loadDeals() {
       setLoading(true);
       try {
-        const deals = await getMarketplaceDeals();
+        const deals = await fetchMarketplaceDeals();
         setAllDeals(deals);
       } catch (error) {
         console.error('Failed to load deals:', error);

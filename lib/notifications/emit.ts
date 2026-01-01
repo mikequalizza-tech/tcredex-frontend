@@ -77,23 +77,29 @@ async function getRecipientUsers(
 
   // Get deal owner (sponsor)
   if (roles.includes('sponsor')) {
-    const { data: deal } = await supabase
+    const { data: rawDeal } = await supabase
       .from('deals')
       .select('user_id, profiles(id, email, full_name)')
       .eq('id', dealId)
       .single();
-    
+
+    type DealWithProfile = {
+      user_id: string;
+      profiles: { id: string; email: string; full_name: string } | { id: string; email: string; full_name: string }[] | null;
+    };
+    const deal = rawDeal as DealWithProfile | null;
+
     if (deal?.user_id && deal.profiles && !seenIds.has(deal.user_id)) {
       // Handle profiles - could be object or array
-      const profileData = Array.isArray(deal.profiles) 
-        ? deal.profiles[0] 
+      const profileData = Array.isArray(deal.profiles)
+        ? deal.profiles[0]
         : deal.profiles;
-      
+
       if (profileData && typeof profileData === 'object') {
         users.push({
           id: deal.user_id,
-          email: (profileData as Record<string, unknown>).email as string || '',
-          name: (profileData as Record<string, unknown>).full_name as string || 'User',
+          email: profileData.email || '',
+          name: profileData.full_name || 'User',
         });
         seenIds.add(deal.user_id);
       }
@@ -102,29 +108,36 @@ async function getRecipientUsers(
 
   // Get deal parties (CDE, investor)
   if (roles.includes('cde') || roles.includes('investor')) {
-    const { data: parties } = await supabase
+    const { data: rawParties } = await supabase
       .from('deal_parties')
       .select('user_id, role, profiles(id, email, full_name)')
       .eq('deal_id', dealId);
 
+    type PartyWithProfile = {
+      user_id: string;
+      role: string | null;
+      profiles: { id: string; email: string; full_name: string } | { id: string; email: string; full_name: string }[] | null;
+    };
+    const parties = rawParties as PartyWithProfile[] | null;
+
     parties?.forEach((party) => {
       if (party.user_id && party.profiles && !seenIds.has(party.user_id)) {
         const partyRole = party.role?.toLowerCase();
-        const shouldInclude = 
+        const shouldInclude =
           (roles.includes('cde') && partyRole?.includes('cde')) ||
           (roles.includes('investor') && partyRole?.includes('investor'));
-        
+
         if (shouldInclude) {
           // Handle profiles - could be object or array
-          const profileData = Array.isArray(party.profiles) 
-            ? party.profiles[0] 
+          const profileData = Array.isArray(party.profiles)
+            ? party.profiles[0]
             : party.profiles;
-          
+
           if (profileData && typeof profileData === 'object') {
             users.push({
               id: party.user_id,
-              email: (profileData as Record<string, unknown>).email as string || '',
-              name: (profileData as Record<string, unknown>).full_name as string || 'User',
+              email: profileData.email || '',
+              name: profileData.full_name || 'User',
             });
             seenIds.add(party.user_id);
           }
@@ -135,11 +148,14 @@ async function getRecipientUsers(
 
   // Get admins
   if (roles.includes('admin')) {
-    const { data: admins } = await supabase
+    const { data: rawAdmins } = await supabase
       .from('profiles')
       .select('id, email, full_name')
       .eq('role', 'admin');
-    
+
+    type AdminRow = { id: string; email: string; full_name: string | null };
+    const admins = rawAdmins as AdminRow[] | null;
+
     admins?.forEach((admin) => {
       if (admin.id && admin.email && !seenIds.has(admin.id)) {
         users.push({
@@ -165,10 +181,13 @@ async function sendPush(
   data: Record<string, unknown>,
   supabase: typeof supabaseAdmin
 ): Promise<void> {
-  const { data: tokens } = await supabase
+  const { data: rawTokens } = await supabase
     .from('push_tokens')
     .select('token')
     .in('user_id', userIds);
+
+  type TokenRow = { token: string };
+  const tokens = rawTokens as TokenRow[] | null;
 
   if (!tokens?.length) return;
 
@@ -301,7 +320,7 @@ export async function emitNotification(
   // 1. Create in-app notifications
   if (!options.skipInApp) {
     for (const userId of recipientUserIds) {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('notifications')
         .insert({
           user_id: userId,
@@ -314,10 +333,12 @@ export async function emitNotification(
           read: false,
           expires_at: expiresAt,
           created_at: new Date().toISOString(),
-        })
+        } as never)
         .select('id')
         .single();
 
+      type InsertResult = { id: string };
+      const data = rawData as InsertResult | null;
       if (data?.id) notificationIds.push(data.id);
       if (error) console.error('In-app notification error:', error);
     }

@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     
     const { data, error } = await supabase
       .from('users')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id)
       .select(`
         *,
@@ -120,7 +120,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     
     const { error } = await supabase
       .from('users')
-      .update({ is_active: false })
+      .update({ is_active: false } as never)
       .eq('id', id);
     
     if (error) throw error;

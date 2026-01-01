@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         deals_at_founder_rate: 1, // Start with 1 deal at 1%
         referral_count: 0,
         created_at: new Date().toISOString()
-      })
+      } as never)
       .select()
       .single();
 
@@ -80,11 +80,14 @@ export async function POST(request: NextRequest) {
     // If referred, increment referrer's count
     if (referral_code) {
       // Get the referrer
-      const { data: referrer } = await supabase
+      const { data: referrerData } = await supabase
         .from('founder_members')
         .select('id, referral_count, deals_at_founder_rate')
         .eq('founder_code', referral_code.toUpperCase())
         .single();
+
+      type ReferrerRow = { id: string; referral_count: number | null; deals_at_founder_rate: number | null };
+      const referrer = referrerData as ReferrerRow | null;
 
       if (referrer) {
         const newCount = (referrer.referral_count || 0) + 1;
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
           .update({
             referral_count: newCount,
             deals_at_founder_rate: newDeals
-          })
+          } as never)
           .eq('id', referrer.id);
       }
     }
@@ -108,7 +111,7 @@ export async function POST(request: NextRequest) {
         actor_type: 'human',
         actor_id: email.toLowerCase(),
         entity_type: 'application',
-        entity_id: founder.id,
+        entity_id: (founder as { id: string }).id,
         action: 'application_created',
         payload_json: {
           type: 'founder_registration',
@@ -122,7 +125,7 @@ export async function POST(request: NextRequest) {
         },
         prev_hash: null,
         hash: 'pending' // Will be computed by background job
-      });
+      } as never);
     } catch (ledgerError) {
       // Don't block registration on ledger failure
       console.error('[Founders] Ledger error:', ledgerError);

@@ -57,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const { data, error } = await supabase
       .from('deals')
-      .update(updates)
+      .update(updates as never)
       .eq('id', id)
       .select()
       .single();
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       action: 'application_updated',
       payload_json: { updated_fields: Object.keys(updates) },
       hash: generateHash({ id, updates }),
-    });
+    } as never);
 
     return NextResponse.json(data);
   } catch (error) {
@@ -98,7 +98,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // Soft delete - change status to withdrawn
     const { data, error } = await supabase
       .from('deals')
-      .update({ status: 'withdrawn', visible: false })
+      .update({ status: 'withdrawn', visible: false } as never)
       .eq('id', id)
       .select()
       .single();
@@ -119,7 +119,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       action: 'application_status_changed',
       payload_json: { new_status: 'withdrawn' },
       hash: generateHash({ id, action: 'withdrawn' }),
-    });
+    } as never);
 
     return NextResponse.json({ success: true, message: 'Deal withdrawn' });
   } catch (error) {

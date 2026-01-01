@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFeaturedDeals, PROGRAM_COLORS, Deal } from '@/lib/data/deals';
+import { PROGRAM_COLORS, Deal } from '@/lib/data/deals';
+import { fetchMarketplaceDeals } from '@/lib/supabase/queries';
 
 export default function FeaturedDeals() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -11,7 +12,9 @@ export default function FeaturedDeals() {
   useEffect(() => {
     async function loadDeals() {
       try {
-        const featured = await getFeaturedDeals();
+        const allDeals = await fetchMarketplaceDeals();
+        // Get first 3 deals as featured
+        const featured = allDeals.slice(0, 3);
         setDeals(featured);
       } catch (error) {
         console.error('Failed to load featured deals:', error);

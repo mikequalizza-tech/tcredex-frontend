@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { findMatches, MATCH_THRESHOLDS } from '@/lib/automatch';
 
 export async function POST(request: NextRequest) {
@@ -44,26 +44,32 @@ export async function POST(request: NextRequest) {
 
     // If cdeId provided, find deals for this CDE
     if (cdeId) {
-      const supabase = supabaseAdmin;
+      const supabase = getSupabaseAdmin();
 
       // Get CDE info
-      const { data: cde } = await supabase
+      const { data: cdeData } = await supabase
         .from('organizations')
         .select('*')
         .eq('id', cdeId)
         .eq('type', 'CDE')
         .single();
 
+      type CDERow = { id: string; name: string };
+      const cde = cdeData as CDERow | null;
+
       if (!cde) {
         return NextResponse.json({ error: 'CDE not found' }, { status: 404 });
       }
 
       // Get available deals
-      const { data: deals } = await supabase
+      const { data: dealsData } = await supabase
         .from('deals')
         .select('id')
         .eq('status', 'available')
         .eq('program_type', 'NMTC');
+
+      type DealRow = { id: string };
+      const deals = dealsData as DealRow[] | null;
 
       // Score each deal for this CDE
       const matches = [];
@@ -128,10 +134,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
 
     // Get saved matches
-    const { data: matches, error } = await supabase
+    const { data: matchesData, error } = await supabase
       .from('deal_matches')
       .select(`
         cde_id,
@@ -146,6 +152,17 @@ export async function GET(request: NextRequest) {
       .order('score', { ascending: false })
       .limit(10);
 
+    type MatchRow = {
+      cde_id: string;
+      score: number;
+      match_strength: string;
+      breakdown: Record<string, unknown> | null;
+      reasons: string[] | null;
+      created_at: string;
+      organizations: { id: string; name: string } | { id: string; name: string }[] | null;
+    };
+    const matches = matchesData as MatchRow[] | null;
+
     if (error) {
       // Table might not exist yet
       return NextResponse.json({ matches: [] });
@@ -155,11 +172,11 @@ export async function GET(request: NextRequest) {
       // Handle organizations - could be object, array, or null
       let cdeName = 'Unknown CDE';
       if (m.organizations) {
-        const orgData = Array.isArray(m.organizations) 
-          ? m.organizations[0] 
+        const orgData = Array.isArray(m.organizations)
+          ? m.organizations[0]
           : m.organizations;
         if (orgData && typeof orgData === 'object') {
-          cdeName = (orgData as Record<string, unknown>).name as string || 'Unknown CDE';
+          cdeName = orgData.name || 'Unknown CDE';
         }
       }
 

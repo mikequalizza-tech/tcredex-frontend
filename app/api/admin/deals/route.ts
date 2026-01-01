@@ -5,12 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { DealStatus } from '@/lib/deals';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
 
     // Verify admin
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if ((profile as unknown as { role?: string })?.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
@@ -67,19 +67,36 @@ export async function GET(request: NextRequest) {
       query = query.or(`project_name.ilike.%${search}%,sponsor_name.ilike.%${search}%`);
     }
 
-    const { data: deals, count, error } = await query;
+    const { data: dealsData, count, error } = await query;
 
     if (error) {
       console.error('Admin deals query error:', error);
       return NextResponse.json({ error: 'Failed to fetch deals' }, { status: 500 });
     }
 
+    type DealRow = {
+      id: string;
+      project_name: string;
+      sponsor_name: string;
+      program_type: string;
+      status: string;
+      allocation_amount: number | null;
+      city: string | null;
+      state: string | null;
+      census_tract: string | null;
+      created_at: string;
+      updated_at: string;
+      profiles: { email?: string; full_name?: string } | null;
+    };
+
+    const deals = dealsData as DealRow[] | null;
+
     // Format response
     const formatted = (deals || []).map(deal => ({
       id: deal.id,
       projectName: deal.project_name,
       sponsorName: deal.sponsor_name,
-      sponsorEmail: (deal.profiles as { email?: string })?.email,
+      sponsorEmail: deal.profiles?.email,
       programType: deal.program_type,
       status: deal.status,
       allocation: deal.allocation_amount || 0,

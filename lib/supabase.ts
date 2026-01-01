@@ -1,134 +1,44 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-// =============================================================================
-// LAZY-INITIALIZED CLIENTS
-// These functions create the client only when first called at runtime,
-// avoiding build-time errors when env vars aren't available
-// =============================================================================
-
-let _supabase: SupabaseClient | null = null;
-let _supabaseAdmin: SupabaseClient | null = null;
-
 /**
- * Get client-side Supabase (uses anon key)
- */
-export function getSupabase(): SupabaseClient {
-  if (!_supabase) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) {
-      throw new Error('Missing Supabase client environment variables');
-    }
-    _supabase = createClient(url, key);
-  }
-  return _supabase;
-}
-
-/**
- * Get server-side Supabase (uses service role key for full access)
+ * Supabase Client Configuration
  *
- * NOTE: In the new architecture, admin operations should go through the backend API.
- * This function is kept for backward compatibility during migration.
+ * Provides both client-side and server-side Supabase clients
  */
-export function getSupabaseAdmin(): SupabaseClient {
-  if (!_supabaseAdmin) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!url) {
-      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
-    }
+import { createClient } from '@supabase/supabase-js';
 
-    // Warn if falling back to anon key (operations may fail)
-    if (!serviceKey && anonKey) {
-      console.warn(
-        '[DEPRECATION] Using anon key for admin operations. ' +
-        'For production, admin operations should go through tcredex-backend API. ' +
-        'See lib/api/client.ts for the new architecture.'
-      );
-      _supabaseAdmin = createClient(url, anonKey);
-    } else if (serviceKey) {
-      _supabaseAdmin = createClient(url, serviceKey);
-    } else {
-      // During build, return a dummy client
-      if (typeof window === 'undefined') {
-        console.warn('Supabase admin env vars not available during build');
-        return createClient('https://placeholder.supabase.co', 'placeholder-key');
-      }
-      throw new Error(
-        'Missing Supabase credentials. ' +
-        'Set SUPABASE_SERVICE_ROLE_KEY or use backend API for admin operations.'
-      );
-    }
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Client-side Supabase client (uses anon key)
+let supabaseClient: ReturnType<typeof createClient> | null = null;
+
+export function getSupabase() {
+  if (!supabaseClient) {
+    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
   }
-  return _supabaseAdmin;
+  return supabaseClient;
 }
 
-// =============================================================================
-// LEGACY EXPORTS (deprecated - use getSupabase/getSupabaseAdmin instead)
-// These use getter functions to defer initialization until runtime
-// =============================================================================
+// Server-side Supabase admin client (uses service role key)
+let supabaseAdminClient: ReturnType<typeof createClient> | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createLazyClient = (getter: () => SupabaseClient): any => {
-  return new Proxy({}, {
-    get(_, prop) {
-      const client = getter();
-      const value = (client as unknown as Record<string, unknown>)[prop as string];
-      if (typeof value === 'function') {
-        return value.bind(client);
-      }
-      return value;
-    }
-  });
-};
-
-export const supabase: SupabaseClient = createLazyClient(getSupabase);
-export const supabaseAdmin: SupabaseClient = createLazyClient(getSupabaseAdmin);
-
-// =============================================================================
-// TYPES
-// =============================================================================
-
-export interface CensusTract {
-  geoid: string;
-  state_name: string;
-  county_name: string;
-  nmtc_eligible: boolean;
-  poverty_rate: number | null;
-  poverty_qualifies: boolean;
-  median_income_pct: number | null;
-  income_qualifies: boolean;
-  unemployment_rate: number | null;
-  unemployment_qualifies: boolean;
-  state_nmtc: boolean;
-  nmtc_transferable: string | null;
-  nmtc_refundable: string | null;
-  state_htc: boolean;
-  htc_transferable: string | null;
-  htc_refundable: string | null;
-  brownfield_credit: boolean;
-  brownfield_transferable: string | null;
-  brownfield_refundable: string | null;
-  classification: string | null;
+export function getSupabaseAdmin() {
+  if (!supabaseAdminClient) {
+    // Use service key if available, otherwise fall back to anon key
+    const key = supabaseServiceKey || supabaseAnonKey;
+    supabaseAdminClient = createClient(supabaseUrl, key, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+  }
+  return supabaseAdminClient;
 }
 
-export interface StateCredit {
-  id: number;
-  state_name: string;
-  is_state_nmtc: boolean | null;
-  is_state_nmtc_transferable: boolean | null;
-  is_state_nmtc_refundable: boolean | null;
-  state_nmtc_notes_url: string | null;
-  is_state_htc: boolean | null;
-  is_state_htc_transferable: string | null;
-  is_state_htc_refundable: string | null;
-  state_htc_notes_url: string | null;
-  is_state_brownfield: boolean | null;
-  is_state_brownfield_transferable: string | null;
-  is_state_brownfield_refundable: string | null;
-  state_brownfield_notes_url: string | null;
-  stacking_notes: string | null;
-  state_credit_tags: string | null;
-}
+// Export the admin client directly for backward compatibility
+export const supabaseAdmin = getSupabaseAdmin();
+
+// Re-export for convenience
+export { createClient };

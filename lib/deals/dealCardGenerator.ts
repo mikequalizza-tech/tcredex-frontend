@@ -107,32 +107,12 @@ export function generateDealFromIntake(
     }
   }
 
-  // Build the Deal object
+  // Build the Deal object (matching lib/data/deals.ts Deal interface)
   const deal: Deal = {
     id: dealId || `DEAL-${Date.now()}`,
     projectName: intake.projectName || 'Untitled Project',
-    location,
     sponsorName: intake.sponsorName || '',
-    address: intake.address,
-    censusTract: intake.censusTract,
-    povertyRate: intake.tractPovertyRate,
-    medianIncome: intake.tractMedianIncome,
-    unemployment: intake.tractUnemployment,
-    projectCost: intake.totalProjectCost || 0,
-    fedNmtcReq,
-    stateNmtcReq,
-    htc: htcAmount,
-    lihtc: lihtcAmount,
-    shovelReady,
-    completionDate: intake.constructionEndDate,
-    financingGap: intake.financingGap || 0,
-    coordinates: intake.latitude && intake.longitude 
-      ? [intake.longitude, intake.latitude] 
-      : undefined,
-    description: intake.projectDescription,
-    communityImpact: intake.communityImpact,
-    hasProfile: tier >= 2,
-    // Required fields from lib/data/deals.ts
+    sponsorDescription: intake.projectDescription,
     programType: (intake.programs && intake.programs[0]) as any || 'NMTC',
     programLevel: 'federal',
     allocation: intake.requestedAllocation || intake.financingGap || 0,
@@ -141,8 +121,21 @@ export function generateDealFromIntake(
     city: intake.city || '',
     tractType: [],
     status: 'available',
+    description: intake.projectDescription,
+    communityImpact: intake.communityImpact,
     submittedDate: new Date().toISOString(),
+    povertyRate: intake.tractPovertyRate,
+    medianIncome: intake.tractMedianIncome,
     visible: true,
+    coordinates: intake.latitude && intake.longitude
+      ? [intake.longitude, intake.latitude]
+      : undefined,
+    projectCost: intake.totalProjectCost || 0,
+    financingGap: intake.financingGap || 0,
+    censusTract: intake.censusTract,
+    unemployment: intake.tractUnemployment,
+    shovelReady,
+    completionDate: intake.constructionEndDate,
   };
 
   return {
@@ -219,9 +212,10 @@ export function validateForDealCard(intake: IntakeData): ValidationResult {
  * Generate a shareable summary for the deal
  */
 export function generateDealSummary(deal: Deal): string {
+  const location = [deal.city, deal.state].filter(Boolean).join(', ') || 'Unknown Location';
   const lines: string[] = [
     `📋 ${deal.projectName}`,
-    `📍 ${deal.location || 'Unknown Location'}`,
+    `📍 ${location}`,
     `💰 Project Cost: $${((deal.projectCost || 0) / 1000000).toFixed(1)}M`,
     `📊 Financing Gap: $${((deal.financingGap || 0) / 1000000).toFixed(2)}M`,
   ];

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Option 1: Aggregate statistics
     // ===============================
     if (stats === 'true' || stats === '1') {
-      const { data, error } = await supabase.rpc('get_tract_statistics');
+      const { data: statsData, error } = await supabase.rpc('get_tract_statistics' as never);
 
       if (error) {
         console.error('[TractAPI] Stats error:', error);
@@ -48,6 +48,9 @@ export async function GET(request: NextRequest) {
           eligible_tracts: eligibleData || 0
         });
       }
+
+      type StatsResult = Record<string, unknown>;
+      const data = (statsData || {}) as StatsResult;
 
       return NextResponse.json({
         source: 'master_tax_credit_sot',
@@ -80,7 +83,22 @@ export async function GET(request: NextRequest) {
       if (qctOnly) query = query.eq('is_qct', true);
       if (ozOnly) query = query.eq('is_oz', true);
 
-      const { data, error } = await query.limit(limit);
+      const { data: searchData, error } = await query.limit(limit);
+
+      type SearchRow = {
+        geoid: string;
+        state_fips: string;
+        poverty_rate: number;
+        mfi_pct: number;
+        unemployment_rate: number;
+        is_nmtc_eligible: boolean;
+        is_qct: boolean;
+        is_oz: boolean;
+        is_dda: boolean;
+        has_any_tax_credit: boolean;
+        stack_score: number;
+      };
+      const data = searchData as SearchRow[] | null;
 
       if (error) {
         console.error('[TractAPI] Search error:', error);
@@ -99,7 +117,7 @@ export async function GET(request: NextRequest) {
     // Option 3: State summary
     // ===============================
     if (summary === 'true' || summary === '1') {
-      const { data, error } = await supabase.rpc('get_state_summaries');
+      const { data: summaryData, error } = await supabase.rpc('get_state_summaries' as never);
 
       if (error) {
         console.error('[TractAPI] Summary error:', error);
@@ -108,7 +126,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         source: 'master_tax_credit_sot',
-        states: data
+        states: summaryData
       });
     }
 
@@ -120,10 +138,24 @@ export async function GET(request: NextRequest) {
       const stateFips = STATE_ABBR_TO_FIPS[stateUpper] || stateUpper.padStart(2, '0');
 
       // No limit - return all tracts for state
-      const { data, error } = await supabase
+      const { data: stateData, error } = await supabase
         .from('master_tax_credit_sot')
         .select('geoid, poverty_rate, mfi_pct, unemployment_rate, is_nmtc_eligible, is_qct, is_oz, is_dda, has_any_tax_credit, stack_score')
         .eq('state_fips', stateFips);
+
+      type StateRow = {
+        geoid: string;
+        poverty_rate: number;
+        mfi_pct: number;
+        unemployment_rate: number;
+        is_nmtc_eligible: boolean;
+        is_qct: boolean;
+        is_oz: boolean;
+        is_dda: boolean;
+        has_any_tax_credit: boolean;
+        stack_score: number;
+      };
+      const data = stateData as StateRow[] | null;
 
       if (error) {
         console.error('[TractAPI] State query error:', error);

@@ -4,11 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
 
     // Get current user from session
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -21,13 +21,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Get profile with organization
-    const { data: profile, error: profileError } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('*, organizations(*)')
       .eq('id', user.id)
       .single();
 
-    if (profileError) {
+    type ProfileData = {
+      id: string;
+      full_name: string | null;
+      role: string | null;
+      organizations: { id: string; name: string; type: string } | null;
+    };
+    const profile = profileData as ProfileData | null;
+
+    if (profileError || !profile) {
       // Return basic user info if profile doesn't exist
       return NextResponse.json({
         id: user.id,

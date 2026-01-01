@@ -17,11 +17,11 @@ export default function HomePage() {
       <Features />
       <NoRiskSection />
       <FeaturedDeals />
-      <MapSection 
-        title="Tax Credit Eligibility Lookup" 
-        description="Search any U.S. address for all 5 federal credits (NMTC, LIHTC QCT, DDA, HTC, OZ) plus state programs. No login required." 
-        showLegend 
-        showSearch 
+      <MapSection
+        title="Tax Credit Eligibility Lookup"
+        description="Search any U.S. address for federal credits (NMTC, LIHTC QCT, DDA, Opportunity Zones) plus state programs. No login required."
+        showLegend
+        showSearch
       />
       <Workflows />
       <Cta />

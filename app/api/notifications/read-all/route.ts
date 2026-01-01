@@ -4,11 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
     
     // Verify auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     // Mark all as read
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true })
+      .update({ read: true } as never)
       .eq('user_id', user.id)
       .eq('read', false);
 

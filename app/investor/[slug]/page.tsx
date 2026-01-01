@@ -1,11 +1,23 @@
 'use client';
 
-import { use, useEffect } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getInvestorBySlug, INVESTOR_TYPE_LABELS, type Investor } from '@/lib/data/investors';
+import { fetchInvestorBySlug, InvestorDetail } from '@/lib/supabase/queries';
 import { useCurrentUser } from '@/lib/auth';
 
+// Investor type labels
+const INVESTOR_TYPE_LABELS: Record<string, string> = {
+  bank: 'Bank',
+  insurance: 'Insurance Company',
+  corporate: 'Corporate',
+  foundation: 'Foundation',
+  fund: 'Investment Fund',
+  institutional: 'Institutional Investor',
+  family_office: 'Family Office',
+};
+
+// Program colors
 const PROGRAM_COLORS: Record<string, string> = {
   NMTC: 'bg-emerald-900/30 text-emerald-300',
   HTC: 'bg-blue-900/30 text-blue-300',
@@ -21,8 +33,24 @@ interface InvestorPageProps {
 export default function InvestorDetailPage({ params }: InvestorPageProps) {
   const { slug } = use(params);
   const router = useRouter();
-  const investor = getInvestorBySlug(slug);
+  const [investor, setInvestor] = useState<InvestorDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const { isAuthenticated, isLoading, orgType } = useCurrentUser();
+
+  useEffect(() => {
+    async function loadInvestor() {
+      setLoading(true);
+      try {
+        const fetchedInvestor = await fetchInvestorBySlug(slug);
+        setInvestor(fetchedInvestor);
+      } catch (error) {
+        console.error('Failed to load investor:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadInvestor();
+  }, [slug]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -30,7 +58,7 @@ export default function InvestorDetailPage({ params }: InvestorPageProps) {
     }
   }, [isLoading, isAuthenticated, router, slug]);
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || loading || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
@@ -66,12 +94,12 @@ export default function InvestorDetailPage({ params }: InvestorPageProps) {
             </svg>
             Back to Marketplace
           </Link>
-          
+
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <span className="px-3 py-1 bg-white/20 rounded-full text-white text-sm font-bold">
-                  {INVESTOR_TYPE_LABELS[investor.investorType]}
+                  {INVESTOR_TYPE_LABELS[investor.investorType] || investor.investorType}
                 </span>
                 {investor.activelyInvesting ? (
                   <span className="px-3 py-1 bg-green-500/30 text-green-300 rounded-full text-sm">Actively Investing</span>
@@ -82,11 +110,11 @@ export default function InvestorDetailPage({ params }: InvestorPageProps) {
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{investor.name}</h1>
               <div className="flex flex-wrap gap-2 mt-3">
                 {investor.programs.map(p => (
-                  <span key={p} className={`px-3 py-1 rounded-full text-sm ${PROGRAM_COLORS[p]}`}>{p}</span>
+                  <span key={p} className={`px-3 py-1 rounded-full text-sm ${PROGRAM_COLORS[p] || 'bg-gray-700 text-gray-300'}`}>{p}</span>
                 ))}
               </div>
             </div>
-            
+
             {(orgType === 'sponsor' || orgType === 'cde') && investor.activelyInvesting && (
               <button className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100">
                 Submit Opportunity
@@ -103,27 +131,31 @@ export default function InvestorDetailPage({ params }: InvestorPageProps) {
           <div className="lg:col-span-2 space-y-8">
             <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
               <h2 className="text-xl font-semibold text-white mb-4">About</h2>
-              <p className="text-gray-300 leading-relaxed">{investor.description}</p>
+              <p className="text-gray-300 leading-relaxed">{investor.description || 'No description available.'}</p>
             </section>
 
-            <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Investment Preferences</h2>
-              <div className="flex flex-wrap gap-2">
-                {investor.projectPreferences.map(p => (
-                  <span key={p} className="px-3 py-1.5 bg-gray-800 text-gray-300 rounded-lg text-sm">{p}</span>
-                ))}
-              </div>
-            </section>
+            {investor.projectPreferences.length > 0 && (
+              <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Investment Preferences</h2>
+                <div className="flex flex-wrap gap-2">
+                  {investor.projectPreferences.map(p => (
+                    <span key={p} className="px-3 py-1.5 bg-gray-800 text-gray-300 rounded-lg text-sm">{p}</span>
+                  ))}
+                </div>
+              </section>
+            )}
 
-            <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Geographic Focus</h2>
-              <p className="text-gray-400 text-sm mb-3">{investor.focusType}</p>
-              <div className="flex flex-wrap gap-2">
-                {investor.geographicFocus.map(g => (
-                  <span key={g} className="px-3 py-1 bg-gray-800 text-gray-300 rounded text-sm">{g}</span>
-                ))}
-              </div>
-            </section>
+            {investor.geographicFocus.length > 0 && (
+              <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Geographic Focus</h2>
+                <p className="text-gray-400 text-sm mb-3">{investor.focusType}</p>
+                <div className="flex flex-wrap gap-2">
+                  {investor.geographicFocus.map(g => (
+                    <span key={g} className="px-3 py-1 bg-gray-800 text-gray-300 rounded text-sm">{g}</span>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
               <h2 className="text-xl font-semibold text-white mb-4">Investment Structure</h2>
@@ -162,7 +194,7 @@ export default function InvestorDetailPage({ params }: InvestorPageProps) {
           <div className="space-y-6">
             <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 sticky top-6">
               <h3 className="text-lg font-semibold text-white mb-4">Investment Summary</h3>
-              
+
               <div className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b border-gray-800">
                   <span className="text-gray-400">Available Capital</span>
@@ -193,9 +225,9 @@ export default function InvestorDetailPage({ params }: InvestorPageProps) {
                   </button>
                 )}
                 {investor.website && (
-                  <a 
-                    href={`https://${investor.website}`} 
-                    target="_blank" 
+                  <a
+                    href={investor.website.startsWith('http') ? investor.website : `https://${investor.website}`}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center rounded-lg"
                   >
@@ -204,12 +236,14 @@ export default function InvestorDetailPage({ params }: InvestorPageProps) {
                 )}
               </div>
 
-              <div className="mt-6 pt-6 border-t border-gray-800">
-                <h4 className="text-sm font-medium text-gray-400 mb-3">Contact</h4>
-                <p className="text-white font-medium">{investor.primaryContact}</p>
-                <p className="text-gray-400 text-sm">{investor.contactEmail}</p>
-                <p className="text-gray-400 text-sm">{investor.contactPhone}</p>
-              </div>
+              {(investor.primaryContact || investor.contactEmail) && (
+                <div className="mt-6 pt-6 border-t border-gray-800">
+                  <h4 className="text-sm font-medium text-gray-400 mb-3">Contact</h4>
+                  {investor.primaryContact && <p className="text-white font-medium">{investor.primaryContact}</p>}
+                  {investor.contactEmail && <p className="text-gray-400 text-sm">{investor.contactEmail}</p>}
+                  {investor.contactPhone && <p className="text-gray-400 text-sm">{investor.contactPhone}</p>}
+                </div>
+              )}
             </div>
           </div>
         </div>

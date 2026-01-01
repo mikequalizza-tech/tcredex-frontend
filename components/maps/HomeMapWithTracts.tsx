@@ -16,6 +16,12 @@ import { Deal } from '@/lib/data/deals';
  * - Zoom < 8: Vector tiles for instant full-US rendering (85K+ tracts)
  * - Zoom >= 8: GeoJSON polygons for detailed view with all program data
  *
+ * Performance Optimization:
+ * - Pre-warm WebGL context before map initialization
+ * - Use requestAnimationFrame for smooth rendering
+ * - Aggressive canvas forcing on visibility change
+ * - Fallback static image while loading
+ *
  * Color Scheme:
  * - Purple (has_any_tax_credit = true): Tract qualifies for at least one program
  * - Gray (has_any_tax_credit = false): Tract has no eligible programs
@@ -23,6 +29,28 @@ import { Deal } from '@/lib/data/deals';
  *
  * Leveling the playing field - no more old boys network gatekeeping this data.
  */
+
+// Pre-warm WebGL context to avoid first-render delay
+const preWarmWebGL = (container: HTMLElement) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  canvas.style.position = 'absolute';
+  canvas.style.opacity = '0';
+  canvas.style.pointerEvents = 'none';
+  container.appendChild(canvas);
+
+  const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
+  if (gl) {
+    // Force WebGL to initialize
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.flush();
+  }
+
+  // Clean up after a short delay
+  setTimeout(() => canvas.remove(), 100);
+};
 
 interface TractData {
   geoid: string;
@@ -37,7 +65,7 @@ interface DealPin {
   id: string;
   name: string;
   coordinates: [number, number];
-  type: 'nmtc' | 'htc' | 'lihtc' | 'oz';
+  type: 'nmtc' | 'lihtc' | 'oz';
   projectCost?: number;
 }
 
@@ -52,7 +80,6 @@ interface HomeMapWithTractsProps {
 
 const PIN_COLORS: Record<string, string> = {
   nmtc: '#22c55e',
-  htc: '#f59e0b',
   lihtc: '#3b82f6',
   oz: '#a855f7',
   search: '#ef4444',
@@ -79,10 +106,36 @@ export default function HomeMapWithTracts({
   const isLoadingTracts = useRef(false);
 
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapVisible, setMapVisible] = useState(false);
   const [loadingTract, setLoadingTract] = useState(false);
   const [tractCount, setTractCount] = useState(0);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+  // Use IntersectionObserver to detect when map container is visible
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setMapVisible(true);
+            // Force render when map becomes visible
+            if (map.current) {
+              map.current.resize();
+              map.current.triggerRepaint();
+            }
+          }
+        });
+      },
+      { threshold: 0.1 } // Trigger when 10% of map is visible
+    );
+
+    observer.observe(mapContainer.current);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Load tracts for current viewport
   // Strategy:
@@ -138,7 +191,7 @@ export default function HomeMapWithTracts({
     }
   }, []);
 
-  // Initialize map immediately - no hydration guard needed (dynamic import handles SSR)
+  // Initialize map with aggressive render forcing
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -147,8 +200,12 @@ export default function HomeMapWithTracts({
       return;
     }
 
+    // Pre-warm WebGL context before Mapbox initializes
+    preWarmWebGL(mapContainer.current);
+
     mapboxgl.accessToken = mapboxToken;
 
+    // Create map with optimized settings for instant rendering
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
@@ -156,13 +213,122 @@ export default function HomeMapWithTracts({
       zoom: 4,
       minZoom: 3,
       maxZoom: 18,
+      preserveDrawingBuffer: true,
+      antialias: true,
+      refreshExpiredTiles: false,
+      fadeDuration: 0, // Disable fade animations for instant display
+      trackResize: true,
+      renderWorldCopies: false, // Slight performance boost
     });
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
+    // Robust render forcing using requestAnimationFrame
+    let frameCount = 0;
+    const maxFrames = 60; // Try for ~1 second at 60fps
+
+    const forceRender = () => {
+      if (!map.current) return;
+
+      // Resize triggers internal recalculation
+      map.current.resize();
+
+      // Force repaint
+      map.current.triggerRepaint();
+
+      // Access canvas and force WebGL flush
+      const canvas = map.current.getCanvas();
+      if (canvas) {
+        // Force style recalculation
+        canvas.style.display = 'block';
+
+        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
+        if (gl) {
+          gl.flush();
+          gl.finish(); // Block until all commands are complete
+        }
+      }
+
+      // Continue forcing until we hit maxFrames or map is fully rendered
+      frameCount++;
+      if (frameCount < maxFrames && map.current && !map.current.loaded()) {
+        requestAnimationFrame(forceRender);
+      }
+    };
+
+    // Start the render forcing loop
+    requestAnimationFrame(forceRender);
+
+    // Also force render on visibility change (tab switching, etc.)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && map.current) {
+        frameCount = 0;
+        requestAnimationFrame(forceRender);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Force render when window gains focus
+    const handleFocus = () => {
+      if (map.current) {
+        map.current.resize();
+        map.current.triggerRepaint();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Also handle resize events
+    const handleResize = () => {
+      if (map.current) {
+        map.current.resize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+
+    // NUCLEAR OPTION: Force WebGL to render by triggering camera movement
+    // jumpTo with same position forces a render cycle
+    const forceMapRender = () => {
+      if (!map.current) return;
+      const center = map.current.getCenter();
+      const zoom = map.current.getZoom();
+
+      // jumpTo forces immediate render without animation
+      map.current.jumpTo({
+        center: [center.lng + 0.00001, center.lat],
+        zoom: zoom
+      });
+
+      // Jump back (imperceptible)
+      requestAnimationFrame(() => {
+        if (map.current) {
+          map.current.jumpTo({ center: [center.lng, center.lat], zoom: zoom });
+        }
+      });
+    };
+
+    // Try on first idle
+    map.current.once('idle', forceMapRender);
+
+    // Also try on style load
+    map.current.once('styledata', () => {
+      setTimeout(forceMapRender, 100);
+    });
+
     map.current.on('load', () => {
       setMapLoaded(true);
       if (!map.current) return;
+
+      // Final aggressive render push after load
+      frameCount = 0;
+      requestAnimationFrame(forceRender);
+
+      // Force map render using jumpTo trick
+      forceMapRender();
+
+      // Delayed render attempts
+      setTimeout(forceMapRender, 100);
+      setTimeout(forceMapRender, 300);
+      setTimeout(forceMapRender, 500);
 
       // =================================================================
       // VECTOR TILE SOURCE - Fast full-US rendering at low zoom
@@ -440,6 +606,11 @@ export default function HomeMapWithTracts({
     });
 
     return () => {
+      // Clean up event listeners
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('resize', handleResize);
+
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -526,15 +697,19 @@ export default function HomeMapWithTracts({
             .setLngLat([lng, lat])
             .addTo(map.current);
 
-          // Build programs list
+          // Build programs list - NO HTC or Brownfield (not implemented yet)
           const programs: string[] = [];
+          // NMTC: Federal first, then State if applicable
+          if (props.is_nmtc_eligible || props.severely_distressed) {
+            programs.push('Federal NMTC');
+            if (props.has_state_nmtc) programs.push('State NMTC');
+          }
+          // LIHTC QCT
           if (props.is_qct || props.is_lihtc_qct) programs.push('LIHTC QCT');
+          // DDA (30% basis boost)
+          if (props.is_dda) programs.push('DDA (30% Boost)');
+          // Opportunity Zone
           if (props.is_oz || props.is_oz_designated) programs.push('Opportunity Zone');
-          if (props.is_dda) programs.push('DDA');
-          if (props.is_nmtc_eligible || props.severely_distressed) programs.push('Federal NMTC');
-          if (props.has_state_nmtc) programs.push('State NMTC');
-          if (props.has_state_htc) programs.push('State HTC');
-          if (props.has_brownfield_credit) programs.push('Brownfield');
 
           // Create results popup
           popupRef.current = new mapboxgl.Popup({
@@ -626,17 +801,40 @@ export default function HomeMapWithTracts({
 
   return (
     <div className={`relative rounded-xl overflow-hidden shadow-lg ${className}`} style={{ height }}>
-      <div ref={mapContainer} className="w-full h-full" />
-
-      {/* Loading overlay */}
+      {/* Static map placeholder - shows immediately while interactive map loads */}
       {!mapLoaded && (
-        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            <p className="text-gray-400">Loading map...</p>
+        <div className="absolute inset-0 z-10">
+          {/* High-res static map from Mapbox with purple overlay to hint at tract colors */}
+          <img
+            src={`https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/-98.5795,39.8283,3.5,0/1280x720@2x?access_token=${mapboxToken}`}
+            alt="US Tax Credit Eligibility Map"
+            className="w-full h-full object-cover"
+            loading="eager"
+            fetchPriority="high"
+          />
+          {/* Purple tint overlay to hint at tax credit data */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'radial-gradient(ellipse at center, rgba(168, 85, 247, 0.15) 0%, transparent 70%)',
+              mixBlendMode: 'screen'
+            }}
+          />
+          {/* Gradient fade at bottom */}
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent" />
+
+          {/* Loading indicator */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center bg-gray-900/80 rounded-xl px-6 py-4 backdrop-blur-sm border border-purple-500/30">
+              <div className="w-10 h-10 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-white font-medium">Loading Tax Credit Map</p>
+              <p className="text-gray-400 text-xs mt-1">85,000+ census tracts nationwide</p>
+            </div>
           </div>
         </div>
       )}
+
+      <div ref={mapContainer} className="w-full h-full" />
 
       {/* Tract count */}
       {mapLoaded && tractCount > 0 && (

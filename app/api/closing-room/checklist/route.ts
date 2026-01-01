@@ -14,22 +14,36 @@ export async function GET(request: NextRequest) {
     // If dealId provided, get deal-specific checklist with status
     if (dealId) {
       // First get the deal to know the program type
-      const { data: deal, error: dealError } = await supabase
+      const { data: dealData, error: dealError } = await supabase
         .from('deals')
         .select('id, project_name, program_type')
         .eq('id', dealId)
         .single();
+
+      type DealRow = { id: string; project_name: string; program_type: string };
+      const deal = dealData as DealRow | null;
 
       if (dealError || !deal) {
         return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
       }
 
       // Get checklist templates for this program
-      const { data: templates, error: templateError } = await supabase
+      const { data: templatesData, error: templateError } = await supabase
         .from('closing_checklist_templates')
         .select('*')
         .eq('program_type', deal.program_type)
         .order('sort_order', { ascending: true });
+
+      type TemplateRow = {
+        id: string;
+        program_type: string;
+        category: string;
+        item_name: string;
+        description: string | null;
+        required: boolean;
+        sort_order: number;
+      };
+      const templates = templatesData as TemplateRow[] | null;
 
       if (templateError) {
         console.error('Template fetch error:', templateError);
@@ -37,10 +51,20 @@ export async function GET(request: NextRequest) {
       }
 
       // Get deal-specific checklist status
-      const { data: dealChecklist, error: checklistError } = await supabase
+      const { data: dealChecklistData, error: checklistError } = await supabase
         .from('deal_checklists')
         .select('*')
         .eq('deal_id', dealId);
+
+      type ChecklistItem = {
+        template_id: string;
+        status: string;
+        document_id: string | null;
+        notes: string | null;
+        due_date: string | null;
+        completed_at: string | null;
+      };
+      const dealChecklist = dealChecklistData as ChecklistItem[] | null;
 
       if (checklistError) {
         console.error('Checklist fetch error:', checklistError);
@@ -88,36 +112,50 @@ export async function GET(request: NextRequest) {
 
     // If programType provided, get template checklist (no deal context)
     if (programType) {
-      const { data: templates, error } = await supabase
+      const { data: templatesData2, error } = await supabase
         .from('closing_checklist_templates')
         .select('*')
         .eq('program_type', programType.toUpperCase())
         .order('sort_order', { ascending: true });
+
+      type TemplateRow2 = {
+        id: string;
+        program_type: string;
+        category: string;
+        item_name: string;
+        description: string | null;
+        required: boolean;
+        sort_order: number;
+      };
+      const templates2 = templatesData2 as TemplateRow2[] | null;
 
       if (error) {
         return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 });
       }
 
       // Group by category
-      const grouped = templates?.reduce((acc, item) => {
+      const grouped = templates2?.reduce((acc, item) => {
         if (!acc[item.category]) {
           acc[item.category] = [];
         }
         acc[item.category].push(item);
         return acc;
-      }, {} as Record<string, typeof templates>);
+      }, {} as Record<string, typeof templates2>);
 
       return NextResponse.json({
         programType,
         checklist: grouped,
-        totalItems: templates?.length || 0
+        totalItems: templates2?.length || 0
       });
     }
 
     // No params - return all program types summary
-    const { data: summary, error } = await supabase
+    const { data: summaryData, error } = await supabase
       .from('closing_checklist_templates')
       .select('program_type');
+
+    type SummaryRow = { program_type: string };
+    const summary = summaryData as SummaryRow[] | null;
 
     if (error) {
       return NextResponse.json({ error: 'Failed to fetch summary' }, { status: 500 });
@@ -152,21 +190,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Get deal info
-    const { data: deal, error: dealError } = await supabase
+    const { data: dealData3, error: dealError } = await supabase
       .from('deals')
       .select('id, program_type')
       .eq('id', dealId)
       .single();
+
+    type DealRow3 = { id: string; program_type: string };
+    const deal = dealData3 as DealRow3 | null;
 
     if (dealError || !deal) {
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
     }
 
     // Get all template items for this program
-    const { data: templates, error: templateError } = await supabase
+    const { data: templatesData3, error: templateError } = await supabase
       .from('closing_checklist_templates')
       .select('id')
       .eq('program_type', deal.program_type);
+
+    type TemplateRow3 = { id: string };
+    const templates = templatesData3 as TemplateRow3[] | null;
 
     if (templateError) {
       return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 });
@@ -182,9 +226,9 @@ export async function POST(request: NextRequest) {
     if (checklistItems && checklistItems.length > 0) {
       const { error: insertError } = await supabase
         .from('deal_checklists')
-        .upsert(checklistItems, { 
+        .upsert(checklistItems as never[], {
           onConflict: 'deal_id,template_id',
-          ignoreDuplicates: true 
+          ignoreDuplicates: true
         });
 
       if (insertError) {
@@ -236,7 +280,7 @@ export async function PATCH(request: NextRequest) {
         deal_id: dealId,
         template_id: templateId,
         ...updateData
-      }, {
+      } as never, {
         onConflict: 'deal_id,template_id'
       })
       .select()

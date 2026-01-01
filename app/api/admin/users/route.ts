@@ -45,9 +45,21 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false });
 
-    if (!usersError && users) {
-      for (const user of users) {
-        const orgType = (user.organization as any)?.type;
+    type UserRow = {
+      id: string;
+      name: string | null;
+      email: string;
+      role: string | null;
+      status: string | null;
+      organization_id: string | null;
+      last_login_at: string | null;
+      organization: { name: string; type: string } | null;
+    };
+    const typedUsers = users as UserRow[] | null;
+
+    if (!usersError && typedUsers) {
+      for (const user of typedUsers) {
+        const orgType = user.organization?.type;
         const userRole = orgType === 'admin' ? 'admin' : 'cde';
 
         // Apply filters
@@ -69,9 +81,9 @@ export async function GET(request: NextRequest) {
           name: user.name || 'Unknown',
           email: user.email,
           role: userRole as 'admin' | 'cde',
-          status: (user.status as any) || 'active',
-          organization: (user.organization as any)?.name || 'Unknown Organization',
-          organizationId: user.organization_id,
+          status: (user.status as 'active' | 'pending' | 'suspended') || 'active',
+          organization: user.organization?.name || 'Unknown Organization',
+          organizationId: user.organization_id || undefined,
           lastActive: user.last_login_at || new Date().toISOString(),
           dealsCount,
         });
@@ -94,8 +106,19 @@ export async function GET(request: NextRequest) {
         .not('primary_contact_email', 'is', null)
         .order('created_at', { ascending: false });
 
-      if (!investorsError && investors) {
-        for (const inv of investors) {
+      type InvestorRow = {
+        id: string;
+        primary_contact_name: string | null;
+        primary_contact_email: string;
+        status: string | null;
+        organization_id: string | null;
+        updated_at: string | null;
+        organization: { name: string } | null;
+      };
+      const typedInvestors = investors as InvestorRow[] | null;
+
+      if (!investorsError && typedInvestors) {
+        for (const inv of typedInvestors) {
           // Apply search filter
           if (search && !inv.primary_contact_name?.toLowerCase().includes(search) && !inv.primary_contact_email?.toLowerCase().includes(search)) continue;
 
@@ -112,9 +135,9 @@ export async function GET(request: NextRequest) {
             name: inv.primary_contact_name || 'Investor User',
             email: inv.primary_contact_email,
             role: 'investor',
-            status: (inv.status as any) || 'active',
-            organization: (inv.organization as any)?.name || 'Unknown Organization',
-            organizationId: inv.organization_id,
+            status: (inv.status as 'active' | 'pending' | 'suspended') || 'active',
+            organization: inv.organization?.name || 'Unknown Organization',
+            organizationId: inv.organization_id || undefined,
             lastActive: inv.updated_at || new Date().toISOString(),
             dealsCount,
           });
@@ -138,8 +161,19 @@ export async function GET(request: NextRequest) {
         .not('primary_contact_email', 'is', null)
         .order('created_at', { ascending: false });
 
-      if (!sponsorsError && sponsors) {
-        for (const sp of sponsors) {
+      type SponsorRow = {
+        id: string;
+        primary_contact_name: string | null;
+        primary_contact_email: string;
+        status: string | null;
+        organization_id: string | null;
+        updated_at: string | null;
+        organization: { name: string } | null;
+      };
+      const typedSponsors = sponsors as SponsorRow[] | null;
+
+      if (!sponsorsError && typedSponsors) {
+        for (const sp of typedSponsors) {
           // Apply search filter
           if (search && !sp.primary_contact_name?.toLowerCase().includes(search) && !sp.primary_contact_email?.toLowerCase().includes(search)) continue;
 
@@ -158,9 +192,9 @@ export async function GET(request: NextRequest) {
             name: sp.primary_contact_name || 'Sponsor User',
             email: sp.primary_contact_email,
             role: 'sponsor',
-            status: (sp.status as any) || 'active',
-            organization: (sp.organization as any)?.name || 'Unknown Organization',
-            organizationId: sp.organization_id,
+            status: (sp.status as 'active' | 'pending' | 'suspended') || 'active',
+            organization: sp.organization?.name || 'Unknown Organization',
+            organizationId: sp.organization_id || undefined,
             lastActive: sp.updated_at || new Date().toISOString(),
             dealsCount,
           });

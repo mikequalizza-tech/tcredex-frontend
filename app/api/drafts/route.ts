@@ -94,8 +94,8 @@ export async function POST(request: NextRequest) {
           project_name: projectName,
           readiness_score: readinessScore || 0,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', existing.id)
+        } as never)
+        .eq('id', (existing as { id: string }).id)
         .select()
         .single();
     } else {
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
           data,
           readiness_score: readinessScore || 0,
           status: 'draft'
-        })
+        } as never)
         .select()
         .single();
     }

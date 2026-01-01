@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         device_type: deviceType,
         referer,
         created_at: new Date().toISOString()
-      });
+      } as never);
 
     if (insertError) {
       console.error('[Track] Insert error:', insertError);
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // If referral, increment referral count for the referrer
     if (isReferral) {
-      await supabase.rpc('increment_referral_clicks', { referral_code: code });
+      await supabase.rpc('increment_referral_clicks' as never, { referral_code: code } as never);
     }
 
     // Return tracking pixel (1x1 transparent GIF) for embed tracking

@@ -185,7 +185,7 @@ export async function processPostSubmission(dealId: string): Promise<PostSubmiss
         tier: scoring.tier,
         model_version: '1.0.0',
         calculated_at: new Date().toISOString(),
-      }, { onConflict: 'deal_id' });
+      } as never, { onConflict: 'deal_id' });
 
       // Update deal with scoring tier
       await supabase
@@ -193,7 +193,7 @@ export async function processPostSubmission(dealId: string): Promise<PostSubmiss
         .update({
           scoring_tier: scoring.tier,
           section_c_score: scoring.totalScore,
-        })
+        } as never)
         .eq('id', dealId);
 
       result.scoring = {
@@ -211,7 +211,7 @@ export async function processPostSubmission(dealId: string): Promise<PostSubmiss
         action: 'scoring_calculated',
         payload_json: scoring,
         hash: Date.now().toString(16),
-      });
+      } as never);
 
     } catch (scoringError) {
       console.error('Section C Scoring failed:', scoringError);
@@ -257,7 +257,7 @@ export async function processPostSubmission(dealId: string): Promise<PostSubmiss
           })),
         },
         hash: Date.now().toString(16),
-      });
+      } as never);
 
     } catch (matchError) {
       console.error('AutoMatch failed:', matchError);

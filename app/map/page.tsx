@@ -8,7 +8,7 @@ import { Deal } from '@/lib/data/deals';
 import CDECard from '@/components/CDECard';
 import MapFilterRail, { FilterState, defaultFilters } from '@/components/maps/MapFilterRail';
 import { fetchDeals, fetchCDEs } from '@/lib/supabase/queries';
-import { calculateCDEMatchScore } from '@/lib/mockCDEData';
+import { calculateCDEMatchScore } from '@/lib/cde/matchScore';
 import { CDEDealCard } from '@/lib/types/cde';
 import { useCurrentUser } from '@/lib/auth';
 import { mapDealToCard } from '@/lib/utils/dealCardMapper';
@@ -151,13 +151,12 @@ function MapContent() {
   const filteredCDEs = cdes
     .filter(cde => cde.status === 'active')
     .map(cde => {
-      const { score, reasons } = autoMatchEnabled 
+      const { score, reasons } = autoMatchEnabled
         ? calculateCDEMatchScore(cde, {
             state: 'IL',
             projectType: 'Manufacturing',
             allocationRequest: 5000000,
-            isRural: false,
-            isSeverelyDistressed: false,
+            severelyDistressed: false,
           })
         : { score: undefined, reasons: [] };
       

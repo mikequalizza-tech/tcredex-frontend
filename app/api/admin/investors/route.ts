@@ -58,9 +58,29 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false });
 
-    if (!investorsError && investors) {
-      for (const inv of investors) {
-        const investorName = (inv.organization as any)?.name || 'Unknown Investor';
+    type InvestorRow = {
+      id: string;
+      investor_type: string | null;
+      total_capital: number | null;
+      deployed_capital: number | null;
+      available_capital: number | null;
+      target_return: string | null;
+      preferred_sectors: string[] | null;
+      geographic_focus: string[] | null;
+      min_investment: number | null;
+      max_investment: number | null;
+      status: string | null;
+      primary_contact_name: string | null;
+      primary_contact_email: string | null;
+      organization_id: string | null;
+      organization: { name: string } | null;
+    };
+
+    const typedInvestors = investors as InvestorRow[] | null;
+
+    if (!investorsError && typedInvestors) {
+      for (const inv of typedInvestors) {
+        const investorName = inv.organization?.name || 'Unknown Investor';
         const investorType = mapInvestorType(inv.investor_type);
 
         // Apply filters
@@ -89,7 +109,7 @@ export async function GET(request: NextRequest) {
           preferredStates: inv.geographic_focus || [],
           minDeal: Number(inv.min_investment) || 0,
           maxDeal: Number(inv.max_investment) || 0,
-          status: (inv.status as any) || 'active',
+          status: (inv.status as 'active' | 'pending' | 'paused') || 'active',
           contact: inv.primary_contact_name || '',
           email: inv.primary_contact_email || '',
         });

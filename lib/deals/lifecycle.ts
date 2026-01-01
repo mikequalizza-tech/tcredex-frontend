@@ -5,7 +5,8 @@
  * database updates, timeline logging, and notifications
  */
 
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
+const supabaseAdmin = getSupabaseAdmin();
 import { notify } from '@/lib/notifications';
 import { email } from '@/lib/email';
 import {
@@ -38,7 +39,7 @@ export async function transitionDeal(
   note?: string
 ): Promise<TransitionResult> {
   // Get current deal state
-  const { data: deal, error: fetchError } = await supabaseAdmin
+  const { data: rawDeal, error: fetchError } = await supabaseAdmin
     .from('deals')
     .select(`
       id,
@@ -49,6 +50,15 @@ export async function transitionDeal(
     `)
     .eq('id', dealId)
     .single();
+
+  type DealWithProfile = {
+    id: string;
+    project_name: string;
+    status: string;
+    user_id: string;
+    profiles: { id: string; email: string; full_name: string } | { id: string; email: string; full_name: string }[] | null;
+  };
+  const deal = rawDeal as DealWithProfile | null;
 
   if (fetchError || !deal) {
     return { success: false, error: 'Deal not found' };
@@ -68,7 +78,7 @@ export async function transitionDeal(
     .update({
       status: newStatus,
       updated_at: new Date().toISOString(),
-    })
+    } as never)
     .eq('id', dealId);
 
   if (updateError) {
@@ -81,7 +91,7 @@ export async function transitionDeal(
     completed: true,
     completed_at: new Date().toISOString(),
     notes: note,
-  });
+  } as never);
 
   // Handle profiles - could be object, array, or null
   let sponsorEmail = '';
@@ -206,18 +216,21 @@ export async function expireStaleDeals(
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysInactive);
 
-  const { data: staleDeals } = await supabaseAdmin
+  const { data: rawStaleDeals } = await supabaseAdmin
     .from('deals')
     .select('id')
     .eq('status', 'available')
     .lt('updated_at', cutoffDate.toISOString());
+
+  type DealIdRow = { id: string };
+  const staleDeals = rawStaleDeals as DealIdRow[] | null;
 
   const expired: string[] = [];
 
   for (const deal of staleDeals || []) {
     const { error } = await supabaseAdmin
       .from('deals')
-      .update({ status: 'expired', updated_at: new Date().toISOString() })
+      .update({ status: 'expired', updated_at: new Date().toISOString() } as never)
       .eq('id', deal.id);
 
     if (!error) {
@@ -243,7 +256,10 @@ export async function getDealActivitySummary(userId?: string): Promise<{
     query = query.eq('user_id', userId);
   }
 
-  const { data: deals } = await query;
+  const { data: rawDeals } = await query;
+
+  type DealStatusRow = { id: string; status: string };
+  const deals = rawDeals as DealStatusRow[] | null;
 
   const byStatus = {} as Record<DealStatus, number>;
   for (const deal of deals || []) {
@@ -251,11 +267,19 @@ export async function getDealActivitySummary(userId?: string): Promise<{
     byStatus[status] = (byStatus[status] || 0) + 1;
   }
 
-  const { data: timeline } = await supabaseAdmin
+  const { data: rawTimeline } = await supabaseAdmin
     .from('deal_timeline')
     .select('deal_id, milestone, completed_at, deals(project_name)')
     .order('completed_at', { ascending: false })
     .limit(10);
+
+  type TimelineRow = {
+    deal_id: string;
+    milestone: string;
+    completed_at: string;
+    deals: { project_name: string } | { project_name: string }[] | null;
+  };
+  const timeline = rawTimeline as TimelineRow[] | null;
 
   const recentActivity = (timeline || []).map((t) => {
     // Handle deals - could be object, array, or null
@@ -263,7 +287,7 @@ export async function getDealActivitySummary(userId?: string): Promise<{
     if (t.deals) {
       const dealData = Array.isArray(t.deals) ? t.deals[0] : t.deals;
       if (dealData && typeof dealData === 'object') {
-        projectName = (dealData as Record<string, unknown>).project_name as string || 'Unknown';
+        projectName = dealData.project_name || 'Unknown';
       }
     }
     return {

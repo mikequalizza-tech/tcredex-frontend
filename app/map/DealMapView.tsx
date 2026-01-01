@@ -42,9 +42,9 @@ export default function DealMapView() {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         if (!deal.projectName.toLowerCase().includes(query) &&
-            !(deal.location || '').toLowerCase().includes(query) &&
             !deal.city.toLowerCase().includes(query) &&
-            !deal.state.toLowerCase().includes(query)) {
+            !deal.state.toLowerCase().includes(query) &&
+            !(deal.sponsorName || '').toLowerCase().includes(query)) {
           return false;
         }
       }

@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
+const supabaseAdmin = getSupabaseAdmin();
 import { transitionDeal, DealStatus } from '@/lib/deals';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -30,7 +31,7 @@ export async function GET(
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if ((profile as unknown as { role?: string })?.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
@@ -79,7 +80,7 @@ export async function PATCH(
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if ((profile as unknown as { role?: string })?.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
@@ -134,7 +135,7 @@ export async function PATCH(
 
       const { error: updateError } = await supabaseAdmin
         .from('deals')
-        .update(updates)
+        .update(updates as never)
         .eq('id', id);
 
       if (updateError) {
@@ -171,7 +172,7 @@ export async function DELETE(
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if ((profile as unknown as { role?: string })?.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
@@ -190,7 +191,7 @@ export async function DELETE(
     } else {
       const { error } = await supabaseAdmin
         .from('deals')
-        .update({ status: 'withdrawn', updated_at: new Date().toISOString() })
+        .update({ status: 'withdrawn', updated_at: new Date().toISOString() } as never)
         .eq('id', id);
 
       if (error) {

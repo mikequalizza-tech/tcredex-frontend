@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         phone: body.phone,
         title: body.title,
         avatar_url: body.avatar_url,
-      })
+      } as never)
       .select(`
         *,
         organization:organizations(id, name, slug, type)

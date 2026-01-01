@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         city: body.city,
         state: body.state,
         zip_code: body.zip_code,
-      })
+      } as never)
       .select()
       .single();
 

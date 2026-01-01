@@ -5,12 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { notify } from '@/lib/notifications';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
     const dealId = searchParams.get('dealId');
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: messages, error } = await supabase
+    const { data: messagesData, error } = await supabase
       .from('messages')
       .select(`
         id,
@@ -44,6 +44,18 @@ export async function GET(request: NextRequest) {
       `)
       .eq('deal_id', dealId)
       .order('created_at', { ascending: true });
+
+    type MessageRow = {
+      id: string;
+      deal_id: string;
+      sender_id: string;
+      sender_name: string;
+      sender_org: string | null;
+      content: string;
+      attachments: unknown[] | null;
+      created_at: string;
+    };
+    const messages = messagesData as MessageRow[] | null;
 
     if (error) {
       console.error('Messages query error:', error);
@@ -71,7 +83,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
     
     // Verify auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -92,21 +104,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Get sender profile
-    const { data: profile } = await supabase
+    const { data: profileData } = await supabase
       .from('profiles')
       .select('full_name, organizations(name)')
       .eq('id', user.id)
       .single();
 
+    type ProfileRow = { full_name: string | null; organizations: { name?: string } | null };
+    const profile = profileData as ProfileRow | null;
+
     const senderName = profile?.full_name || user.email?.split('@')[0] || 'User';
-    const senderOrg = (profile?.organizations as { name?: string })?.name || '';
+    const senderOrg = profile?.organizations?.name || '';
 
     // Get deal info for notification
-    const { data: deal } = await supabase
+    const { data: dealData } = await supabase
       .from('deals')
       .select('project_name')
       .eq('id', dealId)
       .single();
+
+    type DealRow = { project_name: string };
+    const deal = dealData as DealRow | null;
 
     const { data: message, error } = await supabase
       .from('messages')
@@ -118,7 +136,7 @@ export async function POST(request: NextRequest) {
         content,
         attachments: attachments || [],
         created_at: new Date().toISOString(),
-      })
+      } as never)
       .select()
       .single();
 
@@ -141,15 +159,26 @@ export async function POST(request: NextRequest) {
       console.error('Notification error:', notifyError);
     }
 
+    type MsgRow = {
+      id: string;
+      deal_id: string;
+      sender_id: string;
+      sender_name: string;
+      sender_org: string | null;
+      content: string;
+      attachments: unknown[] | null;
+      created_at: string;
+    };
+    const typedMessage = message as unknown as MsgRow;
     const formatted = {
-      id: message.id,
-      dealId: message.deal_id,
-      senderId: message.sender_id,
-      senderName: message.sender_name,
-      senderOrg: message.sender_org,
-      content: message.content,
-      attachments: message.attachments,
-      createdAt: message.created_at,
+      id: typedMessage.id,
+      dealId: typedMessage.deal_id,
+      senderId: typedMessage.sender_id,
+      senderName: typedMessage.sender_name,
+      senderOrg: typedMessage.sender_org,
+      content: typedMessage.content,
+      attachments: typedMessage.attachments,
+      createdAt: typedMessage.created_at,
       isOwn: true,
     };
 

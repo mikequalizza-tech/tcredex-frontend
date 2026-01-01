@@ -59,12 +59,15 @@ function validateScoringInput(input: unknown): input is ScoringInput {
 async function logScoreToLedger(score: DealScore, actorId: string): Promise<void> {
   try {
     // Get previous hash for chain
-    const { data: lastEvent } = await supabase
+    const { data: lastEventData } = await supabase
       .from('ledger_events')
       .select('hash')
       .order('id', { ascending: false })
       .limit(1)
       .single();
+
+    type LedgerRow = { hash: string | null };
+    const lastEvent = lastEventData as LedgerRow | null;
 
     const prevHash = lastEvent?.hash || null;
 
@@ -96,7 +99,7 @@ async function logScoreToLedger(score: DealScore, actorId: string): Promise<void
       reason_codes: score.reason_codes,
       prev_hash: prevHash,
       hash,
-    });
+    } as never);
   } catch (error) {
     console.error('Failed to log score to ledger:', error);
     // Don't throw - ledger failure shouldn't block scoring
@@ -132,7 +135,7 @@ async function saveScoreToDatabase(score: DealScore): Promise<void> {
       input_snapshot: score.input_snapshot,
       computed_at: score.computed_at,
       updated_at: new Date().toISOString(),
-    }, {
+    } as never, {
       onConflict: 'deal_id',
     });
   } catch (error) {

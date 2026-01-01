@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Update CDE profile
     const { data, error } = await supabase
       .from('cdes')
-      .update(cdeUpdates)
+      .update(cdeUpdates as never)
       .eq('id', id)
       .select()
       .single();
@@ -85,7 +85,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           deployment_deadline: a.deployment_deadline,
         }));
 
-        await supabase.from('cde_allocations').insert(allocationsToInsert);
+        await supabase.from('cde_allocations').insert(allocationsToInsert as never);
       }
 
       // Recalculate totals
@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       await supabase
         .from('cdes')
-        .update({ total_allocation: totalAllocation, remaining_allocation: remainingAllocation })
+        .update({ total_allocation: totalAllocation, remaining_allocation: remainingAllocation } as never)
         .eq('id', id);
     }
 
@@ -122,7 +122,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { error } = await supabase
       .from('cdes')
-      .update({ status: 'inactive' })
+      .update({ status: 'inactive' } as never)
       .eq('id', id);
 
     if (error) throw error;

@@ -57,6 +57,9 @@ export async function GET(
         console.log('[Tiles] RPC not available, using inline query');
         const simplifyFactor = z < 6 ? 0.01 : (z < 10 ? 0.001 : 0.0001);
 
+        // Eligibility = Federal programs only (State programs are bonuses)
+        // NMTC (LIC or High Migration), LIHTC QCT, OZ
+        // NOTE: DDA is NOT a standalone qualifier - only a 30% boost if LIHTC QCT eligible
         result = await client.query(`
           WITH bounds AS (
             SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) as geom_bounds,
@@ -66,7 +69,13 @@ export async function GET(
           FROM (
             SELECT
               g.geoid,
-              CASE WHEN COALESCE(s.has_any_tax_credit, false) THEN 1 ELSE 0 END as e,
+              CASE WHEN (
+                COALESCE(s.is_nmtc_eligible, false) OR
+                COALESCE(s.is_nmtc_high_migration, false) OR
+                COALESCE(s.is_lihtc_qct_2025, false) OR
+                COALESCE(s.is_lihtc_qct_2026, false) OR
+                COALESCE(s.is_oz_designated, false)
+              ) THEN 1 ELSE 0 END as e,
               COALESCE(s.stack_score, 0) as s,
               ST_AsMVTGeom(
                 ST_Transform(

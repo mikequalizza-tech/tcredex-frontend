@@ -6,7 +6,8 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useCurrentUser } from '@/lib/auth';
 import { fetchDealsByOrganization } from '@/lib/supabase/queries';
 
-type ProjectStatus = 'draft' | 'submitted' | 'matched' | 'closing' | 'closed' | 'withdrawn';
+// Unified with lib/db/types.ts DealStatus
+type ProjectStatus = 'draft' | 'submitted' | 'under_review' | 'available' | 'seeking_capital' | 'matched' | 'closing' | 'closed' | 'withdrawn';
 
 interface SponsorProject {
   id: string;
@@ -29,8 +30,11 @@ interface SponsorProject {
 const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; bgColor: string }> = {
   draft: { label: 'Draft', color: 'text-gray-400', bgColor: 'bg-gray-800' },
   submitted: { label: 'Submitted', color: 'text-blue-400', bgColor: 'bg-blue-900/50' },
-  matched: { label: 'Matched', color: 'text-green-400', bgColor: 'bg-green-900/50' },
-  closing: { label: 'Closing', color: 'text-purple-400', bgColor: 'bg-purple-900/50' },
+  under_review: { label: 'Under Review', color: 'text-amber-400', bgColor: 'bg-amber-900/50' },
+  available: { label: 'Available', color: 'text-green-400', bgColor: 'bg-green-900/50' },
+  seeking_capital: { label: 'Seeking Capital', color: 'text-indigo-400', bgColor: 'bg-indigo-900/50' },
+  matched: { label: 'Matched', color: 'text-purple-400', bgColor: 'bg-purple-900/50' },
+  closing: { label: 'Closing', color: 'text-teal-400', bgColor: 'bg-teal-900/50' },
   closed: { label: 'Closed', color: 'text-emerald-400', bgColor: 'bg-emerald-900/50' },
   withdrawn: { label: 'Withdrawn', color: 'text-red-400', bgColor: 'bg-red-900/50' },
 };

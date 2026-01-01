@@ -9,7 +9,8 @@
  * - Distress criteria alignment
  */
 
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
+const supabaseAdmin = getSupabaseAdmin();
 import { notify } from '@/lib/notifications';
 
 // ============================================
@@ -185,11 +186,31 @@ export async function findMatches(
   } = options;
 
   // Get deal details
-  const { data: dealData, error: dealError } = await supabaseAdmin
+  const { data: rawDealData, error: dealError } = await supabaseAdmin
     .from('deals')
     .select('*')
     .eq('id', dealId)
     .single();
+
+  type DealRow = {
+    id: string;
+    project_name: string;
+    sponsor_name: string;
+    program_type: string;
+    nmtc_financing_requested: number | null;
+    allocation_amount: number | null;
+    state: string;
+    city: string;
+    census_tract: string;
+    project_type: string | null;
+    tract_eligible: boolean | null;
+    is_qct: boolean | null;
+    tract_severely_distressed: boolean | null;
+    is_severely_distressed: boolean | null;
+    section_c_score: number | null;
+    distress_score: number | null;
+  };
+  const dealData = rawDealData as DealRow | null;
 
   if (dealError || !dealData) {
     throw new Error('Deal not found');
@@ -211,7 +232,7 @@ export async function findMatches(
   };
 
   // Get all active CDEs from the cdes table (joined with organizations)
-  const { data: cdeData, error: cdeError } = await supabaseAdmin
+  const { data: rawCdeData, error: cdeError } = await supabaseAdmin
     .from('cdes')
     .select(`
       *,
@@ -222,6 +243,20 @@ export async function findMatches(
       )
     `)
     .eq('status', 'active');
+
+  type CdeRow = {
+    id: string;
+    organizations: { name: string; slug: string; website: string } | null;
+    primary_states: string[] | null;
+    target_sectors: string[] | null;
+    min_deal_size: number | null;
+    max_deal_size: number | null;
+    remaining_allocation: number | null;
+    require_severely_distressed: boolean | null;
+    contact_email: string | null;
+    contact_name: string | null;
+  };
+  const cdeData = rawCdeData as CdeRow[] | null;
 
   if (cdeError) {
     throw new Error('Failed to fetch CDEs');
@@ -273,7 +308,7 @@ export async function findMatches(
       breakdown: match.breakdown,
       reasons: match.reasons,
       created_at: new Date().toISOString(),
-    }, {
+    } as never, {
       onConflict: 'deal_id,cde_id',
     });
   }
@@ -293,11 +328,14 @@ export async function runAutoMatchBatch(): Promise<{
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-  const { data: deals } = await supabaseAdmin
+  const { data: rawDeals } = await supabaseAdmin
     .from('deals')
     .select('id')
     .eq('status', 'available')
     .or(`last_matched_at.is.null,last_matched_at.lt.${oneDayAgo.toISOString()}`);
+
+  type DealIdRow = { id: string };
+  const deals = rawDeals as DealIdRow[] | null;
 
   let totalMatches = 0;
 
@@ -308,7 +346,7 @@ export async function runAutoMatchBatch(): Promise<{
 
       await supabaseAdmin
         .from('deals')
-        .update({ last_matched_at: new Date().toISOString() })
+        .update({ last_matched_at: new Date().toISOString() } as never)
         .eq('id', deal.id);
     } catch (error) {
       console.error(`AutoMatch failed for deal ${deal.id}:`, error);

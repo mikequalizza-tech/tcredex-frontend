@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,7 +13,7 @@ export async function PATCH(
   context: RouteContext
 ) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
     const { id } = await context.params;
     
     // Verify auth
@@ -29,7 +29,7 @@ export async function PATCH(
 
     const { error } = await supabase
       .from('notifications')
-      .update({ read: body.read ?? true })
+      .update({ read: body.read ?? true } as never)
       .eq('id', id)
       .eq('user_id', user.id);
 

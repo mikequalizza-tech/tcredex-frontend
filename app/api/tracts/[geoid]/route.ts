@@ -30,11 +30,29 @@ export async function GET(
   try {
     const supabase = getSupabaseAdmin();
 
-    const { data, error } = await supabase
+    const { data: tractData, error } = await supabase
       .from('master_tax_credit_sot')
       .select('*')
       .eq('geoid', normalizedGeoid)
       .single();
+
+    type TractRow = {
+      geoid: string;
+      state_fips: string;
+      has_any_tax_credit: boolean;
+      is_nmtc_eligible: boolean;
+      is_qct: boolean;
+      is_oz: boolean;
+      is_dda: boolean;
+      has_state_nmtc: boolean;
+      has_state_htc: boolean;
+      has_brownfield_credit: boolean;
+      poverty_rate: number;
+      mfi_pct: number;
+      unemployment_rate: number;
+      stack_score: number;
+    };
+    const data = tractData as TractRow | null;
 
     if (error || !data) {
       return NextResponse.json(

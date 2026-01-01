@@ -52,19 +52,22 @@ export async function GET(request: NextRequest) {
       coordinates = [parseFloat(lng), parseFloat(lat)];
 
       // Use RPC function for point-in-polygon
-      const { data, error } = await supabase.rpc('get_tract_at_point', {
+      const { data, error } = await supabase.rpc('get_tract_at_point' as never, {
         p_lat: coordinates[1],
         p_lng: coordinates[0]
-      });
+      } as never);
+
+      type RpcResult = { geoid: string }[];
+      const rpcData = data as RpcResult | null;
 
       if (error) {
         console.error('[Eligibility] Point lookup error:', error);
-      } else if (data && data.length > 0) {
+      } else if (rpcData && rpcData.length > 0) {
         // Get full data from master_tax_credit_sot
         const { data: sotData } = await supabase
           .from('master_tax_credit_sot')
           .select('*')
-          .eq('geoid', data[0].geoid)
+          .eq('geoid', rpcData[0].geoid)
           .single();
 
         eligibilityData = sotData;
@@ -98,19 +101,22 @@ export async function GET(request: NextRequest) {
       coordinates = [match.coordinates.x, match.coordinates.y];
 
       // Use RPC for point-in-polygon
-      const { data, error } = await supabase.rpc('get_tract_at_point', {
+      const { data: rpcData2, error } = await supabase.rpc('get_tract_at_point' as never, {
         p_lat: coordinates[1],
         p_lng: coordinates[0]
-      });
+      } as never);
+
+      type RpcResult2 = { geoid: string }[];
+      const tractData = rpcData2 as RpcResult2 | null;
 
       if (error) {
         console.error('[Eligibility] Address point lookup error:', error);
-      } else if (data && data.length > 0) {
+      } else if (tractData && tractData.length > 0) {
         // Get full data from master_tax_credit_sot
         const { data: sotData } = await supabase
           .from('master_tax_credit_sot')
           .select('*')
-          .eq('geoid', data[0].geoid)
+          .eq('geoid', tractData[0].geoid)
           .single();
 
         eligibilityData = sotData;
@@ -155,15 +161,42 @@ function formatEligibilityResponse(
   matchedAddress: string | null,
   debug: boolean
 ) {
-  // Build programs array (using actual SOT column names)
+  // Build programs array
+  // Federal programs are qualifiers, State programs are bonuses (only if federal qualifies)
   const programs: string[] = [];
-  if (data.is_nmtc_eligible) programs.push('Federal NMTC');
-  if (data.is_lihtc_qct_2025) programs.push('LIHTC QCT');
-  if (data.is_oz_designated) programs.push('Opportunity Zone');
-  if (data.is_dda_2025) programs.push('DDA');
-  if (data.has_state_nmtc) programs.push('State NMTC');
-  if (data.has_state_htc) programs.push('State HTC');
-  if (data.has_brownfield_credit) programs.push('Brownfield');
+
+  // NMTC: Federal NMTC or High Migration are qualifiers, State NMTC is a bonus
+  const isNmtcEligible = data.is_nmtc_eligible || data.is_nmtc_high_migration;
+  if (data.is_nmtc_eligible) {
+    programs.push('Federal NMTC');
+  }
+  if (data.is_nmtc_high_migration) {
+    programs.push('High Migration NMTC');
+  }
+  // State NMTC is bonus only if Federal NMTC or High Migration eligible
+  if (isNmtcEligible && data.has_state_nmtc) {
+    programs.push('State NMTC');
+  }
+
+  // LIHTC: Federal QCT is the qualifier, State LIHTC and DDA are bonuses
+  const isLihtcQct = data.is_lihtc_qct_2025 || data.is_lihtc_qct_2026;
+  if (isLihtcQct) {
+    if (data.is_lihtc_qct_2025) programs.push('LIHTC QCT 2025');
+    if (data.is_lihtc_qct_2026) programs.push('LIHTC QCT 2026');
+    // DDA is 30% boost - only relevant if QCT eligible
+    if (data.is_dda_2025 || data.is_dda_2026) {
+      programs.push('DDA (30% Boost)');
+    }
+    // State LIHTC is bonus only if QCT eligible
+    if (data.has_state_lihtc) {
+      programs.push('State LIHTC');
+    }
+  }
+
+  // Opportunity Zone - standalone qualifier
+  if (data.is_oz_designated) {
+    programs.push('Opportunity Zone');
+  }
 
   const geoid = data.geoid as string;
 
@@ -172,9 +205,9 @@ function formatEligibilityResponse(
     tract: geoid,
     state_fips: geoid?.substring(0, 2),
 
-    // Primary eligibility flag
-    eligible: data.has_any_tax_credit || false,
-    has_any_tax_credit: data.has_any_tax_credit || false,
+    // Primary eligibility flag (recalculated without HTC/Brownfield)
+    eligible: programs.length > 0,
+    has_any_tax_credit: programs.length > 0,
 
     // All programs
     programs,
@@ -202,15 +235,14 @@ function formatEligibilityResponse(
       )
     },
 
-    // State programs
+    // State programs (NO HTC or Brownfield - not implemented yet)
     state: {
       nmtc: data.has_state_nmtc || false,
-      htc: data.has_state_htc || false,
-      brownfield: data.has_brownfield_credit || false
+      lihtc: data.has_state_lihtc || false,
     },
 
     // Reason
-    reason: data.has_any_tax_credit
+    reason: programs.length > 0
       ? 'Qualifies for one or more tax credit programs'
       : 'Does not qualify for any tax credit programs',
 

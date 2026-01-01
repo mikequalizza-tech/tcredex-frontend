@@ -44,7 +44,7 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
     state: deal.state || '',
     city: deal.city || '',
     tractType: (deal.tract_types || []) as TractType[],
-    status: (deal.status === 'draft' ? 'available' : deal.status) as DealStatus,
+    status: (deal.status || 'draft') as DealStatus,
     description: deal.project_description,
     communityImpact: deal.community_benefit,
     projectHighlights: [],
@@ -76,17 +76,20 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
  */
 export async function fetchDealById(id: string): Promise<Deal | null> {
   const supabase = getSupabase();
-  
-  const { data, error } = await supabase
+
+  const { data: rawData, error } = await supabase
     .from('deals')
     .select('*')
     .eq('id', id)
     .single();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = rawData as Record<string, any> | null;
+
   if (error || !data) {
     const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
     const isRecursion = error?.message?.toLowerCase().includes('recursion');
-    
+
     if (!isBuild || (error && !isRecursion)) {
       logger.error('Error fetching deal by ID', error);
     }
@@ -107,7 +110,7 @@ export async function fetchDealById(id: string): Promise<Deal | null> {
     state: data.state || '',
     city: data.city || '',
     tractType: (data.tract_types || []) as TractType[],
-    status: (data.status === 'draft' ? 'available' : data.status) as DealStatus,
+    status: (data.status || 'draft') as DealStatus,
     description: data.project_description,
     communityImpact: data.community_benefit,
     projectHighlights: [],
@@ -142,15 +145,26 @@ export async function fetchMarketplaceDeals(): Promise<Deal[]> {
 }
 
 /**
- * Fetch deals for a specific organization
+ * Fetch deals for a specific organization or user
+ * Also includes deals where the intake_data contains matching organization or user info
  */
-export async function fetchDealsByOrganization(orgId: string): Promise<Deal[]> {
+export async function fetchDealsByOrganization(orgId: string, userEmail?: string): Promise<Deal[]> {
   const supabase = getSupabase();
-  
+
+  // If orgId is empty/undefined, just fetch all deals
+  if (!orgId || orgId === 'undefined' || orgId === 'null') {
+    logger.info('fetchDealsByOrganization: No valid orgId, fetching all deals');
+    return fetchDeals();
+  }
+
+  // Build the OR conditions for organization matching
+  const orConditions = `sponsor_organization_id.eq.${orgId},assigned_cde_id.eq.${orgId},investor_id.eq.${orgId}`;
+
   const { data, error } = await supabase
     .from('deals')
     .select('*')
-    .or(`sponsor_organization_id.eq.${orgId},assigned_cde_id.eq.${orgId},investor_id.eq.${orgId}`);
+    .or(orConditions)
+    .order('created_at', { ascending: false });
 
   if (error) {
     const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
@@ -176,7 +190,7 @@ export async function fetchDealsByOrganization(orgId: string): Promise<Deal[]> {
     state: deal.state || '',
     city: deal.city || '',
     tractType: (deal.tract_types || []) as TractType[],
-    status: (deal.status === 'draft' ? 'available' : deal.status) as DealStatus,
+    status: (deal.status || 'draft') as DealStatus,
     description: deal.project_description,
     communityImpact: deal.community_benefit,
     projectHighlights: [],
@@ -238,9 +252,9 @@ export async function fetchCDEs(): Promise<CDEDealCard[]> {
     primaryStates: cde.primary_states || [],
     targetSectors: cde.target_sectors || [],
     impactPriorities: cde.impact_priorities || [],
-    dealSizeRange: { 
-      min: Number(cde.min_deal_size) || 0, 
-      max: Number(cde.max_deal_size) || 0 
+    dealSizeRange: {
+      min: Number(cde.min_deal_size) || 0,
+      max: Number(cde.max_deal_size) || 0
     },
     ruralFocus: cde.rural_focus || false,
     urbanFocus: cde.urban_focus || false,
@@ -250,4 +264,212 @@ export async function fetchCDEs(): Promise<CDEDealCard[]> {
     status: 'active',
     lastUpdated: cde.updated_at || '',
   }));
+}
+
+/**
+ * CDE detail interface for profile pages
+ */
+export interface CDEDetail {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  headquartersCity: string;
+  headquartersState: string;
+  missionFocus: string[];
+  projectTypes: string[];
+  serviceArea: string[];
+  serviceAreaType: string;
+  availableAllocation: number;
+  totalAllocation: number;
+  allocationYear: string;
+  minDealSize: number;
+  maxDealSize: number;
+  projectsClosed: number;
+  totalDeployed: number;
+  avgDealSize: number;
+  responseTime: string;
+  acceptingApplications: boolean;
+  website: string;
+  primaryContact: string;
+  contactEmail: string;
+  contactPhone: string;
+}
+
+/**
+ * Fetch a single CDE by slug
+ */
+export async function fetchCDEBySlug(slug: string): Promise<CDEDetail | null> {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('cdes')
+    .select(`
+      *,
+      organizations:organization_id (
+        name,
+        slug,
+        website
+      )
+    `)
+    .eq('organizations.slug', slug)
+    .single();
+
+  if (error || !data) {
+    // Try by CDE id as fallback
+    const { data: byId, error: byIdError } = await supabase
+      .from('cdes')
+      .select(`
+        *,
+        organizations:organization_id (
+          name,
+          slug,
+          website
+        )
+      `)
+      .eq('id', slug)
+      .single();
+
+    if (byIdError || !byId) {
+      return null;
+    }
+
+    return mapCDEToDetail(byId);
+  }
+
+  return mapCDEToDetail(data);
+}
+
+function mapCDEToDetail(cde: any): CDEDetail {
+  return {
+    id: cde.id,
+    name: cde.organizations?.name || 'Unknown CDE',
+    slug: cde.organizations?.slug || cde.id,
+    description: cde.mission_statement || '',
+    headquartersCity: cde.headquarters_city || '',
+    headquartersState: cde.headquarters_state || '',
+    missionFocus: cde.impact_priorities || [],
+    projectTypes: cde.target_sectors || [],
+    serviceArea: cde.primary_states || [],
+    serviceAreaType: cde.service_area_type || 'Regional',
+    availableAllocation: Number(cde.remaining_allocation) || 0,
+    totalAllocation: Number(cde.total_allocation) || 0,
+    allocationYear: cde.allocation_year || new Date().getFullYear().toString(),
+    minDealSize: Number(cde.min_deal_size) || 0,
+    maxDealSize: Number(cde.max_deal_size) || 0,
+    projectsClosed: Number(cde.projects_closed) || 0,
+    totalDeployed: Number(cde.total_deployed) || 0,
+    avgDealSize: Number(cde.avg_deal_size) || 0,
+    responseTime: cde.response_time || '2-3 weeks',
+    acceptingApplications: cde.status === 'active',
+    website: cde.organizations?.website || '',
+    primaryContact: cde.contact_name || '',
+    contactEmail: cde.contact_email || '',
+    contactPhone: cde.contact_phone || '',
+  };
+}
+
+/**
+ * Investor detail interface for profile pages
+ */
+export interface InvestorDetail {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  investorType: string;
+  programs: string[];
+  projectPreferences: string[];
+  geographicFocus: string[];
+  focusType: string;
+  availableCapital: number;
+  totalCapital: number;
+  minInvestment: number;
+  maxInvestment: number;
+  dealsCompleted: number;
+  totalInvested: number;
+  avgDealSize: number;
+  targetReturn: string;
+  responseTime: string;
+  activelyInvesting: boolean;
+  requiresCDE: boolean;
+  directInvestment: boolean;
+  website: string;
+  primaryContact: string;
+  contactEmail: string;
+  contactPhone: string;
+}
+
+/**
+ * Fetch a single investor by slug
+ */
+export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail | null> {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('investors')
+    .select(`
+      *,
+      organizations:organization_id (
+        name,
+        slug,
+        website
+      )
+    `)
+    .eq('organizations.slug', slug)
+    .single();
+
+  if (error || !data) {
+    // Try by investor id as fallback
+    const { data: byId, error: byIdError } = await supabase
+      .from('investors')
+      .select(`
+        *,
+        organizations:organization_id (
+          name,
+          slug,
+          website
+        )
+      `)
+      .eq('id', slug)
+      .single();
+
+    if (byIdError || !byId) {
+      return null;
+    }
+
+    return mapInvestorToDetail(byId);
+  }
+
+  return mapInvestorToDetail(data);
+}
+
+function mapInvestorToDetail(investor: any): InvestorDetail {
+  return {
+    id: investor.id,
+    name: investor.organizations?.name || 'Unknown Investor',
+    slug: investor.organizations?.slug || investor.id,
+    description: investor.investment_thesis || '',
+    investorType: investor.investor_type || 'institutional',
+    programs: investor.programs || ['NMTC'],
+    projectPreferences: investor.project_preferences || [],
+    geographicFocus: investor.geographic_focus || [],
+    focusType: investor.focus_type || 'National',
+    availableCapital: Number(investor.available_capital) || 0,
+    totalCapital: Number(investor.total_capital) || 0,
+    minInvestment: Number(investor.min_investment) || 0,
+    maxInvestment: Number(investor.max_investment) || 0,
+    dealsCompleted: Number(investor.deals_completed) || 0,
+    totalInvested: Number(investor.total_invested) || 0,
+    avgDealSize: Number(investor.avg_deal_size) || 0,
+    targetReturn: investor.target_return || 'Market Rate',
+    responseTime: investor.response_time || '1-2 weeks',
+    activelyInvesting: investor.status === 'active',
+    requiresCDE: investor.requires_cde ?? true,
+    directInvestment: investor.direct_investment ?? false,
+    website: investor.organizations?.website || '',
+    primaryContact: investor.contact_name || '',
+    contactEmail: investor.contact_email || '',
+    contactPhone: investor.contact_phone || '',
+  };
 }

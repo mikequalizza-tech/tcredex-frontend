@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
 
     // Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -62,15 +62,18 @@ export async function POST(request: NextRequest) {
       .ilike('name', organizationName)
       .single();
 
-    if (existingOrg) {
-      organization = existingOrg;
+    type OrgData = { id: string; name: string; type: string };
+    const typedExistingOrg = existingOrg as OrgData | null;
+
+    if (typedExistingOrg) {
+      organization = typedExistingOrg;
     } else {
       const { data: newOrg, error: orgError } = await supabase
         .from('organizations')
         .insert({
           name: organizationName,
           type: role === 'cde' ? 'CDE' : role === 'investor' ? 'Investor' : 'Sponsor',
-        })
+        } as never)
         .select()
         .single();
 
@@ -78,7 +81,7 @@ export async function POST(request: NextRequest) {
         console.error('Org creation error:', orgError);
         // Continue without org - profile will be created without org link
       } else {
-        organization = newOrg;
+        organization = newOrg as OrgData | null;
       }
     }
 
@@ -91,7 +94,7 @@ export async function POST(request: NextRequest) {
         email: email,
         role: role,
         organization_id: organization?.id || null,
-      });
+      } as never);
 
     if (profileError) {
       console.error('Profile creation error:', profileError);

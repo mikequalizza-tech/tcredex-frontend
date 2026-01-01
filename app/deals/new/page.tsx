@@ -7,7 +7,7 @@ import Link from 'next/link';
 
 export default function NewDealPage() {
   const router = useRouter();
-  const { orgType, isLoading, isAuthenticated } = useCurrentUser();
+  const { orgType, isLoading, isAuthenticated, organizationId, orgName, userName, userEmail } = useCurrentUser();
 
   // Role-based access control - only sponsors can submit deals
   if (isLoading) {
@@ -68,21 +68,33 @@ export default function NewDealPage() {
 
   const handleSave = async (data: IntakeData, readinessScore: number) => {
     console.log('Saving draft...', { data, readinessScore });
-    
+
     try {
-      const response = await fetch('/api/deals', { 
-        method: 'POST', 
+      // Enrich data with user/org info
+      const enrichedData = {
+        ...data,
+        sponsorOrganizationId: organizationId,
+        sponsorName: data.sponsorName || orgName || userName,
+        personCompletingForm: userEmail || userName,
+      };
+
+      // Use /api/intake which properly maps IntakeData to deal record
+      const response = await fetch('/api/intake', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data, readinessScore, status: 'draft' }) 
+        body: JSON.stringify({
+          intakeData: enrichedData,
+          saveOnly: true  // Save as draft without submitting
+        })
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to save draft');
+        throw new Error(error.message || error.error || 'Failed to save draft');
       }
-      
-      const deal = await response.json();
-      console.log('Draft saved:', deal);
+
+      const result = await response.json();
+      console.log('Draft saved:', result);
     } catch (error) {
       console.error('Save failed:', error);
       alert('Failed to save draft. Please try again.');
@@ -91,22 +103,40 @@ export default function NewDealPage() {
 
   const handleSubmit = async (data: IntakeData, readinessScore: number) => {
     console.log('Submitting to marketplace...', { data, readinessScore });
-    
+
     try {
-      const response = await fetch('/api/deals', { 
-        method: 'POST', 
+      // Enrich data with user/org info
+      const enrichedData = {
+        ...data,
+        sponsorOrganizationId: organizationId,
+        sponsorName: data.sponsorName || orgName || userName,
+        personCompletingForm: userEmail || userName,
+      };
+
+      // Use /api/intake which properly maps IntakeData to deal record
+      const response = await fetch('/api/intake', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data, readinessScore, status: 'submitted' }) 
+        body: JSON.stringify({
+          intakeData: enrichedData,
+          saveOnly: false  // Submit to marketplace
+        })
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to submit deal');
+        throw new Error(error.message || error.error || 'Failed to submit deal');
       }
-      
-      const deal = await response.json();
-      console.log('Deal submitted:', deal);
-      router.push('/deals');
+
+      const result = await response.json();
+      console.log('Deal submitted:', result);
+
+      // Redirect to the new deal's page or marketplace
+      if (result.dealId) {
+        router.push(`/deals/${result.dealId}`);
+      } else {
+        router.push('/deals');
+      }
     } catch (error) {
       console.error('Submit failed:', error);
       alert('Failed to submit deal. Please try again.');

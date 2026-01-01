@@ -10,7 +10,8 @@
 
 export type ProgramType = 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
 export type ProgramLevel = 'federal' | 'state';
-export type DealStatus = 'draft' | 'submitted' | 'under_review' | 'available' | 'matched' | 'closing' | 'closed';
+// Unified with lib/db/types.ts (the database source of truth)
+export type DealStatus = 'draft' | 'submitted' | 'under_review' | 'available' | 'seeking_capital' | 'matched' | 'closing' | 'closed' | 'withdrawn';
 export type TractType = 'QCT' | 'SD' | 'LIC' | 'DDA';
 
 export interface DocumentRecord {

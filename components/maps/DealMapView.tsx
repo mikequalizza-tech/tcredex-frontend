@@ -129,7 +129,7 @@ export default function DealMapView({ deals, selectedDealId, onSelectDeal }: Dea
       }).setHTML(`
         <div class="bg-gray-900 text-white p-3 rounded-lg min-w-[200px]">
           <h3 class="font-semibold text-sm">${deal.projectName}</h3>
-          <p class="text-xs text-indigo-400">${deal.location}</p>
+          <p class="text-xs text-indigo-400">${deal.city}, ${deal.state}</p>
           <div class="mt-2 text-xs">
             <span class="text-gray-400">Cost:</span> 
             <span class="text-white">$${((deal.projectCost || 0) / 1000000).toFixed(1)}M</span>

@@ -4,12 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { getDealsRequiringAction, getDealActivitySummary } from '@/lib/deals';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
 
     // Verify admin
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if ((profile as unknown as { role?: string })?.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
@@ -36,10 +36,12 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Get deals by program type
-    const { data: programDeals } = await supabase
+    const { data: programDealsData } = await supabase
       .from('deals')
       .select('program_type')
       .not('program_type', 'is', null);
+
+    const programDeals = programDealsData as Array<{ program_type: string }> | null;
 
     const byProgram: Record<string, number> = {};
     for (const deal of programDeals || []) {
@@ -57,10 +59,12 @@ export async function GET(request: NextRequest) {
       .gte('created_at', weekAgo.toISOString());
 
     // Calculate total allocation
-    const { data: allocationData } = await supabase
+    const { data: allocationDataRaw } = await supabase
       .from('deals')
       .select('allocation_amount')
       .in('status', ['available', 'in_discussions', 'term_sheet', 'closing', 'funded']);
+
+    const allocationData = allocationDataRaw as Array<{ allocation_amount: number | null }> | null;
 
     const totalAllocation = (allocationData || []).reduce(
       (sum, d) => sum + (d.allocation_amount || 0),

@@ -89,7 +89,7 @@ export default function PipelinePage() {
 
 function PipelineContent() {
   const router = useRouter();
-  const { orgType, orgName, currentDemoRole, organizationId } = useCurrentUser();
+  const { orgType, orgName, currentDemoRole, organizationId, userEmail } = useCurrentUser();
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [selectedDeal, setSelectedDeal] = useState<PipelineDeal | null>(null);
   const [drafts, setDrafts] = useState<PipelineDeal[]>([]);
@@ -136,9 +136,8 @@ function PipelineContent() {
     async function loadSupabaseDeals() {
       setIsLoadingSupabase(true);
       try {
-        const fetched = organizationId
-          ? await fetchDealsByOrganization(organizationId)
-          : await fetchDeals();
+        // Fetch deals - the query function handles null/undefined orgId gracefully
+        const fetched = await fetchDealsByOrganization(organizationId || '', userEmail);
 
         const mapped: PipelineDeal[] = fetched.map(d => ({
           id: d.id,
@@ -174,7 +173,7 @@ function PipelineContent() {
       }
     }
     loadSupabaseDeals();
-  }, [effectiveRole, organizationId]);
+  }, [effectiveRole, organizationId, userEmail]);
 
   const getStageConfig = (): Record<string, StageConfig> => {
     switch (effectiveRole) {

@@ -48,19 +48,19 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const { data, error } = await supabase.rpc('get_tracts_in_bbox', {
+      const { data, error } = await supabase.rpc('get_tracts_in_bbox' as never, {
         p_min_lng: minLng,
         p_min_lat: minLat,
         p_max_lng: maxLng,
         p_max_lat: maxLat
-      });
+      } as never);
 
       if (error) {
         console.error('[GeoTracts] BBox error:', error);
         return NextResponse.json({ type: 'FeatureCollection', features: [] });
       }
 
-      const features = (data || []).map((row: TractRow) => mapRowToFeature(row));
+      const features = ((data as TractRow[] | null) || []).map((row: TractRow) => mapRowToFeature(row));
       console.log(`[GeoTracts] Returned ${features.length} tracts`);
 
       return NextResponse.json({
@@ -74,17 +74,19 @@ export async function GET(request: NextRequest) {
     if (geoid) {
       const cleanGeoid = geoid.replace(/[-\s]/g, '').padStart(11, '0');
 
-      const { data, error } = await supabase.rpc('get_tract_with_credits', {
+      const { data: geoidData, error } = await supabase.rpc('get_tract_with_credits' as never, {
         p_geoid: cleanGeoid
-      });
+      } as never);
 
-      if (error || !data || data.length === 0) {
+      const tractData = geoidData as TractRow[] | null;
+
+      if (error || !tractData || tractData.length === 0) {
         return NextResponse.json({ type: 'FeatureCollection', features: [] });
       }
 
       return NextResponse.json({
         type: 'FeatureCollection',
-        features: [mapRowToFeature(data[0] as TractRow)],
+        features: [mapRowToFeature(tractData[0])],
         source: 'tract_map_layer'
       });
     }

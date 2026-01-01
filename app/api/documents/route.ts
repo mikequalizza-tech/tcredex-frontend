@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         category: body.category,
         tags: body.tags || [],
         status: 'pending',
-      })
+      } as never)
       .select()
       .single();
 
@@ -80,15 +80,15 @@ export async function POST(request: NextRequest) {
       actor_type: 'human',
       actor_id: body.uploaded_by || 'unknown',
       entity_type: 'document',
-      entity_id: data.id,
+      entity_id: (data as { id: string }).id,
       action: 'document_uploaded',
       payload_json: {
         name: body.name,
         category: body.category,
         deal_id: body.deal_id,
       },
-      hash: generateHash(data),
-    });
+      hash: generateHash(data as Record<string, unknown>),
+    } as never);
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

@@ -19,12 +19,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = await request.json();
     
     // Get current deal
-    const { data: deal, error: fetchError } = await supabase
+    const { data: dealData, error: fetchError } = await supabase
       .from('deals')
       .select('*')
       .eq('id', id)
       .single();
-    
+
+    type DealRow = {
+      id: string;
+      status: string;
+      exclusivity_agreed: boolean | null;
+      intake_data: Record<string, unknown> | null;
+      programs: string[] | null;
+    };
+    const deal = dealData as DealRow | null;
+
     if (fetchError || !deal) {
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
     }
@@ -67,13 +76,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     
     const { data: updatedDeal, error: updateError } = await supabase
       .from('deals')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id)
       .select()
       .single();
-    
+
     if (updateError) throw updateError;
-    
+
     // Log to ledger
     await supabase.from('ledger_events').insert({
       actor_type: 'human',
@@ -87,7 +96,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         programs: deal.programs,
       },
       hash: generateHash(updateData),
-    });
+    } as never);
     
     return NextResponse.json({
       deal: updatedDeal,

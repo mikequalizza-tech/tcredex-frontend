@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { recordAuditEvent } from '@/lib/utils/audit';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24;
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = supabaseAdmin;
+    const supabase = getSupabaseAdmin();
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -35,11 +35,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user profile
-    const { data: profile } = await supabase
+    const { data: profileData } = await supabase
       .from('profiles')
       .select('*, organizations(*)')
       .eq('id', data.user.id)
       .single();
+
+    type ProfileData = {
+      id: string;
+      full_name: string | null;
+      role: string | null;
+      organizations: { id: string; name: string; type: string } | null;
+    };
+    const profile = profileData as ProfileData | null;
 
     const response = NextResponse.json({
       token: data.session?.access_token,

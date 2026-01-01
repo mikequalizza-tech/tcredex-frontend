@@ -23,6 +23,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30000,
+  statement_timeout: 5000, // 5 second timeout for tile queries
 });
 
 export const dynamic = 'force-dynamic';
@@ -118,7 +119,19 @@ export async function GET(
     } finally {
       client.release();
     }
-  } catch (error) {
+  } catch (error: unknown) {
+    // Return empty tile on timeout or error (graceful degradation)
+    const pgError = error as { code?: string };
+    if (pgError.code === '57014') {
+      // Statement timeout - return empty tile silently
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          'Content-Type': 'application/x-protobuf',
+          'Cache-Control': 'public, max-age=300', // Short cache on timeout
+        },
+      });
+    }
     console.error('[Tiles] Error generating tile:', error);
     return NextResponse.json({ error: 'Tile generation failed' }, { status: 500 });
   }

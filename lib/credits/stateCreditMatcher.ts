@@ -38,27 +38,42 @@ export interface StateCreditMatch {
 
 interface RawCreditRow {
   state_name: string;
-  state_abbrev?: string;
-  is_state_htc?: boolean;
-  is_state_nmtc?: boolean;
-  is_state_brownfield?: boolean;
-  is_state_lihtc?: boolean;
-  is_state_oz?: boolean;
-  is_state_htc_transferable?: boolean;
-  is_state_htc_refundable?: boolean;
-  is_state_nmtc_transferable?: boolean;
-  is_state_nmtc_refundable?: boolean;
-  is_state_brownfield_transferable?: boolean;
-  is_state_brownfield_refundable?: boolean;
-  state_htc_rate?: number;
-  state_nmtc_rate?: number;
-  state_brownfield_rate?: number;
-  state_htc_notes_url?: string;
-  state_nmtc_notes_url?: string;
-  state_brownfield_notes_url?: string;
+  // State NMTC
+  state_nmtc?: boolean;
+  state_nmtc_program_name?: string;
+  state_nmtc_admin_agency?: string;
+  state_nmtc_credit_structure?: string;
+  state_nmtc_transferable?: boolean;
+  state_nmtc_notes?: string;
+  // State LIHTC
+  state_lihtc?: boolean;
+  state_lihtc_program_size?: string;
+  state_lihtc_credit_pct_years?: string;
+  state_lihtc_refundable_transferable?: string;
+  state_lihtc_admin_agency?: string;
+  // State HTC
+  state_htc?: boolean;
+  state_htc_credit_pct?: string;
+  state_htc_annual_cap?: string;
+  state_htc_transferable?: boolean;
+  state_htc_refundable?: boolean;
+  state_htc_admin_agency?: string;
+  // State OZ
+  oz_federal_conformity?: boolean;
+  state_oz_program?: boolean;
+  state_oz_program_type?: string;
+  state_oz_admin_agency?: string;
+  // Brownfield
+  brownfield_credit?: boolean;
+  brownfield_credit_type?: string;
+  brownfield_credit_amount?: string;
+  brownfield_transferable?: boolean;
+  brownfield_refundable?: boolean;
+  brownfield_admin_agency?: string;
+  brownfield_notes?: string;
+  // Stacking
   stacking_notes?: string;
-  state_credit_tags?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // =============================================================================
@@ -88,11 +103,11 @@ export async function matchEligibleCredits(project: ProjectInput): Promise<State
     return [];
   }
 
-  // Query by state name or abbreviation
+  // Query by state name (state_tax_credit_programs_staging is the SOT)
   const { data, error } = await supabase
-    .from('state_credit_matrix')
+    .from('state_tax_credit_programs_staging')
     .select('*')
-    .or(`state_name.ilike.%${state}%,state_abbrev.ilike.${state}`);
+    .ilike('state_name', `%${state}%`);
 
   if (error) {
     console.error('[matchEligibleCredits] Supabase query failed:', error.message);
@@ -106,24 +121,24 @@ export async function matchEligibleCredits(project: ProjectInput): Promise<State
   const matches: StateCreditMatch[] = [];
 
   for (const row of data as RawCreditRow[]) {
-    // Check each program type
-    if (programs.includes('HTC') && row.is_state_htc) {
+    // Check each program type using correct column names from state_tax_credit_programs_staging
+    if (programs.includes('HTC') && row.state_htc) {
       matches.push(buildCreditMatch(row, 'HTC', project));
     }
-    
-    if (programs.includes('NMTC') && row.is_state_nmtc) {
+
+    if (programs.includes('NMTC') && row.state_nmtc) {
       matches.push(buildCreditMatch(row, 'NMTC', project));
     }
-    
-    if (programs.includes('Brownfield') && row.is_state_brownfield) {
+
+    if (programs.includes('Brownfield') && row.brownfield_credit) {
       matches.push(buildCreditMatch(row, 'Brownfield', project));
     }
-    
-    if (programs.includes('LIHTC') && row.is_state_lihtc) {
+
+    if (programs.includes('LIHTC') && row.state_lihtc) {
       matches.push(buildCreditMatch(row, 'LIHTC', project));
     }
-    
-    if (programs.includes('OZ') && row.is_state_oz) {
+
+    if (programs.includes('OZ') && row.state_oz_program) {
       matches.push(buildCreditMatch(row, 'OZ', project));
     }
   }
@@ -136,12 +151,13 @@ export async function matchEligibleCredits(project: ProjectInput): Promise<State
 // =============================================================================
 
 function buildCreditMatch(
-  row: RawCreditRow, 
+  row: RawCreditRow,
   creditType: CreditProgram,
   project: ProjectInput
 ): StateCreditMatch {
-  const stateAbbrev = row.state_abbrev || row.state_name?.slice(0, 2).toUpperCase();
-  
+  // Get state abbreviation from state name (first 2 chars of each word)
+  const stateAbbrev = getStateAbbrev(row.state_name);
+
   return {
     program: `${stateAbbrev} State ${creditType}`,
     state: row.state_name || stateAbbrev,
@@ -155,31 +171,61 @@ function buildCreditMatch(
     stackableWithLIHTC: checkStackability(row.stacking_notes, 'lihtc'),
     notes: row.stacking_notes || undefined,
     url: getUrl(row, creditType),
-    tags: row.state_credit_tags || undefined,
   };
+}
+
+// State name to abbreviation mapping
+const STATE_ABBREVS: Record<string, string> = {
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+  'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
+  'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
+  'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+  'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
+  'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+  'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
+  'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+  'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
+  'District of Columbia': 'DC', 'Puerto Rico': 'PR',
+};
+
+function getStateAbbrev(stateName?: string): string {
+  if (!stateName) return 'XX';
+  return STATE_ABBREVS[stateName] || stateName.slice(0, 2).toUpperCase();
 }
 
 function getRate(row: RawCreditRow, creditType: CreditProgram): number | null {
   switch (creditType) {
     case 'HTC':
-      return row.state_htc_rate ?? parseRateFromNotes(row.state_htc_notes_url);
+      return parseRateFromString(row.state_htc_credit_pct);
     case 'NMTC':
-      return row.state_nmtc_rate ?? parseRateFromNotes(row.state_nmtc_notes_url);
+      return parseRateFromString(row.state_nmtc_credit_structure);
     case 'Brownfield':
-      return row.state_brownfield_rate ?? parseRateFromNotes(row.state_brownfield_notes_url);
+      return parseRateFromString(row.brownfield_credit_amount);
+    case 'LIHTC':
+      return parseRateFromString(row.state_lihtc_credit_pct_years);
     default:
       return null;
   }
 }
 
+function parseRateFromString(value?: string): number | null {
+  if (!value) return null;
+  const match = value.match(/(\d{1,3})%/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 function getTransferability(row: RawCreditRow, creditType: CreditProgram): boolean {
   switch (creditType) {
     case 'HTC':
-      return row.is_state_htc_transferable === true;
+      return row.state_htc_transferable === true;
     case 'NMTC':
-      return row.is_state_nmtc_transferable === true;
+      return row.state_nmtc_transferable === true;
     case 'Brownfield':
-      return row.is_state_brownfield_transferable === true;
+      return row.brownfield_transferable === true;
+    case 'LIHTC':
+      // Parse from state_lihtc_refundable_transferable field
+      return row.state_lihtc_refundable_transferable?.toLowerCase().includes('transferable') ?? false;
     default:
       return false;
   }
@@ -188,11 +234,15 @@ function getTransferability(row: RawCreditRow, creditType: CreditProgram): boole
 function getRefundability(row: RawCreditRow, creditType: CreditProgram): boolean {
   switch (creditType) {
     case 'HTC':
-      return row.is_state_htc_refundable === true;
+      return row.state_htc_refundable === true;
     case 'NMTC':
-      return row.is_state_nmtc_refundable === true;
+      // NMTC doesn't have a refundable column in staging table
+      return false;
     case 'Brownfield':
-      return row.is_state_brownfield_refundable === true;
+      return row.brownfield_refundable === true;
+    case 'LIHTC':
+      // Parse from state_lihtc_refundable_transferable field
+      return row.state_lihtc_refundable_transferable?.toLowerCase().includes('refundable') ?? false;
     default:
       return false;
   }
@@ -200,29 +250,29 @@ function getRefundability(row: RawCreditRow, creditType: CreditProgram): boolean
 
 function getUrl(row: RawCreditRow, creditType: CreditProgram): string | undefined {
   let notesField: string | undefined;
-  
+
   switch (creditType) {
     case 'HTC':
-      notesField = row.state_htc_notes_url;
+      notesField = row.state_htc_admin_agency;
       break;
     case 'NMTC':
-      notesField = row.state_nmtc_notes_url;
+      notesField = row.state_nmtc_notes;
       break;
     case 'Brownfield':
-      notesField = row.state_brownfield_notes_url;
+      notesField = row.brownfield_notes;
+      break;
+    case 'LIHTC':
+      notesField = row.state_lihtc_admin_agency;
+      break;
+    case 'OZ':
+      notesField = row.state_oz_admin_agency;
       break;
   }
-  
+
   if (!notesField) return undefined;
-  
+
   const match = notesField.match(/https?:\/\/[^\s)]+/);
   return match ? match[0] : undefined;
-}
-
-function parseRateFromNotes(notes?: string): number | null {
-  if (!notes) return null;
-  const match = notes.match(/(\d{1,2})%/);
-  return match ? parseInt(match[1], 10) : null;
 }
 
 function checkStackability(notes: string | undefined, program: string): boolean {

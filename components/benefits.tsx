@@ -108,7 +108,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "22%", left: "52%" }}
-                  src="/images/world-user-01.jpg"
+                  src="/images/avatar-01.jpg"
                   width={32}
                   height={32}
                   alt="User 01"
@@ -117,7 +117,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "50%", left: "58%" }}
-                  src="/images/world-user-02.jpg"
+                  src="/images/avatar-02.jpg"
                   width={48}
                   height={48}
                   alt="User 02"
@@ -127,7 +127,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "8.5%", left: "70.5%" }}
-                  src="/images/world-user-03.jpg"
+                  src="/images/avatar-03.jpg"
                   width={56}
                   height={56}
                   alt="User 03"
@@ -137,7 +137,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "34%", left: "76.5%" }}
-                  src="/images/world-user-04.jpg"
+                  src="/images/avatar-04.jpg"
                   width={72}
                   height={72}
                   alt="User 04"
@@ -167,7 +167,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "20%", left: "24.5%" }}
-                  src="/images/world-user-07.jpg"
+                  src="/images/testimonial-01.jpg"
                   width={64}
                   height={64}
                   alt="User 07"
@@ -177,7 +177,7 @@ export default function Benefits() {
                 <Image
                   className="absolute rounded-full max-sm:scale-75!"
                   style={{ top: "39%", left: "43%" }}
-                  src="/images/world-user-08.jpg"
+                  src="/images/testimonial-02.jpg"
                   width={40}
                   height={40}
                   alt="User 08"

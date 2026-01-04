@@ -2,44 +2,59 @@
 
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { fetchDealById } from '@/lib/supabase/queries';
 import { Deal } from '@/lib/data/deals';
-
-// Tract type labels
-const TRACT_LABELS: Record<string, string> = {
-  QCT: 'Qualified Census Tract',
-  SD: 'Severely Distressed',
-  LIC: 'Low-Income Community',
-  DDA: 'Difficult Development Area',
-};
 
 // Extended profile data generator
 function generateProfileData(deal: Deal) {
   const totalProjectCost = deal.projectCost || deal.allocation * 2.5;
   const financingGap = deal.financingGap || deal.allocation * 0.2;
-  
+
   // Use real census tract if available, otherwise generate mock
   let censusTract = deal.censusTract;
   if (!censusTract) {
     const stateCode = deal.state === 'IL' ? '17' : deal.state === 'WI' ? '55' : deal.state === 'MI' ? '26' : deal.state === 'MO' ? '29' : deal.state === 'IN' ? '18' : deal.state === 'AL' ? '01' : '99';
     censusTract = `${stateCode}031${deal.id.replace(/\D/g, '').padStart(6, '0').slice(0, 6)}`;
   }
-  
+
+  // Calculate sources total
+  const sources = deal.sources && deal.sources.length > 0
+    ? deal.sources
+    : [
+        { name: 'Private Funding', amount: totalProjectCost * 0.6 },
+        { name: 'NMTC Gap', amount: financingGap },
+        { name: 'Public Capital', amount: totalProjectCost * 0.02 },
+      ];
+
+  const uses = deal.uses && deal.uses.length > 0
+    ? deal.uses
+    : deal.useOfFunds && deal.useOfFunds.length > 0
+      ? deal.useOfFunds.map(u => ({ name: u.category, amount: u.amount }))
+      : [
+          { name: 'Construction', amount: totalProjectCost * 0.85 },
+          { name: 'Soft Costs', amount: totalProjectCost * 0.15 },
+        ];
+
   return {
     // Header
     projectName: deal.projectName,
     city: deal.city,
     state: deal.state,
-    
+
+    // Media
+    logoUrl: deal.logoUrl,
+    heroImageUrl: deal.heroImageUrl,
+
     // Stats
     parent: deal.sponsorName,
     location: `${deal.city}, ${deal.state}`,
     censusTract: censusTract,
-    status: deal.tractType.includes('SD') ? 'Severely Distressed' : 
+    status: deal.tractType.includes('SD') ? 'Severely Distressed' :
             deal.tractType.includes('QCT') ? 'Qualified Census Tract' : 'Low-Income Community',
     povertyRate: deal.povertyRate || 28.5,
-    medianIncome: deal.medianIncome ? `${deal.medianIncome}%` : '41.98%', // MFI percentage
+    medianIncome: deal.medianIncome ? `${deal.medianIncome}%` : '41.98%',
     unemployment: deal.unemployment || 8.2,
     projectCost: totalProjectCost,
     financingGap: financingGap,
@@ -48,30 +63,21 @@ function generateProfileData(deal: Deal) {
     shovelReady: deal.shovelReady ? 'Yes' : 'No',
     completion: deal.completionDate || 'Q2 2026',
     dealId: `TC-${deal.id.toUpperCase().slice(0, 8)}`,
-    
+
     // Contact
-    contactName: 'tCredex Team',
-    contactEmail: 'deals@tcredex.com',
-    
+    contactName: deal.contactName || 'tCredex Team',
+    contactEmail: deal.contactEmail || 'deals@tcredex.com',
+
     // Content
     projectDescription: deal.description || `${deal.projectName} represents a transformative investment in the ${deal.city} community. This ${deal.programType} project will create quality jobs and provide essential services to residents of this ${deal.tractType.includes('SD') ? 'severely distressed' : 'qualified'} census tract. The development addresses critical community needs while generating measurable economic impact.`,
-    
+
     communityImpact: deal.communityImpact || `Located in a ${deal.tractType.includes('SD') ? 'Severely Distressed Census Tract' : 'Qualified Census Tract'}, this project will bring over ${Math.floor(deal.allocation / 150000)} construction jobs and ${Math.floor(deal.allocation / 300000)} permanent roles. Annual impact includes community services for ${Math.floor(deal.allocation / 10000)}+ individuals served. The project continues to serve the greater ${deal.city} area through comprehensive community development programs.`,
-    
+
     // Financing
-    sources: [
-      { name: 'Private Funding', amount: totalProjectCost * 0.6 },
-      { name: 'NMTC Gap', amount: financingGap },
-      { name: 'Public Capital', amount: totalProjectCost * 0.02 },
-    ],
-    uses: deal.useOfFunds && deal.useOfFunds.length > 0 
-      ? deal.useOfFunds.map(u => ({ name: u.category, amount: u.amount }))
-      : [
-          { name: 'Construction', amount: totalProjectCost * 0.85 },
-          { name: 'Soft Costs', amount: totalProjectCost * 0.15 },
-        ],
-    totalSources: totalProjectCost,
-    totalUses: totalProjectCost,
+    sources,
+    uses,
+    totalSources: sources.reduce((sum, s) => sum + s.amount, 0),
+    totalUses: uses.reduce((sum, u) => sum + u.amount, 0),
   };
 }
 
@@ -247,13 +253,24 @@ export default function ProjectProfilePage() {
                   </a>
                 </div>
 
-                {/* Logo Placeholder */}
+                {/* Organization Logo */}
                 <div className="pt-4 mt-4 flex justify-center">
-                  <div className="w-16 h-16 bg-slate-700 rounded-lg flex items-center justify-center">
-                    <svg className="w-10 h-10 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
+                  {profile.logoUrl ? (
+                    <div className="relative w-24 h-24 bg-white rounded-lg overflow-hidden">
+                      <Image
+                        src={profile.logoUrl}
+                        alt={profile.parent || 'Organization logo'}
+                        fill
+                        className="object-contain p-2"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 bg-slate-700 rounded-lg flex items-center justify-center">
+                      <svg className="w-10 h-10 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -264,14 +281,23 @@ export default function ProjectProfilePage() {
               <h1 className="text-3xl font-bold text-gray-900 mb-1">{profile.projectName}</h1>
               <p className="text-lg text-teal-600 mb-6">{profile.city}, {profile.state}</p>
 
-              {/* Project Image Placeholder */}
-              <div className="w-full h-64 bg-gradient-to-br from-teal-100 to-green-100 rounded-lg mb-8 flex items-center justify-center border border-gray-200 overflow-hidden">
-                <div className="text-center text-gray-500">
-                  <svg className="w-16 h-16 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm">Project Rendering</p>
-                </div>
+              {/* Project Hero Image */}
+              <div className="w-full h-64 bg-gradient-to-br from-teal-100 to-green-100 rounded-lg mb-8 flex items-center justify-center border border-gray-200 overflow-hidden relative">
+                {profile.heroImageUrl ? (
+                  <Image
+                    src={profile.heroImageUrl}
+                    alt={profile.projectName}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="text-center text-gray-500">
+                    <svg className="w-16 h-16 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm">Project Rendering</p>
+                  </div>
+                )}
               </div>
 
               {/* The Project Section */}

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Logo from "./logo";
 import MobileMenu from "./mobile-menu";
+import HeaderSearch from "./header-search";
 
 export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -131,8 +132,9 @@ export default function Header() {
             </div>
           </nav>
 
-          {/* Auth buttons */}
+          {/* Search + Auth buttons */}
           <div className="flex items-center gap-3">
+            <HeaderSearch />
             {isLoggedIn ? (
               <>
                 <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">

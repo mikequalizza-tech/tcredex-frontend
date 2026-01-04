@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
-import { AuthProvider } from '@/lib/auth';
+import { AuthProvider, useCurrentUser } from '@/lib/auth';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { Role } from '@/lib/auth/types';
 
@@ -19,6 +19,27 @@ const navItems = [
 
 function AdminContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, isLoading, isAuthenticated } = useCurrentUser();
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated - redirect to signin
+  if (!isAuthenticated || !user) {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/signin';
+    }
+    return null;
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-950">
@@ -91,9 +112,7 @@ export default function AdminLayout({
 }) {
   return (
     <AuthProvider>
-      <ProtectedRoute requiredRole={Role.ORG_ADMIN}>
-        <AdminContent>{children}</AdminContent>
-      </ProtectedRoute>
+      <AdminContent>{children}</AdminContent>
     </AuthProvider>
   );
 }

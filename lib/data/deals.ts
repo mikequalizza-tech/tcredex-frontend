@@ -12,6 +12,12 @@ export type TractType = 'QCT' | 'SD' | 'LIC' | 'DDA';
 // DealStatus - Unified with lib/db/types.ts (the database source of truth)
 export type DealStatus = 'draft' | 'submitted' | 'under_review' | 'available' | 'seeking_capital' | 'matched' | 'closing' | 'closed' | 'withdrawn';
 
+// Financing source/use item
+export interface FinancingItem {
+  name: string;
+  amount: number;
+}
+
 // Deal Interface
 export interface Deal {
   id: string;
@@ -46,6 +52,14 @@ export interface Deal {
   unemployment?: number;
   shovelReady?: boolean;
   completionDate?: string;
+  // Profile media fields
+  logoUrl?: string;
+  heroImageUrl?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  sources?: FinancingItem[];
+  uses?: FinancingItem[];
 }
 
 // Status Configuration

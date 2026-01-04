@@ -30,13 +30,26 @@ function DealsLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Marketplace page has its own layout - just render children
+  // Marketplace page - use AppLayout for authenticated users
   if (isMarketplacePage) {
+    if (isAuthenticated) {
+      return (
+        <>
+          <AppLayout>{children}</AppLayout>
+          <ChatTC />
+        </>
+      );
+    }
+    // Public view - show with header/footer
     return (
-      <>
-        {children}
+      <div className="min-h-screen bg-gray-950 flex flex-col">
+        <Header />
+        <main className="grow">
+          {children}
+        </main>
+        <Footer />
         <ChatTC />
-      </>
+      </div>
     );
   }
 

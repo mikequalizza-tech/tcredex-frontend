@@ -79,7 +79,11 @@ export default function InternalHeader({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Demo search - filter demo results based on query
+  // Role-aware search - only show appropriate data per role
+  // GUARDRAILS:
+  // - CDEs: See deals (NMTC only), pages, their documents. NOT other CDEs or Investors.
+  // - Investors: See deals, CDEs, pages, their documents. NOT other Investors.
+  // - Sponsors: See CDEs, deals, pages, their documents. NOT investor financials.
   useEffect(() => {
     if (searchQuery.length < 2) {
       setSearchResults([]);
@@ -88,27 +92,65 @@ export default function InternalHeader({
     }
 
     const query = searchQuery.toLowerCase();
-    const demoSearchItems = [
-      { type: 'deal', title: 'Eastside Grocery Co-Op', href: '/deals/D12345' },
-      { type: 'deal', title: 'Northgate Health Center', href: '/deals/D12346' },
-      { type: 'deal', title: 'Youth Training Center', href: '/deals/D12347' },
-      { type: 'project', title: 'Community Health Center', href: '/dashboard/projects/P001' },
-      { type: 'document', title: 'Phase I Environmental', href: '/dashboard/documents' },
-      { type: 'document', title: 'Budget Projections', href: '/dashboard/documents' },
+
+    // Base items everyone can search - pages and their own stuff
+    const baseSearchItems = [
       { type: 'page', title: 'Deal Map', href: '/map' },
       { type: 'page', title: 'Marketplace', href: '/deals' },
-      { type: 'page', title: 'Closing Room', href: '/closing-room' },
-      { type: 'page', title: 'AutoMatch AI', href: '/dashboard/automatch' },
+      { type: 'page', title: 'Dashboard', href: '/dashboard' },
+      { type: 'page', title: 'Documents', href: '/dashboard/documents' },
+      { type: 'page', title: 'Settings', href: '/dashboard/settings' },
     ];
 
-    const filtered = demoSearchItems.filter(item => 
-      item.title.toLowerCase().includes(query) || 
+    // Role-specific search items
+    let roleSearchItems: {type: string; title: string; href: string}[] = [];
+
+    if (userRole === 'sponsor') {
+      // Sponsors can search: deals, CDEs (to find allocation), pages
+      roleSearchItems = [
+        { type: 'page', title: 'Submit New Deal', href: '/intake' },
+        { type: 'page', title: 'My Projects', href: '/dashboard/projects' },
+        { type: 'page', title: 'AutoMatch AI', href: '/dashboard/automatch' },
+        { type: 'page', title: 'Find CDEs', href: '/deals' },
+      ];
+    } else if (userRole === 'cde') {
+      // CDEs can search: deals (to deploy allocation), pages
+      // NOT other CDEs, NOT investors
+      roleSearchItems = [
+        { type: 'page', title: 'Pipeline', href: '/cde/pipeline' },
+        { type: 'page', title: 'Allocations', href: '/dashboard/allocations' },
+        { type: 'page', title: 'Closing Room', href: '/closing-room' },
+        { type: 'page', title: 'Find Deals', href: '/deals' },
+      ];
+    } else if (userRole === 'investor') {
+      // Investors can search: deals, CDEs, pages
+      // NOT other investors
+      roleSearchItems = [
+        { type: 'page', title: 'Portfolio', href: '/dashboard/portfolio' },
+        { type: 'page', title: 'Find Deals', href: '/deals' },
+        { type: 'page', title: 'Closing Room', href: '/closing-room' },
+      ];
+    } else if (userRole === 'admin') {
+      // Admins can search everything
+      roleSearchItems = [
+        { type: 'page', title: 'Admin Console', href: '/admin' },
+        { type: 'page', title: 'User Management', href: '/admin/users' },
+        { type: 'page', title: 'Deal Approvals', href: '/admin/deals' },
+        { type: 'page', title: 'CDE Management', href: '/admin/cdes' },
+        { type: 'page', title: 'Reports', href: '/admin/reports' },
+      ];
+    }
+
+    const allItems = [...baseSearchItems, ...roleSearchItems];
+
+    const filtered = allItems.filter(item =>
+      item.title.toLowerCase().includes(query) ||
       item.type.toLowerCase().includes(query)
     );
-    
+
     setSearchResults(filtered.slice(0, 5));
     setShowSearchResults(filtered.length > 0);
-  }, [searchQuery]);
+  }, [searchQuery, userRole]);
 
   // Auto-generate breadcrumbs from pathname if not provided
   const autoBreadcrumbs = (): Breadcrumb[] => {
@@ -247,7 +289,7 @@ export default function InternalHeader({
         {/* Quick Actions */}
         <div className="hidden sm:flex items-center gap-2">
           <Link
-            href="/dashboard/documents/new"
+            href="/dashboard/documents?upload=true"
             className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
             title="Upload Document"
           >

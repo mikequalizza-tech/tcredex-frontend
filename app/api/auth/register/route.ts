@@ -1,10 +1,18 @@
 /**
  * tCredex API - Register
  * POST /api/auth/register
+ *
+ * Flow:
+ * 1. Create Supabase auth user
+ * 2. Create/find organization
+ * 3. Create profile
+ * 4. Send confirmation email
+ * 5. Send role-based welcome email
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { email as emailService } from '@/lib/email/send';
 
 export async function POST(request: NextRequest) {
   try {
@@ -98,6 +106,32 @@ export async function POST(request: NextRequest) {
 
     if (profileError) {
       console.error('Profile creation error:', profileError);
+    }
+
+    // =========================================
+    // SEND EMAILS
+    // =========================================
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tcredex.com';
+
+    // 1. Send email confirmation (if Supabase email confirmation is disabled)
+    // Note: Supabase can handle this automatically if configured
+    // This is a backup/custom flow
+    try {
+      const confirmUrl = `${baseUrl}/api/auth/confirm?token=${authData.session?.access_token || authData.user.id}`;
+      await emailService.confirmEmail(email, name, confirmUrl);
+      console.log(`[Email] Confirmation sent to ${email}`);
+    } catch (emailError) {
+      console.error('[Email] Confirmation send failed:', emailError);
+      // Don't fail registration if email fails
+    }
+
+    // 2. Send role-based welcome email
+    try {
+      await emailService.welcome(email, name, role as 'sponsor' | 'cde' | 'investor');
+      console.log(`[Email] Welcome (${role}) sent to ${email}`);
+    } catch (emailError) {
+      console.error('[Email] Welcome send failed:', emailError);
+      // Don't fail registration if email fails
     }
 
     return NextResponse.json({

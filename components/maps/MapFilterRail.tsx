@@ -48,7 +48,7 @@ interface MapFilterRailProps {
   viewMode: 'sponsor' | 'cde' | 'investor';
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
-  onTractFound?: (tract: TractData, coordinates: [number, number]) => void;
+  onTractFound?: (tract: TractData, coordinates: [number, number], address?: string) => void;
   autoMatchEnabled: boolean;
   onAutoMatchToggle: (enabled: boolean) => void;
   onClose?: () => void;
@@ -285,14 +285,15 @@ export default function MapFilterRail({
       };
       setTractResult(tract);
       setSearchError(null);
-      if (onTractFound) onTractFound(tract, [lng, lat]);
+      // Pass address for HTC lookup (coordinate lookup doesn't have address)
+      if (onTractFound) onTractFound(tract, [lng, lat], address || undefined);
     } catch (error) {
       if (requestId === currentRequestId.current) {
         setSearchError(error instanceof Error ? error.message : 'Lookup failed');
         setTractResult(null);
       }
     } finally { if (requestId === currentRequestId.current) setIsSearching(false); }
-  }, [onTractFound]);
+  }, [onTractFound, address]);
 
   const handleAddressSearch = useCallback(async (searchAddress?: string) => {
     const addrToSearch = searchAddress || address;
@@ -330,7 +331,8 @@ export default function MapFilterRail({
       };
       setTractResult(tract);
       setSearchError(null);
-      if (onTractFound && geoData.coordinates) onTractFound(tract, geoData.coordinates);
+      // Pass the searched address for HTC lookup
+      if (onTractFound && geoData.coordinates) onTractFound(tract, geoData.coordinates, addrToSearch);
     } catch (error) { setSearchError(error instanceof Error ? error.message : 'Search failed'); }
     finally { setIsSearching(false); }
   }, [address, onTractFound]);
@@ -535,30 +537,71 @@ export default function MapFilterRail({
           </div>
         )}
 
-        {/* Credit Programs */}
+        {/* Credit Programs - Role-based visibility */}
+        {/* CDEs only see NMTC (their allocation type), Investors/Sponsors see all 5 programs */}
         <AccordionSection title="Credit Programs" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>}
           badge={<span className="px-1.5 py-0.5 text-xs bg-gray-800 text-gray-400 rounded">{filters.creditTypes.length}</span>} defaultOpen={true}>
           <div className="space-y-2">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Federal Credits</p>
-            {[{ key: 'nmtc' as const, label: 'NMTC', color: 'text-green-600' }, { key: 'htc' as const, label: 'Historic Tax Credit', color: 'text-amber-600' }].map(({ key, label, color }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={filters.creditTypes.includes(key)} onChange={() => toggleCreditType(key)} className={`w-4 h-4 rounded border-gray-600 bg-gray-800 ${color}`} />
-                <span className="text-sm text-gray-300 group-hover:text-white">{label}</span>
-              </label>
-            ))}
-            <p className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-2">Stackable Credits</p>
-            {[{ key: 'lihtc' as const, label: 'LIHTC', color: 'text-purple-600' }, { key: 'oz' as const, label: 'Opportunity Zone', color: 'text-blue-600' }, { key: 'brownfield' as const, label: 'Brownfield', color: 'text-orange-600' }].map(({ key, label, color }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={filters.creditTypes.includes(key)} onChange={() => toggleCreditType(key)} className={`w-4 h-4 rounded border-gray-600 bg-gray-800 ${color}`} />
-                <span className="text-sm text-gray-300 group-hover:text-white">{label}</span>
-              </label>
-            ))}
-            <div className="pt-3 mt-3 border-t border-gray-800">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={filters.includeStateCredits} onChange={() => onFiltersChange({ ...filters, includeStateCredits: !filters.includeStateCredits })} className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600" />
-                <span className="text-sm text-gray-300 group-hover:text-white">Include State Credits</span>
-              </label>
-            </div>
+            {viewMode === 'cde' ? (
+              // CDE View: NMTC only - that's their allocation type
+              <>
+                <div className="p-3 bg-green-900/20 border border-green-800/30 rounded-lg mb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="text-sm font-medium text-green-400">NMTC Deals Only</span>
+                  </div>
+                  <p className="text-xs text-gray-400">As a CDE, you deploy NMTC allocation to qualified projects</p>
+                </div>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked={filters.creditTypes.includes('nmtc')} onChange={() => toggleCreditType('nmtc')} className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-green-600" />
+                  <span className="text-sm text-gray-300 group-hover:text-white">NMTC (New Markets Tax Credit)</span>
+                </label>
+                <div className="pt-3 mt-3 border-t border-gray-800">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={filters.includeStateCredits} onChange={() => onFiltersChange({ ...filters, includeStateCredits: !filters.includeStateCredits })} className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600" />
+                    <span className="text-sm text-gray-300 group-hover:text-white">Include State NMTC Programs</span>
+                  </label>
+                </div>
+              </>
+            ) : (
+              // Sponsor & Investor View: All 5 programs
+              <>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Federal Credits</p>
+                {[
+                  { key: 'nmtc' as const, label: 'NMTC', color: 'text-green-600', desc: 'New Markets Tax Credit' },
+                  { key: 'htc' as const, label: 'HTC', color: 'text-amber-600', desc: 'Historic Tax Credit' },
+                ].map(({ key, label, color, desc }) => (
+                  <label key={key} className="flex items-center gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={filters.creditTypes.includes(key)} onChange={() => toggleCreditType(key)} className={`w-4 h-4 rounded border-gray-600 bg-gray-800 ${color}`} />
+                    <div>
+                      <span className="text-sm text-gray-300 group-hover:text-white">{label}</span>
+                      <span className="text-xs text-gray-500 ml-1">({desc})</span>
+                    </div>
+                  </label>
+                ))}
+                <p className="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-2">Stackable Credits</p>
+                {[
+                  { key: 'lihtc' as const, label: 'LIHTC', color: 'text-purple-600', desc: 'Low-Income Housing' },
+                  { key: 'oz' as const, label: 'OZ', color: 'text-blue-600', desc: 'Opportunity Zone' },
+                  { key: 'brownfield' as const, label: 'Brownfield', color: 'text-orange-600', desc: 'EPA Brownfield' },
+                ].map(({ key, label, color, desc }) => (
+                  <label key={key} className="flex items-center gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={filters.creditTypes.includes(key)} onChange={() => toggleCreditType(key)} className={`w-4 h-4 rounded border-gray-600 bg-gray-800 ${color}`} />
+                    <div>
+                      <span className="text-sm text-gray-300 group-hover:text-white">{label}</span>
+                      <span className="text-xs text-gray-500 ml-1">({desc})</span>
+                    </div>
+                  </label>
+                ))}
+                <div className="pt-3 mt-3 border-t border-gray-800">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={filters.includeStateCredits} onChange={() => onFiltersChange({ ...filters, includeStateCredits: !filters.includeStateCredits })} className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600" />
+                    <span className="text-sm text-gray-300 group-hover:text-white">Include State Credits</span>
+                  </label>
+                  <p className="text-xs text-gray-500 ml-7 mt-1">State NMTC, State HTC, State LIHTC</p>
+                </div>
+              </>
+            )}
           </div>
         </AccordionSection>
 

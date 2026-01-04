@@ -35,7 +35,7 @@ export function EconomicBenefits({ data, onChange }: EconomicBenefitsProps) {
         <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
           <span className="text-xl">👷</span>
           Job Creation
-          <span className="text-indigo-400 text-xs font-normal">(Critical CDE metric)</span>
+          <span className="text-indigo-400 text-xs font-normal">(Critical TC metric)</span>
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -121,7 +121,7 @@ export function EconomicBenefits({ data, onChange }: EconomicBenefitsProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Commercial Square Feet <span className="text-red-400">*</span>
+              Commercial Square Feet
             </label>
             <div className="relative">
               <input
@@ -255,21 +255,21 @@ export function EconomicBenefits({ data, onChange }: EconomicBenefitsProps) {
         )}
       </div>
 
-      {/* Need for NMTC */}
+      {/* Need for Tax Credit Subsidy */}
       <div className="border-t border-gray-800 pt-6">
         <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
           <span className="text-xl">💡</span>
-          Need for NMTC Financing <span className="text-red-400">*</span>
+          Need for Tax Credit Subsidy <span className="text-red-400">*</span>
         </h3>
         <textarea
           value={data.needForNMTC || ''}
           onChange={(e) => onChange({ needForNMTC: e.target.value })}
-          placeholder="Why is NMTC financing needed for this project?&#10;&#10;• Financial gap analysis&#10;• Why conventional financing is insufficient&#10;• Impact of NMTC on project viability&#10;• Community benefit that wouldn't occur without NMTC"
+          placeholder="Why is tax credit financing needed for this project?&#10;&#10;• Financial gap analysis&#10;• Why conventional financing is insufficient&#10;• Impact of tax credits on project viability&#10;• Community benefit that wouldn't occur without tax credit subsidy"
           rows={5}
           className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         />
         <p className="text-xs text-gray-500 mt-1">
-          This is a key factor in CDE allocation decisions - be specific about the financing gap
+          This is a key factor in allocation decisions - be specific about the financing gap
         </p>
       </div>
 

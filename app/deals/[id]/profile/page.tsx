@@ -50,8 +50,8 @@ function generateProfileData(deal: Deal) {
     dealId: `TC-${deal.id.toUpperCase().slice(0, 8)}`,
     
     // Contact
-    contactName: 'Michael Qualizza',
-    contactEmail: 'Q@tcredex.com',
+    contactName: 'tCredex Team',
+    contactEmail: 'deals@tcredex.com',
     
     // Content
     projectDescription: deal.description || `${deal.projectName} represents a transformative investment in the ${deal.city} community. This ${deal.programType} project will create quality jobs and provide essential services to residents of this ${deal.tractType.includes('SD') ? 'severely distressed' : 'qualified'} census tract. The development addresses critical community needs while generating measurable economic impact.`,

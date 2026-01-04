@@ -27,7 +27,8 @@ export function LIHTC_Housing({ data, onChange }: LIHTC_HousingProps) {
 
       {/* Credit Type */}
       <div className="border-t border-gray-100 pt-6">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">LIHTC Type <span className="text-red-500">*</span></h3>
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">LIHTC Type</h3>
+        <p className="text-xs text-gray-500 mb-3"><span className="text-red-500">*</span> Required for LIHTC projects</p>
         
         <div className="grid grid-cols-2 gap-4">
           <button

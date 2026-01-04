@@ -322,7 +322,7 @@ export default function AdminReportsPage() {
             <tbody className="divide-y divide-gray-800">
               <tr className="hover:bg-gray-800/50">
                 <td className="px-4 py-3 text-sm text-gray-200">Deal Pipeline Summary</td>
-                <td className="px-4 py-3 text-sm text-gray-400">Mike Qualizza</td>
+                <td className="px-4 py-3 text-sm text-gray-400">System Admin</td>
                 <td className="px-4 py-3 text-sm text-gray-400">Jan 15, 2024</td>
                 <td className="px-4 py-3 text-sm text-gray-400">PDF</td>
                 <td className="px-4 py-3"><button className="text-xs text-indigo-400 hover:text-indigo-300">Download</button></td>

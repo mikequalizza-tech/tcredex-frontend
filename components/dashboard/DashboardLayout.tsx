@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import Logo from '@/components/ui/logo';
 
 export type UserRole = 'sponsor' | 'cde' | 'investor';
 
@@ -140,24 +141,9 @@ export default function DashboardLayout({
         {/* Logo & Toggle */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-800">
           {sidebarOpen ? (
-            <Link href="/" className="flex items-center gap-2">
-              <Image 
-                src="/brand/logo-tcredex-cropped.png" 
-                alt="tCredex" 
-                width={32} 
-                height={32}
-                className="h-8 w-auto"
-              />
-              <span className="text-lg font-semibold text-indigo-300">tCredex</span>
-            </Link>
+            <Logo size="sm" />
           ) : (
-            <Image 
-              src="/brand/logo-tcredex-cropped.png" 
-              alt="tCredex" 
-              width={32} 
-              height={32}
-              className="h-8 w-auto mx-auto"
-            />
+            <Logo variant="icon" size="sm" />
           )}
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}

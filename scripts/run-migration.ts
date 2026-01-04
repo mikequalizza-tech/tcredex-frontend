@@ -1,96 +1,70 @@
 /**
- * Execute Supabase Migration via REST API
- * Run: npx tsx scripts/run-migration.ts
+ * Run a single migration file against the database
+ * Usage: npx tsx scripts/run-migration.ts <migration-file>
  */
 
-const fs = require('fs');
-const path = require('path');
+import { Pool } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const SUPABASE_URL = 'https://xlejizyoggqdedjkyset.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsZWppenlvZ2dxZGVkamt5c2V0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTY2MjUyMCwiZXhwIjoyMDgxMjM4NTIwfQ._cv7Gg0Sc-qQATifHzKz4AJAQfVFGUf-g2LEa5UyMmg';
-
-async function executeSql(sql: string, label: string) {
-  console.log(`\n📋 Executing: ${label}...`);
-  
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
-    method: 'POST',
-    headers: {
-      'apikey': SUPABASE_SERVICE_KEY,
-      'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: sql }),
+// Load environment variables from .env.local
+const envPath = path.join(__dirname, '../.env.local');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex > 0) {
+        const key = trimmed.substring(0, eqIndex);
+        const value = trimmed.substring(eqIndex + 1);
+        if (!process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    }
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`${label} failed: ${response.status} - ${text}`);
-  }
-
-  console.log(`✅ ${label} complete!`);
-  return response.json();
 }
 
-async function runMigration() {
-  console.log('🚀 tCredex Supabase Migration\n');
-  console.log('Project:', SUPABASE_URL);
-  console.log('-----------------------------------');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-  const migrationsDir = path.join(__dirname, '..', 'supabase', 'migrations');
-  
+async function main() {
+  const migrationFile = process.argv[2];
+
+  if (!migrationFile) {
+    console.error('Usage: npx tsx scripts/run-migration.ts <migration-file>');
+    console.error('Example: npx tsx scripts/run-migration.ts 033_fix_rpc_column_names.sql');
+    process.exit(1);
+  }
+
+  // Handle both full path and just filename
+  let fullPath = migrationFile;
+  if (!migrationFile.includes('/') && !migrationFile.includes('\\')) {
+    fullPath = path.join(__dirname, '../supabase/migrations', migrationFile);
+  }
+
+  if (!fs.existsSync(fullPath)) {
+    console.error('Migration file not found: ' + fullPath);
+    process.exit(1);
+  }
+
+  console.log('Running migration: ' + migrationFile);
+
+  const client = await pool.connect();
   try {
-    // Test connection first
-    console.log('\n🔍 Testing connection...');
-    const testResponse = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-      headers: {
-        'apikey': SUPABASE_SERVICE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-      },
-    });
-    
-    if (testResponse.ok) {
-      console.log('✅ Connection successful!');
-    } else {
-      console.log('⚠️ Connection test returned:', testResponse.status);
-    }
-
-    // Check if tables already exist
-    console.log('\n🔍 Checking existing tables...');
-    const tablesResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/organizations?select=id&limit=1`,
-      {
-        headers: {
-          'apikey': SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        },
-      }
-    );
-
-    if (tablesResponse.status === 200) {
-      const data = await tablesResponse.json();
-      console.log('⚠️ Tables already exist! Found organizations:', data.length);
-      console.log('\nTo reset, run DROP commands first in Supabase Dashboard.');
-      console.log('Or continue to seed more data.');
-      
-      // Try seed data anyway
-      const seedFile = path.join(migrationsDir, '002_seed_data.sql');
-      if (fs.existsSync(seedFile)) {
-        console.log('\n🌱 Attempting seed data...');
-      }
-      return;
-    }
-
-    console.log('📋 Tables not found. Ready to create schema.');
-    console.log('\n⚠️ Supabase REST API cannot execute DDL statements.');
-    console.log('\n👉 NEXT STEP: Paste SQL in Supabase Dashboard:\n');
-    console.log('   1. Go to: https://supabase.com/dashboard/project/xlejizyoggqdedjkyset/sql');
-    console.log('   2. Copy contents of: supabase/migrations/001_complete_schema.sql');
-    console.log('   3. Paste and click "Run"');
-    console.log('   4. Then run: supabase/migrations/002_seed_data.sql');
-
-  } catch (error) {
-    console.error('\n❌ Error:', error);
+    const sql = fs.readFileSync(fullPath, 'utf8');
+    await client.query(sql);
+    console.log('Migration applied successfully');
+  } catch (error: any) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  } finally {
+    client.release();
+    await pool.end();
   }
 }
 
-runMigration();
+main();

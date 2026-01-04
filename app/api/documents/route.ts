@@ -98,39 +98,130 @@ export async function POST(request: NextRequest) {
 }
 
 // =============================================================================
-// POST /api/documents/upload-url - Get signed upload URL
+// PUT /api/documents - Upload file directly to Supabase Storage
 // =============================================================================
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { fileName, contentType, dealId } = body;
+    // Check content type to determine if this is a file upload or JSON request
+    const contentType = request.headers.get('content-type') || '';
 
-    if (!fileName) {
-      return NextResponse.json({ error: 'fileName is required' }, { status: 400 });
+    if (contentType.includes('multipart/form-data')) {
+      // Direct file upload
+      const formData = await request.formData();
+      const file = formData.get('file') as File;
+      const dealId = formData.get('dealId') as string | null;
+
+      if (!file) {
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      }
+
+      const timestamp = Date.now();
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const path = dealId
+        ? `deals/${dealId}/${timestamp}-${safeName}`
+        : `uploads/${timestamp}-${safeName}`;
+
+      // Ensure bucket exists
+      await ensureBucketExists();
+
+      // Upload file directly
+      const fileBuffer = await file.arrayBuffer();
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .upload(path, fileBuffer, {
+          contentType: file.type,
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Upload error:', error);
+        return NextResponse.json({
+          error: 'Failed to upload file',
+          details: error.message
+        }, { status: 500 });
+      }
+
+      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${path}`;
+
+      return NextResponse.json({
+        success: true,
+        path: data.path,
+        publicUrl,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+      });
+    } else {
+      // JSON request for signed URL (legacy support)
+      const body = await request.json();
+      const { fileName, contentType: fileContentType, dealId } = body;
+
+      if (!fileName) {
+        return NextResponse.json({ error: 'fileName is required' }, { status: 400 });
+      }
+
+      const timestamp = Date.now();
+      const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const path = dealId
+        ? `deals/${dealId}/${timestamp}-${safeName}`
+        : `uploads/${timestamp}-${safeName}`;
+
+      await ensureBucketExists();
+
+      // Create signed upload URL
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUploadUrl(path);
+
+      if (error) {
+        console.error('Signed URL error:', error.message, error);
+        return NextResponse.json({
+          error: 'Failed to create upload URL',
+          details: error.message
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        uploadUrl: data.signedUrl,
+        path,
+        publicUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${path}`,
+      });
     }
-
-    // Generate unique path
-    const timestamp = Date.now();
-    const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const path = dealId 
-      ? `deals/${dealId}/${timestamp}-${safeName}`
-      : `uploads/${timestamp}-${safeName}`;
-
-    // Create signed upload URL
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .createSignedUploadUrl(path);
-
-    if (error) throw error;
-
-    return NextResponse.json({
-      uploadUrl: data.signedUrl,
-      path,
-      publicUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${path}`,
-    });
   } catch (error) {
     console.error('PUT /api/documents error:', error);
-    return NextResponse.json({ error: 'Failed to create upload URL' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Failed to upload',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+// Helper to ensure the documents bucket exists
+async function ensureBucketExists() {
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const bucketExists = buckets?.some(b => b.name === 'documents');
+
+  if (!bucketExists) {
+    console.log('Creating documents bucket...');
+    const { error: createError } = await supabase.storage.createBucket('documents', {
+      public: true,
+      fileSizeLimit: 52428800, // 50MB
+      allowedMimeTypes: [
+        'application/pdf',
+        'image/png',
+        'image/jpeg',
+        'image/gif',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ],
+    });
+
+    if (createError && !createError.message.includes('already exists')) {
+      console.error('Failed to create bucket:', createError);
+      throw new Error(`Bucket creation failed: ${createError.message}`);
+    }
   }
 }
 

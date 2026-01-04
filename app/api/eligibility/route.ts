@@ -2,14 +2,30 @@
  * Eligibility Check API - SOURCE OF TRUTH
  * ========================================
  * Uses: master_tax_credit_sot + tract_geometries (for point-in-polygon)
+ *       historic_buildings (for Federal HTC eligibility)
  *
  * GET /api/eligibility?tract=01001020100
  * GET /api/eligibility?lat=38.846&lng=-76.9275
  * GET /api/eligibility?address=4600 Silver Hill Rd, Washington, DC
+ *
+ * Note: HTC eligibility is PROPERTY-based (National Register), not tract-based
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+
+interface HistoricBuildingMatch {
+  id: number;
+  property_name: string;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  category: string | null;
+  status: string | null;
+  listed_date: string | null;
+  is_nhl: boolean;
+  distance_miles?: number;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +42,7 @@ export async function GET(request: NextRequest) {
     let eligibilityData: Record<string, unknown> | null = null;
     let matchedAddress: string | null = null;
     let coordinates: [number, number] | null = null;
+    let historicBuildings: HistoricBuildingMatch[] = [];
 
     // ===============================
     // Option 1: Direct GEOID lookup
@@ -129,6 +146,70 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // ===============================
+    // HTC Check: Search historic_buildings by address or coordinates
+    // ===============================
+    if (address || matchedAddress) {
+      // Extract street number and name for better matching
+      const searchAddr = matchedAddress || address || '';
+
+      // Try to extract just the street address part (before city/state)
+      const streetPart = searchAddr.split(',')[0].trim();
+
+      // Also try matching on city if we can extract it
+      const parts = searchAddr.split(',').map(p => p.trim());
+      const city = parts.length > 1 ? parts[1] : null;
+
+      // Build search - look for street address match in same city/state
+      let query = supabase
+        .from('historic_buildings')
+        .select('id, property_name, street_address, city, state, category, status, listed_date, is_nhl')
+        .eq('status', 'Listed');
+
+      // Search by street address pattern
+      if (streetPart) {
+        // Extract just the number and first word of street name for loose match
+        const streetMatch = streetPart.match(/^(\d+)\s+(.+)/);
+        if (streetMatch) {
+          const streetNum = streetMatch[1];
+          const streetName = streetMatch[2].split(/\s+/)[0]; // First word of street name
+          query = query.ilike('street_address', `${streetNum}%${streetName}%`);
+        } else {
+          query = query.ilike('street_address', `%${streetPart}%`);
+        }
+      }
+
+      // Filter by city if available
+      if (city) {
+        query = query.ilike('city', `%${city}%`);
+      }
+
+      const { data: htcData, error: htcError } = await query.limit(10);
+
+      if (htcError) {
+        console.error('[Eligibility] HTC search error:', htcError);
+      }
+
+      if (htcData && htcData.length > 0) {
+        historicBuildings = htcData as HistoricBuildingMatch[];
+      }
+    }
+
+    // Fallback: search by coordinates if we have them and no address match (within 0.25 miles)
+    if (coordinates && historicBuildings.length === 0) {
+      const { data: nearbyData } = await supabase.rpc('get_historic_buildings_near_point' as never, {
+        p_lat: coordinates[1],
+        p_lng: coordinates[0],
+        p_radius_miles: 0.25,
+        p_limit: 5
+      } as never);
+
+      const nearbyResults = nearbyData as HistoricBuildingMatch[] | null;
+      if (nearbyResults && nearbyResults.length > 0) {
+        historicBuildings = nearbyResults;
+      }
+    }
+
     // Not found
     if (!eligibilityData) {
       return NextResponse.json({
@@ -144,7 +225,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build response
-    return NextResponse.json(formatEligibilityResponse(eligibilityData, coordinates, matchedAddress, debug));
+    return NextResponse.json(formatEligibilityResponse(eligibilityData, coordinates, matchedAddress, historicBuildings, debug));
 
   } catch (error) {
     console.error('[Eligibility] Error:', error);
@@ -159,11 +240,23 @@ function formatEligibilityResponse(
   data: Record<string, unknown>,
   coordinates: [number, number] | null,
   matchedAddress: string | null,
+  historicBuildings: HistoricBuildingMatch[],
   debug: boolean
 ) {
   // Build programs array
   // Federal programs are qualifiers, State programs are bonuses (only if federal qualifies)
   const programs: string[] = [];
+
+  // HTC: Property is on National Register of Historic Places
+  const isHtcEligible = historicBuildings.length > 0;
+  const isNHL = historicBuildings.some(b => b.is_nhl);
+
+  if (isHtcEligible) {
+    programs.push('Federal HTC');
+    if (isNHL) {
+      programs.push('National Historic Landmark');
+    }
+  }
 
   // NMTC: Federal NMTC or High Migration are qualifiers, State NMTC is a bonus
   const isNmtcEligible = data.is_nmtc_eligible || data.is_nmtc_high_migration;
@@ -224,6 +317,8 @@ function formatEligibilityResponse(
       lihtc_dda_2025: data.is_dda_2025 || false,
       lihtc_dda_2026: data.is_dda_2026 || false,
       opportunity_zone: data.is_oz_designated || false,
+      htc_eligible: isHtcEligible,
+      htc_is_nhl: isNHL,
       poverty_rate: data.poverty_rate,
       poverty_qualifies: data.poverty_rate ? Number(data.poverty_rate) >= 20 : false,
       median_income_pct: data.mfi_percent,
@@ -235,7 +330,17 @@ function formatEligibilityResponse(
       )
     },
 
-    // State programs (NO HTC or Brownfield - not implemented yet)
+    // HTC: Historic buildings at/near this address (property-based, not tract-based)
+    htc: {
+      eligible: isHtcEligible,
+      is_national_historic_landmark: isNHL,
+      buildings: historicBuildings,
+      note: isHtcEligible
+        ? 'Property appears on National Register of Historic Places - eligible for 20% Federal HTC'
+        : 'No matching historic properties found. Search manually at nps.gov/subjects/nationalregister'
+    },
+
+    // State programs
     state: {
       nmtc: data.has_state_nmtc || false,
       lihtc: data.has_state_lihtc || false,

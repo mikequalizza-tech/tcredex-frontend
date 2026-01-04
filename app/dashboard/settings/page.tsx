@@ -8,6 +8,7 @@ interface UserSettings {
   email: string;
   phone: string;
   title: string;
+  organization: string;
   timezone: string;
   emailNotifications: boolean;
   dealAlerts: boolean;
@@ -16,39 +17,12 @@ interface UserSettings {
   twoFactorEnabled: boolean;
 }
 
-// Demo user profiles to simulate different logged-in users
-const USER_PROFILES: Record<string, Partial<UserSettings>> = {
-  'sponsor': {
-    fullName: 'Michael Chen',
-    email: 'mchen@localrootsfoundation.org',
-    phone: '(312) 555-0123',
-    title: 'Development Director',
-  },
-  'cde': {
-    fullName: 'Sarah Johnson',
-    email: 'sjohnson@midwestcde.org',
-    phone: '(314) 555-0456',
-    title: 'Senior Investment Officer',
-  },
-  'investor': {
-    fullName: 'David Park',
-    email: 'dpark@capitalinvestors.com',
-    phone: '(212) 555-0789',
-    title: 'Managing Director',
-  },
-  'admin': {
-    fullName: 'Admin User',
-    email: 'admin@tcredex.com',
-    phone: '(555) 555-0000',
-    title: 'Platform Administrator',
-  },
-};
-
 const DEFAULT_SETTINGS: UserSettings = {
-  fullName: 'User',
-  email: 'user@example.com',
+  fullName: '',
+  email: '',
   phone: '',
   title: '',
+  organization: '',
   timezone: 'America/Chicago',
   emailNotifications: true,
   dealAlerts: true,
@@ -65,16 +39,20 @@ const TIMEZONES = [
 ];
 
 export default function SettingsPage() {
-  const { orgType, isAuthenticated, isLoading } = useCurrentUser();
+  const { orgType, isAuthenticated, isLoading, userName, userEmail, orgName } = useCurrentUser();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
 
-  // Update settings when user loads
+  // Update settings with actual logged-in user data
   useEffect(() => {
-    if (!isLoading && isAuthenticated && orgType) {
-      const userProfile = USER_PROFILES[orgType] || {};
-      setSettings(prev => ({ ...prev, ...userProfile }));
+    if (!isLoading && isAuthenticated) {
+      setSettings(prev => ({
+        ...prev,
+        fullName: userName || 'User',
+        email: userEmail || '',
+        organization: orgName || '',
+      }));
     }
-  }, [orgType, isAuthenticated, isLoading]);
+  }, [userName, userEmail, orgName, isAuthenticated, isLoading]);
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'security'>('profile');
   const [saved, setSaved] = useState(false);
 
@@ -145,6 +123,15 @@ export default function SettingsPage() {
                     type="text"
                     value={settings.fullName}
                     onChange={(e) => handleInputChange('fullName', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Organization</label>
+                  <input
+                    type="text"
+                    value={settings.organization}
+                    onChange={(e) => handleInputChange('organization', e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>

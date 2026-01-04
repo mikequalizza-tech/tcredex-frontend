@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCurrentUser } from '@/lib/auth';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { fetchCDEAllocations, fetchCDECriteria, fetchCDEPipelineDeals, CDEAllocation, CDEInvestmentCriteria } from '@/lib/supabase/queries';
+import { Deal } from '@/lib/data/deals';
 
 // Types for CDE Allocation Management
 interface AllocationSource {
@@ -202,19 +204,131 @@ const DEMO_PIPELINE: PipelineDeal[] = [
 
 export default function CDEAllocationsPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowedOrgTypes={['cde']}>
       <CDEAllocationsContent />
     </ProtectedRoute>
   );
 }
 
 function CDEAllocationsContent() {
-  const { orgName } = useCurrentUser();
-  const [allocations] = useState<AllocationSource[]>(DEMO_ALLOCATIONS);
+  const { orgName, organizationId, orgType } = useCurrentUser();
+  const [allocations, setAllocations] = useState<AllocationSource[]>(DEMO_ALLOCATIONS);
   const [criteria, setCriteria] = useState<InvestmentCriteria>(DEMO_CRITERIA);
-  const [pipeline] = useState<PipelineDeal[]>(DEMO_PIPELINE);
+  const [pipeline, setPipeline] = useState<PipelineDeal[]>(DEMO_PIPELINE);
   const [showCriteriaEditor, setShowCriteriaEditor] = useState(false);
   const [showAddAllocation, setShowAddAllocation] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch real data from Supabase
+  useEffect(() => {
+    async function loadData() {
+      if (!organizationId || orgType !== 'cde') {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch allocations
+        const supabaseAllocations = await fetchCDEAllocations(organizationId);
+        if (supabaseAllocations.length > 0) {
+          // Transform Supabase data to component format
+          const transformed: AllocationSource[] = supabaseAllocations.map(alloc => ({
+            id: alloc.id,
+            name: `${alloc.type === 'federal' ? 'Federal' : alloc.stateCode || 'State'} ${alloc.year}`,
+            source: alloc.type,
+            roundYear: alloc.year,
+            stateProgram: alloc.stateCode ? `${alloc.stateCode} NMTC` : undefined,
+            totalAmount: alloc.awardedAmount,
+            deployedAmount: alloc.deployedAmount,
+            availableAmount: alloc.availableOnPlatform,
+            deploymentDeadline: alloc.deploymentDeadline || '',
+            status: getDeadlineStatus(alloc.deploymentDeadline, alloc.availableOnPlatform),
+            commitments: {
+              nonMetroMinPercent: 20, // Default values, would come from CDE preferences
+              nonMetroCurrentPercent: 0,
+              ruralCDEStatus: false,
+              severelyDistressedTarget: 50,
+            },
+          }));
+          setAllocations(transformed);
+        }
+
+        // Fetch investment criteria
+        const cdeCriteria = await fetchCDECriteria(organizationId);
+        if (cdeCriteria) {
+          setCriteria({
+            serviceArea: {
+              type: cdeCriteria.primaryStates.length > 3 ? 'multi_state' :
+                    cdeCriteria.primaryStates.length === 1 ? 'single_state' : 'multi_state',
+              states: cdeCriteria.primaryStates,
+            },
+            dealSize: {
+              minQEI: cdeCriteria.minDealSize,
+              maxQEI: cdeCriteria.maxDealSize,
+            },
+            prioritySectors: cdeCriteria.targetSectors,
+            impactRequirements: {
+              minJobsPerMillion: cdeCriteria.minJobsPerMillion || 28,
+              bipocOwnershipPreferred: true,
+              mbeSpendingRequired: false,
+            },
+            tractPreferences: {
+              severelyDistressedRequired: cdeCriteria.requireSeverelyDistressed,
+              qctRequired: true,
+              minPovertyRate: 20,
+            },
+          });
+        }
+
+        // Fetch pipeline deals
+        const pipelineDeals = await fetchCDEPipelineDeals(organizationId);
+        if (pipelineDeals.length > 0) {
+          const transformedPipeline: PipelineDeal[] = pipelineDeals.map(deal => ({
+            id: deal.id,
+            projectName: deal.projectName,
+            sponsorName: deal.sponsorName,
+            city: deal.city,
+            state: deal.state,
+            requestedQEI: deal.allocation,
+            matchScore: 85, // Would come from matching algorithm
+            status: mapDealStatus(deal.status),
+            submittedDate: deal.submittedDate,
+            tractType: deal.tractType || [],
+          }));
+          setPipeline(transformedPipeline);
+        }
+      } catch (error) {
+        console.error('Error loading CDE data:', error);
+        // Keep demo data as fallback
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadData();
+  }, [organizationId, orgType]);
+
+  // Helper to determine allocation status based on deadline
+  function getDeadlineStatus(deadline?: string, available?: number): 'active' | 'fully_deployed' | 'expiring_soon' {
+    if (!available || available <= 0) return 'fully_deployed';
+    if (!deadline) return 'active';
+    const months = getMonthsUntilDeadline(deadline);
+    if (months <= 6) return 'expiring_soon';
+    return 'active';
+  }
+
+  // Map deal status to pipeline status
+  function mapDealStatus(status: string): 'new' | 'reviewing' | 'approved' | 'declined' {
+    switch (status) {
+      case 'submitted': return 'new';
+      case 'under_review': return 'reviewing';
+      case 'matched':
+      case 'closing':
+      case 'closed': return 'approved';
+      case 'withdrawn': return 'declined';
+      default: return 'new';
+    }
+  }
 
   // Calculations
   const totalAvailable = allocations.reduce((sum, a) => sum + a.availableAmount, 0);
@@ -260,13 +374,25 @@ function CDEAllocationsContent() {
     return styles[status];
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm text-gray-400">Loading Allocations...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-100">Allocation Management</h1>
-          <p className="text-gray-400 mt-1">{orgName || 'Midwest Community Development Entity'}</p>
+          <p className="text-gray-400 mt-1">{orgName || 'Your Organization'}</p>
         </div>
         <div className="flex gap-3">
           <button

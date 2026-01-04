@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 type DocumentCategory = 'all' | 'corporate' | 'project' | 'financial' | 'real_estate' | 'legal' | 'qalicb' | 'insurance' | 'closing';
 type DocumentStatus = 'all' | 'pending' | 'uploaded' | 'under_review' | 'approved' | 'rejected' | 'expired';
@@ -61,6 +62,8 @@ const STATUS_LABELS: Record<DocumentStatus, string> = {
 };
 
 export default function DocumentsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<DocumentCategory>('all');
@@ -68,6 +71,25 @@ export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+
+  // Check for upload query param to auto-open modal
+  useEffect(() => {
+    if (searchParams.get('upload') === 'true') {
+      setShowUploadModal(true);
+      // Clear the query param from URL
+      router.replace('/dashboard/documents', { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  // Upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadCategory, setUploadCategory] = useState<DocumentCategory>('project');
+  const [uploadDealId, setUploadDealId] = useState<string>('');
+  const [uploadDescription, setUploadDescription] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -155,6 +177,139 @@ export default function DocumentsPage() {
     a.click();
     window.document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // File upload handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      validateAndSetFile(files[0]);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      validateAndSetFile(files[0]);
+    }
+  };
+
+  const validateAndSetFile = (file: File) => {
+    setUploadError(null);
+
+    // Check file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadError('File size exceeds 50MB limit');
+      return;
+    }
+
+    // Check file type
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
+      setUploadError('Only PDF, DOC, DOCX, XLS, and XLSX files are allowed');
+      return;
+    }
+
+    setUploadFile(file);
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) {
+      setUploadError('Please select a file to upload');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      // Step 1: Upload file directly to Supabase via our API
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      if (uploadDealId) {
+        formData.append('dealId', uploadDealId);
+      }
+
+      const uploadResponse = await fetch('/api/documents', {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.details || errorData.error || 'Failed to upload file');
+      }
+
+      const { publicUrl } = await uploadResponse.json();
+
+      // Step 2: Create document record in database
+      const docResponse = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: uploadFile.name,
+          file_url: publicUrl,
+          file_size: uploadFile.size,
+          mime_type: uploadFile.type,
+          category: uploadCategory,
+          deal_id: uploadDealId || undefined,
+        }),
+      });
+
+      if (!docResponse.ok) {
+        const errorData = await docResponse.json();
+        throw new Error(errorData.details || errorData.error || 'Failed to create document record');
+      }
+
+      // Success! Refresh documents list and close modal
+      await fetchDocuments();
+      setShowUploadModal(false);
+      resetUploadForm();
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError(error instanceof Error ? error.message : 'Upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const resetUploadForm = () => {
+    setUploadFile(null);
+    setUploadCategory('project');
+    setUploadDealId('');
+    setUploadDescription('');
+    setUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const closeUploadModal = () => {
+    setShowUploadModal(false);
+    resetUploadForm();
   };
 
   return (
@@ -469,52 +624,148 @@ export default function DocumentsPage() {
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setShowUploadModal(false)} />
+          <div className="absolute inset-0 bg-black/70" onClick={closeUploadModal} />
           <div className="relative bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4 shadow-xl border border-gray-800">
-            <h3 className="text-lg font-semibold text-gray-100 mb-4">Upload Document</h3>
-            
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-100">Upload Document</h3>
+              <button onClick={closeUploadModal} className="text-gray-500 hover:text-gray-300">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
             <div className="space-y-4">
+              {/* Error Message */}
+              {uploadError && (
+                <div className="p-3 bg-red-900/30 border border-red-500/30 rounded-lg text-red-400 text-sm flex items-start gap-2">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {uploadError}
+                </div>
+              )}
+
+              {/* Category Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Project</label>
-                <select className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                  <option>Downtown Community Center</option>
-                  <option>Heritage Theater Restoration</option>
-                  <option>Affordable Housing Complex</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Category</label>
-                <select className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <label className="block text-sm font-medium text-gray-300 mb-1">Category *</label>
+                <select
+                  value={uploadCategory}
+                  onChange={(e) => setUploadCategory(e.target.value as DocumentCategory)}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
                   {Object.entries(CATEGORY_LABELS).filter(([k]) => k !== 'all').map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
               </div>
-              
+
+              {/* Description (optional) */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">File</label>
-                <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-gray-600 transition-colors">
-                  <svg className="w-8 h-8 text-gray-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  <p className="text-sm text-gray-400">
-                    Drag and drop or <span className="text-indigo-400 cursor-pointer">browse</span>
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">PDF, DOC, XLSX up to 50MB</p>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Description (optional)</label>
+                <textarea
+                  value={uploadDescription}
+                  onChange={(e) => setUploadDescription(e.target.value)}
+                  placeholder="Brief description of this document..."
+                  rows={2}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                />
+              </div>
+
+              {/* File Drop Zone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">File *</label>
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                    isDragging
+                      ? 'border-indigo-500 bg-indigo-900/20'
+                      : uploadFile
+                        ? 'border-green-500/50 bg-green-900/10'
+                        : 'border-gray-700 hover:border-gray-600'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+
+                  {uploadFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center">
+                        {uploadFile.name.endsWith('.pdf') ? (
+                          <svg className="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-200">{uploadFile.name}</p>
+                        <p className="text-xs text-gray-500">{formatFileSize(uploadFile.size)}</p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setUploadFile(null); }}
+                        className="ml-2 p-1 text-gray-500 hover:text-red-400 rounded"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <svg className="w-10 h-10 text-gray-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <p className="text-sm text-gray-400">
+                        Drag and drop or <span className="text-indigo-400 font-medium">browse</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">PDF, DOC, XLSX up to 50MB</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setShowUploadModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+                onClick={closeUploadModal}
+                disabled={isUploading}
+                className="flex-1 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
-              <button className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors">
-                Upload
+              <button
+                onClick={handleUpload}
+                disabled={!uploadFile || isUploading}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-800 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isUploading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload
+                  </>
+                )}
               </button>
             </div>
           </div>

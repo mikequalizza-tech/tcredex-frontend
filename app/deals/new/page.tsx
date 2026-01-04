@@ -7,7 +7,7 @@ import Link from 'next/link';
 
 export default function NewDealPage() {
   const router = useRouter();
-  const { orgType, isLoading, isAuthenticated, organizationId, orgName, userName, userEmail } = useCurrentUser();
+  const { orgType, isLoading, isAuthenticated, organizationId, orgName, userName, userEmail, user } = useCurrentUser();
 
   // Role-based access control - only sponsors can submit deals
   if (isLoading) {
@@ -67,13 +67,24 @@ export default function NewDealPage() {
   }
 
   const handleSave = async (data: IntakeData, readinessScore: number) => {
-    console.log('Saving draft...', { data, readinessScore });
+    console.log('Saving draft...', { data, readinessScore, organizationId, userId: user?.id });
+
+    // Use organizationId, fallback to user.id for demo accounts without org
+    const sponsorId = organizationId || user?.id;
+
+    if (!sponsorId) {
+      console.error('No sponsorId available - user may not be properly authenticated');
+      alert('Unable to save: No organization ID available. Please try logging out and back in.');
+      return;
+    }
 
     try {
       // Enrich data with user/org info
+      // sponsor_id = organization ID so all team members see the same deals
       const enrichedData = {
         ...data,
-        sponsorOrganizationId: organizationId,
+        sponsorId: sponsorId,  // Organization ID (or user ID fallback) - shared by all team members
+        sponsorOrganizationId: sponsorId,
         sponsorName: data.sponsorName || orgName || userName,
         personCompletingForm: userEmail || userName,
       };
@@ -102,13 +113,24 @@ export default function NewDealPage() {
   };
 
   const handleSubmit = async (data: IntakeData, readinessScore: number) => {
-    console.log('Submitting to marketplace...', { data, readinessScore });
+    console.log('Submitting to marketplace...', { data, readinessScore, organizationId, userId: user?.id });
+
+    // Use organizationId, fallback to user.id for demo accounts without org
+    const sponsorId = organizationId || user?.id;
+
+    if (!sponsorId) {
+      console.error('No sponsorId available - user may not be properly authenticated');
+      alert('Unable to submit: No organization ID available. Please try logging out and back in.');
+      return;
+    }
 
     try {
       // Enrich data with user/org info
+      // sponsor_id = organization ID so all team members see the same deals
       const enrichedData = {
         ...data,
-        sponsorOrganizationId: organizationId,
+        sponsorId: sponsorId,  // Organization ID (or user ID fallback) - shared by all team members
+        sponsorOrganizationId: sponsorId,
         sponsorName: data.sponsorName || orgName || userName,
         personCompletingForm: userEmail || userName,
       };

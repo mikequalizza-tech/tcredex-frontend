@@ -6,7 +6,9 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useCurrentUser } from '@/lib/auth';
 import InternalHeader from './InternalHeader';
+import InternalFooter from './InternalFooter';
 import DemoRoleSwitcher from '@/components/ui/DemoRoleSwitcher';
+import Logo from '@/components/ui/logo';
 
 interface NavItem {
   name: string;
@@ -214,24 +216,9 @@ export default function AppLayout({
         {/* Logo & Toggle */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-800">
           {sidebarOpen ? (
-            <Link href="/" className="flex items-center gap-2">
-              <Image 
-                src="/brand/tcredex_512x128.png" 
-                alt="tCredex" 
-                width={120} 
-                height={30}
-                className="h-8 w-auto"
-              />
-              <span className="text-lg font-semibold text-indigo-300">tCredex</span>
-            </Link>
+            <Logo size="sm" />
           ) : (
-            <Image 
-              src="/brand/tcredex_256x64.png" 
-              alt="tCredex" 
-              width={60} 
-              height={15}
-              className="h-6 w-auto mx-auto"
-            />
+            <Logo variant="icon" size="sm" />
           )}
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -360,8 +347,11 @@ export default function AppLayout({
         />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
-          {children}
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          <div className="flex-1">
+            {children}
+          </div>
+          <InternalFooter />
         </main>
       </div>
 

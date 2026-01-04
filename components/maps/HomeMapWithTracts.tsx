@@ -5,6 +5,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { fetchDeals } from '@/lib/supabase/queries';
 import { Deal } from '@/lib/data/deals';
+import { startTimer, endTimer, mapPerformance } from '@/lib/performance/monitor';
 
 /**
  * HomeMapWithTracts - THE Community Tax Credit Source of Truth Map
@@ -73,7 +74,7 @@ interface HomeMapWithTractsProps {
   height?: string;
   className?: string;
   onTractSelect?: (tract: TractData | null) => void;
-  searchedLocation?: { lat: number; lng: number; tract?: string } | null;
+  searchedLocation?: { lat: number; lng: number; tract?: string; address?: string } | null;
   deals?: Deal[];
   allocations?: any[];
 }
@@ -148,6 +149,8 @@ export default function HomeMapWithTracts({
     const bounds = map.current.getBounds();
     if (!bounds) return;
 
+    startTimer('tract_load', { zoom, mode: zoom < VECTOR_TILE_MAX_ZOOM ? 'vector' : 'geojson' });
+
     // At low zoom, vector tiles handle everything - no GeoJSON needed
     if (zoom < VECTOR_TILE_MAX_ZOOM) {
       // Clear GeoJSON source when using vector tiles
@@ -156,7 +159,7 @@ export default function HomeMapWithTracts({
         polySource.setData({ type: 'FeatureCollection', features: [] });
       }
       setTractCount(0);
-      console.log(`[Map] Zoom ${zoom.toFixed(1)} < ${VECTOR_TILE_MAX_ZOOM} - using vector tiles`);
+      endTimer('tract_load');
       return;
     }
 
@@ -166,9 +169,11 @@ export default function HomeMapWithTracts({
       const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
       const url = `/api/map/tracts?bbox=${bbox}`;
 
-      console.log(`[Map] Loading GeoJSON polygons for zoom ${zoom.toFixed(1)}`);
-
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'Cache-Control': 'public, max-age=300' // 5 minute cache
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch tracts');
 
       const geojson = await response.json();
@@ -182,30 +187,32 @@ export default function HomeMapWithTracts({
       }
 
       setTractCount(geojson.features?.length || 0);
-      console.log(`[Map] Loaded ${geojson.features?.length || 0} tracts (${geojson.mode || 'unknown'} mode)`);
+      
+      const duration = endTimer('tract_load');
+      if (duration) {
+        mapPerformance.trackTractLoad(geojson.features?.length || 0, duration, 'geojson');
+      }
 
     } catch (error) {
-      console.error('[Map] Error loading tracts:', error);
+      // Silent error handling for production
+      endTimer('tract_load');
     } finally {
       isLoadingTracts.current = false;
     }
   }, []);
 
-  // Initialize map with aggressive render forcing
+  // Initialize map with optimized settings
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current || !mapVisible) return;
 
     if (!mapboxToken) {
       console.warn('Mapbox token not configured');
       return;
     }
 
-    // Pre-warm WebGL context before Mapbox initializes
-    preWarmWebGL(mapContainer.current);
-
     mapboxgl.accessToken = mapboxToken;
 
-    // Create map with optimized settings for instant rendering
+    // Create map with optimized settings
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
@@ -213,71 +220,24 @@ export default function HomeMapWithTracts({
       zoom: 4,
       minZoom: 3,
       maxZoom: 18,
-      preserveDrawingBuffer: true,
-      antialias: true,
+      preserveDrawingBuffer: false, // Better performance
+      antialias: false, // Better performance on mobile
       refreshExpiredTiles: false,
-      fadeDuration: 0, // Disable fade animations for instant display
+      fadeDuration: 100, // Minimal fade for better UX
       trackResize: true,
-      renderWorldCopies: false, // Slight performance boost
+      renderWorldCopies: false,
     });
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Robust render forcing using requestAnimationFrame
-    let frameCount = 0;
-    const maxFrames = 60; // Try for ~1 second at 60fps
-
-    const forceRender = () => {
-      if (!map.current) return;
-
-      // Resize triggers internal recalculation
-      map.current.resize();
-
-      // Force repaint
-      map.current.triggerRepaint();
-
-      // Access canvas and force WebGL flush
-      const canvas = map.current.getCanvas();
-      if (canvas) {
-        // Force style recalculation
-        canvas.style.display = 'block';
-
-        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
-        if (gl) {
-          gl.flush();
-          gl.finish(); // Block until all commands are complete
-        }
-      }
-
-      // Continue forcing until we hit maxFrames or map is fully rendered
-      frameCount++;
-      if (frameCount < maxFrames && map.current && !map.current.loaded()) {
-        requestAnimationFrame(forceRender);
-      }
-    };
-
-    // Start the render forcing loop
-    requestAnimationFrame(forceRender);
-
-    // Also force render on visibility change (tab switching, etc.)
+    // Simple render forcing on visibility change
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && map.current) {
-        frameCount = 0;
-        requestAnimationFrame(forceRender);
+        map.current.resize();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Force render when window gains focus
-    const handleFocus = () => {
-      if (map.current) {
-        map.current.resize();
-        map.current.triggerRepaint();
-      }
-    };
-    window.addEventListener('focus', handleFocus);
-
-    // Also handle resize events
     const handleResize = () => {
       if (map.current) {
         map.current.resize();
@@ -285,50 +245,9 @@ export default function HomeMapWithTracts({
     };
     window.addEventListener('resize', handleResize);
 
-    // NUCLEAR OPTION: Force WebGL to render by triggering camera movement
-    // jumpTo with same position forces a render cycle
-    const forceMapRender = () => {
-      if (!map.current) return;
-      const center = map.current.getCenter();
-      const zoom = map.current.getZoom();
-
-      // jumpTo forces immediate render without animation
-      map.current.jumpTo({
-        center: [center.lng + 0.00001, center.lat],
-        zoom: zoom
-      });
-
-      // Jump back (imperceptible)
-      requestAnimationFrame(() => {
-        if (map.current) {
-          map.current.jumpTo({ center: [center.lng, center.lat], zoom: zoom });
-        }
-      });
-    };
-
-    // Try on first idle
-    map.current.once('idle', forceMapRender);
-
-    // Also try on style load
-    map.current.once('styledata', () => {
-      setTimeout(forceMapRender, 100);
-    });
-
     map.current.on('load', () => {
       setMapLoaded(true);
       if (!map.current) return;
-
-      // Final aggressive render push after load
-      frameCount = 0;
-      requestAnimationFrame(forceRender);
-
-      // Force map render using jumpTo trick
-      forceMapRender();
-
-      // Delayed render attempts
-      setTimeout(forceMapRender, 100);
-      setTimeout(forceMapRender, 300);
-      setTimeout(forceMapRender, 500);
 
       // =================================================================
       // VECTOR TILE SOURCE - Fast full-US rendering at low zoom
@@ -608,7 +527,6 @@ export default function HomeMapWithTracts({
     return () => {
       // Clean up event listeners
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
       window.removeEventListener('resize', handleResize);
 
       if (map.current) {
@@ -616,7 +534,7 @@ export default function HomeMapWithTracts({
         map.current = null;
       }
     };
-  }, [mapboxToken, loadTractsForViewport, onTractSelect, initialDeals]);
+  }, [mapboxToken, mapVisible, loadTractsForViewport, onTractSelect, initialDeals]);
 
   // Add deal markers
   const addDealMarkers = useCallback((deals: Deal[]) => {
@@ -670,46 +588,72 @@ export default function HomeMapWithTracts({
     const fetchSearchedTract = async () => {
       setLoadingTract(true);
       try {
-        const url = tract
+        // Fetch tract geometry for polygon highlight
+        const tractUrl = tract
           ? `/api/map/tracts?geoid=${tract}`
           : `/api/map/tracts?lat=${lat}&lng=${lng}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
+        const tractResponse = await fetch(tractUrl);
+        const tractData = await tractResponse.json();
 
-        if (data.features?.length > 0 && map.current) {
-          const feature = data.features[0];
+        // Also fetch full eligibility including HTC (property-based, not tract-based)
+        const eligibilityUrl = searchedLocation.address
+          ? `/api/eligibility?address=${encodeURIComponent(searchedLocation.address)}`
+          : `/api/eligibility?lat=${lat}&lng=${lng}`;
+
+        let eligibilityData: {
+          programs?: string[];
+          htc?: { eligible: boolean; buildings: Array<{ property_name: string; street_address: string }> };
+          federal?: { htc_eligible?: boolean };
+        } | null = null;
+
+        try {
+          const eligibilityResponse = await fetch(eligibilityUrl);
+          if (eligibilityResponse.ok) {
+            eligibilityData = await eligibilityResponse.json();
+          }
+        } catch (e) {
+          console.error('[Map] Eligibility fetch error:', e);
+        }
+
+        if (tractData.features?.length > 0 && map.current) {
+          const feature = tractData.features[0];
           const props = feature.properties || {};
-          const isEligible = props.has_any_tax_credit === true || props.eligible === true;
+
+          // Check tract-based eligibility OR HTC property-based eligibility
+          const tractEligible = props.has_any_tax_credit === true || props.eligible === true;
+          const htcEligible = eligibilityData?.htc?.eligible === true || eligibilityData?.federal?.htc_eligible === true;
+          const isEligible = tractEligible || htcEligible;
 
           // Update source for polygon highlight
           const source = map.current.getSource('searched-tract') as mapboxgl.GeoJSONSource;
           if (source) {
-            source.setData(data);
+            source.setData(tractData);
           }
 
-          // Create marker with eligibility-based color
+          // Create marker with eligibility-based color (small dot)
           const markerColor = isEligible ? PIN_COLORS.searchEligible : PIN_COLORS.searchNotEligible;
           const el = document.createElement('div');
-          el.innerHTML = `<div style="width:28px;height:28px;background:${markerColor};border:3px solid white;border-radius:50%;box-shadow:0 0 0 4px ${markerColor}40;"></div>`;
+          el.innerHTML = `<div style="width:12px;height:12px;background:${markerColor};border:2px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`;
 
           searchMarkerRef.current = new mapboxgl.Marker(el)
             .setLngLat([lng, lat])
             .addTo(map.current);
 
-          // Build programs list - NO HTC or Brownfield (not implemented yet)
-          const programs: string[] = [];
-          // NMTC: Federal first, then State if applicable
-          if (props.is_nmtc_eligible || props.severely_distressed) {
-            programs.push('Federal NMTC');
-            if (props.has_state_nmtc) programs.push('State NMTC');
+          // Use programs from eligibility API if available (includes HTC), otherwise build from tract props
+          let programs: string[] = [];
+          if (eligibilityData?.programs && eligibilityData.programs.length > 0) {
+            programs = eligibilityData.programs;
+          } else {
+            // Fallback: Build programs list from tract properties
+            if (props.is_nmtc_eligible || props.severely_distressed) {
+              programs.push('Federal NMTC');
+              if (props.has_state_nmtc) programs.push('State NMTC');
+            }
+            if (props.is_qct || props.is_lihtc_qct) programs.push('LIHTC QCT');
+            if (props.is_dda) programs.push('DDA (30% Boost)');
+            if (props.is_oz || props.is_oz_designated) programs.push('Opportunity Zone');
           }
-          // LIHTC QCT
-          if (props.is_qct || props.is_lihtc_qct) programs.push('LIHTC QCT');
-          // DDA (30% basis boost)
-          if (props.is_dda) programs.push('DDA (30% Boost)');
-          // Opportunity Zone
-          if (props.is_oz || props.is_oz_designated) programs.push('Opportunity Zone');
 
           // Create results popup
           popupRef.current = new mapboxgl.Popup({
@@ -744,6 +688,15 @@ export default function HomeMapWithTracts({
                   </div>
                 ` : ''}
 
+                ${eligibilityData?.htc?.eligible && eligibilityData.htc.buildings?.length > 0 ? `
+                  <div style="margin-bottom: 12px; padding: 10px; background: #14532d20; border-radius: 6px; border: 1px solid #166534;">
+                    <div style="font-size: 11px; color: #86efac; text-transform: uppercase; margin-bottom: 6px;">Historic Property Found</div>
+                    <div style="font-size: 13px; color: #22c55e; font-weight: 600;">${eligibilityData.htc.buildings[0].property_name}</div>
+                    <div style="font-size: 11px; color: #9ca3af;">${eligibilityData.htc.buildings[0].street_address || ''}</div>
+                    <div style="font-size: 10px; color: #6b7280; margin-top: 4px;">National Register of Historic Places - 20% Federal HTC</div>
+                  </div>
+                ` : ''}
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                   ${props.mfi_pct !== undefined && props.mfi_pct !== null ? `
                     <div style="background: #1f2937; padding: 8px; border-radius: 6px;">
@@ -762,7 +715,7 @@ export default function HomeMapWithTracts({
                 ${!isEligible ? `
                   <div style="margin-top: 12px; padding: 8px; background: #7f1d1d20; border-radius: 6px; border: 1px solid #7f1d1d;">
                     <p style="font-size: 11px; color: #fca5a5; margin: 0;">
-                      This census tract does not qualify for federal or state tax credit programs.
+                      This location does not qualify for tract-based or historic tax credit programs.
                     </p>
                   </div>
                 ` : ''}
@@ -781,9 +734,9 @@ export default function HomeMapWithTracts({
             });
           }
         } else if (map.current) {
-          // No tract found - show error marker
+          // No tract found - show error marker (small gray dot)
           const el = document.createElement('div');
-          el.innerHTML = `<div style="width:28px;height:28px;background:#6b7280;border:3px solid white;border-radius:50%;box-shadow:0 0 0 4px rgba(107,114,128,0.3);"></div>`;
+          el.innerHTML = `<div style="width:12px;height:12px;background:#6b7280;border:2px solid white;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`;
 
           searchMarkerRef.current = new mapboxgl.Marker(el)
             .setLngLat([lng, lat])

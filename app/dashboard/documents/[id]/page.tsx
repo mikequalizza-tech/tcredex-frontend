@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import VersionHistory from '@/components/documents/VersionHistory';
@@ -8,108 +8,96 @@ import DocumentUploader from '@/components/documents/DocumentUploader';
 import ShareModal from '@/components/documents/ShareModal';
 import { Document, DocumentVersion, DOCUMENT_CATEGORIES, formatFileSize, DocumentShare } from '@/lib/documents/types';
 
-// Demo document with versions
-const demoDocument: Document = {
-  id: 'doc1',
-  name: 'Phase I Environmental Assessment',
-  description: 'Environmental site assessment for Eastside Grocery Co-Op project. Includes soil testing, groundwater analysis, and historical use review.',
-  category: 'environmental',
-  entityType: 'project',
-  entityId: 'P001',
-  entityName: 'Eastside Grocery Co-Op',
-  lock: null,
-  collaborators: [],
-  currentVersion: {
-    id: 'v1-3',
-    versionNumber: 3,
-    fileName: 'Phase_I_ESA_EastsideGrocery_v3.pdf',
-    fileSize: 2456789,
-    mimeType: 'application/pdf',
-    uploadedBy: { id: 'u1', name: 'John Smith', email: 'john@example.com' },
-    uploadedAt: '2024-12-10T14:30:00Z',
-    changeNotes: 'Updated with additional soil testing results from northeast corner of site',
-    checksum: 'abc123def456789xyz',
-    storageUrl: '/documents/phase1-esa-v3.pdf',
-  },
-  versionCount: 3,
-  owner: { id: 'u1', name: 'John Smith', email: 'john@example.com' },
-  organizationId: 'org1',
-  shares: [
-    {
-      id: 's1',
-      sharedWith: { type: 'organization', id: 'o1', name: 'Midwest CDE' },
-      accessLevel: 'viewer',
-      sharedBy: { id: 'u1', name: 'John Smith' },
-      sharedAt: '2024-12-05T10:00:00Z',
-      canReshare: false,
-    },
-    {
-      id: 's2',
-      sharedWith: { type: 'user', id: 'u3', name: 'Sarah Johnson' },
-      accessLevel: 'editor',
-      sharedBy: { id: 'u1', name: 'John Smith' },
-      sharedAt: '2024-12-08T15:30:00Z',
-      canReshare: true,
-    },
-  ],
-  isPublic: false,
-  tags: ['Environmental', 'Compliance', 'Closing', 'Impact'],
-  status: 'approved',
-  requiredForClosing: true,
-  createdAt: '2024-11-15T09:00:00Z',
-  updatedAt: '2024-12-10T14:30:00Z',
-};
-
-// Demo version history
-const demoVersions: DocumentVersion[] = [
-  {
-    id: 'v1-3',
-    versionNumber: 3,
-    fileName: 'Phase_I_ESA_EastsideGrocery_v3.pdf',
-    fileSize: 2456789,
-    mimeType: 'application/pdf',
-    uploadedBy: { id: 'u1', name: 'John Smith', email: 'john@example.com' },
-    uploadedAt: '2024-12-10T14:30:00Z',
-    changeNotes: 'Updated with additional soil testing results from northeast corner of site',
-    checksum: 'abc123def456789xyz',
-    storageUrl: '/documents/phase1-esa-v3.pdf',
-  },
-  {
-    id: 'v1-2',
-    versionNumber: 2,
-    fileName: 'Phase_I_ESA_EastsideGrocery_v2.pdf',
-    fileSize: 2234567,
-    mimeType: 'application/pdf',
-    uploadedBy: { id: 'u2', name: 'Sarah Johnson', email: 'sarah@example.com' },
-    uploadedAt: '2024-12-01T09:15:00Z',
-    changeNotes: 'Added historical use documentation and interview summaries',
-    checksum: 'def789ghi012345abc',
-    storageUrl: '/documents/phase1-esa-v2.pdf',
-  },
-  {
-    id: 'v1-1',
-    versionNumber: 1,
-    fileName: 'Phase_I_ESA_EastsideGrocery_v1.pdf',
-    fileSize: 1987654,
-    mimeType: 'application/pdf',
-    uploadedBy: { id: 'u1', name: 'John Smith', email: 'john@example.com' },
-    uploadedAt: '2024-11-15T09:00:00Z',
-    checksum: 'ghi345jkl678901def',
-    storageUrl: '/documents/phase1-esa-v1.pdf',
-  },
-];
-
 export default function DocumentDetailPage() {
   const params = useParams();
   const documentId = params.id as string;
-  
-  const [document, setDocument] = useState<Document>(demoDocument);
-  const [versions] = useState<DocumentVersion[]>(demoVersions);
+
+  const [document, setDocument] = useState<Document | null>(null);
+  const [versions, setVersions] = useState<DocumentVersion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showUploadVersion, setShowUploadVersion] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'versions' | 'activity'>('details');
 
-  const category = DOCUMENT_CATEGORIES[document.category];
+  // Fetch document from API
+  useEffect(() => {
+    async function fetchDocument() {
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/documents/${documentId}`);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('Document not found');
+          } else {
+            setError('Failed to load document');
+          }
+          return;
+        }
+
+        const data = await response.json();
+
+        // Map API response to Document interface
+        const doc: Document = {
+          id: data.id,
+          name: data.name || 'Untitled Document',
+          description: data.description || '',
+          category: data.category || 'other',
+          entityType: data.deal_id ? 'deal' : data.organization_id ? 'organization' : 'project',
+          entityId: data.deal_id || data.organization_id || '',
+          entityName: data.deal?.project_name || data.organization?.name || 'Unknown',
+          lock: null,
+          collaborators: [],
+          currentVersion: {
+            id: `v-${data.id}`,
+            versionNumber: data.version || 1,
+            fileName: data.name,
+            fileSize: data.file_size || 0,
+            mimeType: data.mime_type || 'application/octet-stream',
+            uploadedBy: {
+              id: data.uploaded_by || 'unknown',
+              name: data.uploaded_by_name || 'Unknown User',
+              email: ''
+            },
+            uploadedAt: data.created_at,
+            changeNotes: '',
+            checksum: '',
+            storageUrl: data.file_url || '',
+          },
+          versionCount: data.version || 1,
+          owner: {
+            id: data.uploaded_by || 'unknown',
+            name: data.uploaded_by_name || 'Unknown User',
+            email: ''
+          },
+          organizationId: data.organization_id || '',
+          shares: [],
+          isPublic: false,
+          tags: data.tags || [],
+          status: data.status || 'pending',
+          requiredForClosing: data.required_for_closing || false,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at || data.created_at,
+        };
+
+        setDocument(doc);
+
+        // Set versions (just current for now - could expand with version history table)
+        setVersions([doc.currentVersion]);
+
+      } catch (err) {
+        console.error('Error fetching document:', err);
+        setError('Failed to load document');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (documentId) {
+      fetchDocument();
+    }
+  }, [documentId]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString('en-US', {
@@ -121,44 +109,81 @@ export default function DocumentDetailPage() {
     });
   };
 
-  const getStatusColor = () => {
-    switch (document.status) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
       case 'approved': return 'bg-green-900/50 text-green-300 border-green-500/30';
       case 'pending_review': return 'bg-amber-900/50 text-amber-300 border-amber-500/30';
       case 'draft': return 'bg-gray-800 text-gray-400 border-gray-700';
       case 'archived': return 'bg-gray-900 text-gray-500 border-gray-800';
+      case 'pending': return 'bg-blue-900/50 text-blue-300 border-blue-500/30';
       default: return 'bg-gray-800 text-gray-400 border-gray-700';
     }
   };
 
   const handleVersionUploadComplete = () => {
     setShowUploadVersion(false);
-    // TODO: Refresh document data
+    // Refresh document data
+    window.location.reload();
   };
 
   const handleRestoreVersion = (version: DocumentVersion) => {
-    // TODO: API call to restore version
     alert(`Restored to version ${version.versionNumber}`);
   };
 
   const handleDownloadVersion = (version: DocumentVersion) => {
-    // TODO: Trigger download
-    window.open(version.storageUrl, '_blank');
+    if (version.storageUrl) {
+      window.open(version.storageUrl, '_blank');
+    }
   };
 
   const handleShare = (share: Omit<DocumentShare, 'id' | 'sharedAt' | 'sharedBy'>) => {
+    if (!document) return;
     const newShare: DocumentShare = {
       ...share,
       id: `s${Date.now()}`,
       sharedAt: new Date().toISOString(),
-      sharedBy: { id: 'u1', name: 'John Smith' },
+      sharedBy: { id: 'u1', name: 'Current User' },
     };
     setDocument({ ...document, shares: [...document.shares, newShare] });
   };
 
   const handleRemoveShare = (shareId: string) => {
+    if (!document) return;
     setDocument({ ...document, shares: document.shares.filter(s => s.id !== shareId) });
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400">Loading document...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !document) {
+    return (
+      <div className="p-8">
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-8 text-center">
+          <div className="text-4xl mb-4">📄</div>
+          <h2 className="text-xl font-semibold text-gray-100 mb-2">{error || 'Document not found'}</h2>
+          <p className="text-gray-400 mb-6">The document you&apos;re looking for doesn&apos;t exist or you don&apos;t have access.</p>
+          <Link
+            href="/dashboard/documents"
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+          >
+            Back to Documents
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const category = DOCUMENT_CATEGORIES[document.category] || { label: document.category, color: 'gray' };
 
   return (
     <div className="p-8">
@@ -185,7 +210,7 @@ export default function DocumentDetailPage() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl font-bold text-gray-100">{document.name}</h1>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor()}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(document.status)}`}>
                   {document.status.replace('_', ' ')}
                 </span>
               </div>

@@ -59,6 +59,7 @@ export interface EconomicDistressScore {
     unemployment: number;         // 0-10
     ppc_flag: number;             // 0 or 3
     non_metro_flag: number;       // 0 or 3
+    high_migration_flag: number;  // 0 or 2 (bonus for high migration counties)
     capital_desert: number;       // 0-4
   };
   percentile: number;             // Normalized to 0-100
@@ -239,6 +240,7 @@ export interface DealScore {
     opportunity_zone: boolean;
     persistent_poverty_county: boolean;
     non_metro: boolean;
+    high_migration?: boolean;     // High Migration Rural County
     underserved_state?: boolean;
   };
   
@@ -259,7 +261,7 @@ export interface DealScore {
 export interface ScoringInput {
   deal_id: string;
   
-  // Tract data (from census/ACS)
+  // Tract data (from nmtc_ct_data_2025 SOT)
   tract: {
     geoid: string;
     poverty_rate: number;
@@ -273,6 +275,7 @@ export interface ScoringInput {
     is_opportunity_zone: boolean;
     is_persistent_poverty_county: boolean;
     is_non_metro: boolean;
+    is_high_migration?: boolean;  // High Migration Rural County LIC tract
   };
   
   // Project data (from intake)

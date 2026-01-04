@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import Logo from '@/components/ui/logo';
 
 interface MarketplaceFooterProps {
   onChatSubmit?: (message: string) => void;
@@ -92,12 +93,7 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
       <div className="flex items-center justify-between px-4 py-3">
         {/* Left - Logo & Links */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">tC</span>
-            </div>
-            <span className="font-semibold text-white hidden sm:inline">tCredex</span>
-          </Link>
+          <Logo size="sm" />
           <nav className="hidden md:flex items-center gap-4 text-sm">
             <Link href="/about" className="text-gray-300 hover:text-white">
               About

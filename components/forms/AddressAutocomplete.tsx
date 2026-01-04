@@ -152,6 +152,9 @@ export default function AddressAutocomplete({
         e.preventDefault();
         if (highlightedIndex >= 0) {
           handleSelect(suggestions[highlightedIndex]);
+        } else if (suggestions.length > 0) {
+          // If no item highlighted, select first suggestion
+          handleSelect(suggestions[0]);
         }
         break;
       case 'Escape':

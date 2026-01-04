@@ -20,14 +20,14 @@ interface DDItem {
 }
 
 const ENVIRONMENTAL_ITEMS: DDItem[] = [
-  { field: 'phaseIEnvironmental', dateField: 'phaseIEnvironmentalDate', label: 'Phase I Environmental', description: 'Required for all NMTC projects', critical: true },
+  { field: 'phaseIEnvironmental', dateField: 'phaseIEnvironmentalDate', label: 'Phase I Environmental', description: 'Recommended for most tax credit projects' },
   { field: 'phaseIIEnvironmental', dateField: 'phaseIIEnvironmentalDate', label: 'Phase II Environmental', description: 'If recommended by Phase I' },
   { field: 'noFurtherActionLetter', label: 'No Further Action Letter', description: 'If environmental remediation completed' },
   { field: 'geotechSoilsStudy', label: 'Geotechnical / Soils Study', description: 'For new construction' },
 ];
 
 const MARKET_APPRAISAL_ITEMS: DDItem[] = [
-  { field: 'marketStudy', label: 'Market Study', description: 'Demand analysis for project type', critical: true },
+  { field: 'marketStudy', label: 'Market Study', description: 'Demand analysis for project type' },
   { field: 'acquisitionAppraisal', label: 'Acquisition Appraisal', description: 'Current fair market value' },
   { field: 'asBuiltAppraisal', label: 'As-Built Appraisal', description: 'Projected stabilized value' },
 ];
@@ -219,7 +219,7 @@ export function ProjectReadiness({ data, onChange }: ProjectReadinessProps) {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <label className="text-sm font-medium text-gray-300">
-                  Construction Drawings <span className="text-red-400">*</span>
+                  Construction Drawings
                 </label>
                 <p className="text-xs text-gray-500">Required for closing</p>
               </div>
@@ -275,17 +275,15 @@ export function ProjectReadiness({ data, onChange }: ProjectReadinessProps) {
           Entitlements & Permits
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <StatusSelector 
-            field="zoningApproval" 
-            label="Zoning Approval" 
-            description="Zoning conformance or variance" 
-            critical 
+          <StatusSelector
+            field="zoningApproval"
+            label="Zoning Approval"
+            description="Zoning conformance or variance"
           />
-          <StatusSelector 
-            field="buildingPermits" 
-            label="Building Permits" 
-            description="Construction permits" 
-            critical 
+          <StatusSelector
+            field="buildingPermits"
+            label="Building Permits"
+            description="Construction permits"
           />
         </div>
       </div>

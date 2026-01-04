@@ -43,8 +43,8 @@ const DEMO_TEAM: TeamMember[] = [
   },
   {
     id: 'user-003',
-    name: 'Michael Chen',
-    email: 'michael.chen@example.com',
+    name: 'David Chen',
+    email: 'david.chen@example.com',
     title: 'Financial Analyst',
     role: 'member',
     lastActive: '3 hours ago',
@@ -107,10 +107,11 @@ const STATUS_COLORS = {
 };
 
 export default function TeamPage() {
-  const { userName, userEmail, orgName } = useCurrentUser();
+  const { userName, userEmail, orgName, orgType } = useCurrentUser();
   const [members, setMembers] = useState<TeamMember[]>(DEMO_TEAM);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
+  const [showOrgSettingsModal, setShowOrgSettingsModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,6 +122,14 @@ export default function TeamPage() {
   const [inviteSending, setInviteSending] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Organization settings state
+  const [organizationName, setOrganizationName] = useState(orgName || 'My Organization');
+  const [orgSettingsSaving, setOrgSettingsSaving] = useState(false);
+
+  // Current user's role (demo - in reality would come from auth)
+  const currentUserRole: MemberRole = 'owner'; // TODO: Get from auth context
+  const canEditOrg = currentUserRole === 'owner' || currentUserRole === 'admin';
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -228,6 +237,52 @@ export default function TeamPage() {
           </svg>
           Invite Member
         </button>
+      </div>
+
+      {/* Organization Settings Card */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-indigo-600/20 border border-indigo-600/30 flex items-center justify-center">
+              <svg className="w-7 h-7 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-gray-100">{organizationName}</h2>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  orgType === 'sponsor' ? 'bg-green-900/50 text-green-400' :
+                  orgType === 'cde' ? 'bg-purple-900/50 text-purple-400' :
+                  'bg-blue-900/50 text-blue-400'
+                }`}>
+                  {orgType === 'sponsor' ? 'Sponsor' : orgType === 'cde' ? 'CDE' : 'Investor'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 mt-0.5">Organization ID: ORG-{Date.now().toString(36).toUpperCase()}</p>
+            </div>
+          </div>
+          {canEditOrg && (
+            <button
+              onClick={() => setShowOrgSettingsModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Organization Settings
+            </button>
+          )}
+        </div>
+        {!canEditOrg && (
+          <p className="text-xs text-gray-500 mt-4 flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Only Owners and Admins can edit organization settings
+          </p>
+        )}
       </div>
 
       {/* Stats */}
@@ -652,12 +707,110 @@ export default function TeamPage() {
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleSendInvite}
                 disabled={inviteSending}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800"
               >
                 {inviteSending ? 'Sending...' : 'Send Invite'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Organization Settings Modal */}
+      {showOrgSettingsModal && canEditOrg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowOrgSettingsModal(false)} />
+          <div className="relative bg-gray-900 rounded-xl w-full max-w-lg mx-4 shadow-xl border border-gray-800 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-indigo-600/20 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-100">Organization Settings</h3>
+                </div>
+                <button onClick={() => setShowOrgSettingsModal(false)} className="text-gray-500 hover:text-white">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Organization Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Organization Name *</label>
+                <input
+                  type="text"
+                  value={organizationName}
+                  onChange={(e) => setOrganizationName(e.target.value)}
+                  placeholder="Enter organization name"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">This name will be visible to other users on the platform</p>
+              </div>
+
+              {/* Organization Type - Read Only */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Organization Type</label>
+                <div className="px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    orgType === 'sponsor' ? 'bg-green-900/50 text-green-400' :
+                    orgType === 'cde' ? 'bg-purple-900/50 text-purple-400' :
+                    'bg-blue-900/50 text-blue-400'
+                  }`}>
+                    {orgType === 'sponsor' ? 'Project Sponsor' : orgType === 'cde' ? 'Community Development Entity' : 'Investor'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Contact support to change your organization type</p>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="pt-4 border-t border-gray-800">
+                <h4 className="text-sm font-medium text-red-400 mb-3">Danger Zone</h4>
+                <div className="p-4 bg-red-900/10 border border-red-900/30 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-300">Delete Organization</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Permanently delete this organization and all associated data</p>
+                    </div>
+                    <button className="px-3 py-1.5 text-sm text-red-400 border border-red-800 rounded hover:bg-red-900/20 transition-colors">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-800 flex gap-3">
+              <button
+                onClick={() => setShowOrgSettingsModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setOrgSettingsSaving(true);
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  setOrgSettingsSaving(false);
+                  setShowOrgSettingsModal(false);
+                  alert('Organization settings saved!');
+                }}
+                disabled={orgSettingsSaving || !organizationName.trim()}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed"
+              >
+                {orgSettingsSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

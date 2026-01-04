@@ -17,12 +17,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { dealId, intakeData, saveOnly } = body;
 
+    // Validate required sponsor_id
+    if (!intakeData.sponsorId) {
+      console.error('POST /api/intake error: sponsorId is required');
+      return NextResponse.json({
+        success: false,
+        error: 'Organization ID (sponsorId) is required. Please ensure you are logged in with a valid organization.'
+      }, { status: 400 });
+    }
+
     // Calculate readiness score
     const { score, tier, missingFields } = calculateReadiness(intakeData);
 
     // Prepare deal record
     const dealRecord = {
       project_name: intakeData.projectName,
+      sponsor_id: intakeData.sponsorId,  // Organization ID - shared by all team members
       sponsor_name: intakeData.sponsorName,
       sponsor_organization_id: intakeData.sponsorOrganizationId,
       programs: intakeData.programs || ['NMTC'],

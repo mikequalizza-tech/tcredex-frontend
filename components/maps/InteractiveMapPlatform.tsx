@@ -138,9 +138,11 @@ export default function InteractiveMapPlatform({
         ? `/api/map/tracts?centroids=true&bbox=${bbox}`
         : `/api/map/tracts?bbox=${bbox}${useSimplified ? '&simplified=true' : ''}`;
 
-      console.log(`[Map] Loading tracts (${useCentroids ? 'centroids' : 'polygons'}) for zoom ${zoom.toFixed(1)}`);
-
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          'Cache-Control': 'public, max-age=300'
+        }
+      });
       if (!response.ok) throw new Error('Failed to fetch tracts');
 
       const geojson = await response.json();
@@ -169,10 +171,9 @@ export default function InteractiveMapPlatform({
       }
 
       setTractCount(geojson.features?.length || 0);
-      console.log(`[Map] Loaded ${geojson.features?.length || 0} tracts from census_tracts`);
 
     } catch (error) {
-      console.error('[Map] Error loading tracts:', error);
+      // Silent error handling for production
     } finally {
       isLoadingTracts.current = false;
       setTractsLoading(false);
@@ -190,7 +191,6 @@ export default function InteractiveMapPlatform({
 
     const initMap = async () => {
       try {
-        console.log('[Map] Starting map initialization...');
         const mapboxgl = (await import('mapbox-gl')).default;
         if (!mounted) return;
 
@@ -213,7 +213,6 @@ export default function InteractiveMapPlatform({
 
         map.on('load', () => {
           if (!mounted || !map) return;
-          console.log('[Map] Mapbox loaded successfully');
 
           // Source for centroids (zoomed out)
           map.addSource('tract-centroids', {

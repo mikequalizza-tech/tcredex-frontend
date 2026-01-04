@@ -87,7 +87,7 @@ export function SponsorDetails({ data, onChange }: SponsorDetailsProps) {
             </label>
           </div>
 
-          {/* Minority-Owned */}
+          {/* Minority-Owned or Controlled */}
           <div className="bg-gray-800/30 rounded-lg p-4 border border-gray-700">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -97,8 +97,8 @@ export function SponsorDetails({ data, onChange }: SponsorDetailsProps) {
                 className="w-5 h-5 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
               />
               <div>
-                <span className="text-sm font-medium text-gray-300">Minority-Owned</span>
-                <p className="text-xs text-gray-500">≥51% minority ownership</p>
+                <span className="text-sm font-medium text-gray-300">Minority-Owned or Controlled</span>
+                <p className="text-xs text-gray-500">≥51% minority ownership or board control</p>
               </div>
             </label>
           </div>

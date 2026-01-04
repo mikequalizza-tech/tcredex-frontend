@@ -16,7 +16,7 @@ export function SocialImpact({ data, onChange }: SocialImpactProps) {
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
           Community Support <span className="text-red-400">*</span>
-          <span className="text-indigo-400 text-xs ml-2">Key CDE Factor</span>
+          <span className="text-indigo-400 text-xs ml-2">(Key TC Factor)</span>
         </label>
         <textarea
           value={data.communitySupport || ''}
@@ -26,7 +26,7 @@ export function SocialImpact({ data, onChange }: SocialImpactProps) {
           className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
         />
         <p className="text-xs text-gray-500 mt-1">
-          Strong community support statements significantly improve CDE matching scores
+          Strong community support statements significantly improve matching scores
         </p>
       </div>
 

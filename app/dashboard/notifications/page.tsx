@@ -17,7 +17,7 @@ export default function NotificationsPage() {
     { id: 1, title: 'New document shared', message: 'Sarah shared "Phase I ESA" with you for the Eastside Grocery project.', time: '5 minutes ago', unread: true, type: 'document', link: '/dashboard/documents' },
     { id: 2, title: 'Deal status update', message: 'Eastside Grocery has moved to Closing stage. Review required documents.', time: '1 hour ago', unread: true, type: 'deal', link: '/deals/deal-001' },
     { id: 3, title: 'AutoMatch found 3 new deals', message: 'New investment opportunities match your criteria. Review them in AutoMatch.', time: '2 hours ago', unread: false, type: 'match', link: '/dashboard/automatch' },
-    { id: 4, title: 'Team member joined', message: 'Michael Chen accepted your invitation and joined your organization.', time: '1 day ago', unread: false, type: 'team', link: '/dashboard/team' },
+    { id: 4, title: 'Team member joined', message: 'A team member accepted your invitation and joined your organization.', time: '1 day ago', unread: false, type: 'team', link: '/dashboard/team' },
     { id: 5, title: 'Compliance reminder', message: 'Annual compliance report for Main Street Manufacturing is due in 30 days.', time: '2 days ago', unread: false, type: 'system' },
     { id: 6, title: 'New comment on document', message: 'Alex left a comment on "Operating Agreement Draft" - "Can we review section 4.2?"', time: '3 days ago', unread: false, type: 'document', link: '/dashboard/documents' },
     { id: 7, title: 'Deal closed successfully', message: 'Congratulations! Downtown Mixed-Use project has officially closed.', time: '1 week ago', unread: false, type: 'deal' },

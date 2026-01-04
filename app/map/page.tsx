@@ -44,6 +44,7 @@ const DEAL_COORDINATES: Record<string, [number, number]> = {
 interface SearchedTract {
   coordinates: [number, number];
   geoid: string;
+  address?: string;
 }
 
 export default function MapPlatformPage() {
@@ -84,8 +85,8 @@ function MapContent() {
   // === FIX: ALL HOOKS MUST BE BEFORE ANY RETURN STATEMENT ===
 
   // 1. Move useCallback UP here
-  const handleTractFound = useCallback((tract: { geoid: string }, coordinates: [number, number]) => {
-    setSearchedTract({ coordinates, geoid: tract.geoid });
+  const handleTractFound = useCallback((tract: { geoid: string }, coordinates: [number, number], address?: string) => {
+    setSearchedTract({ coordinates, geoid: tract.geoid, address });
   }, []);
 
   // 2. Move useEffect (scroll) UP here
@@ -271,7 +272,7 @@ function MapContent() {
             deals={viewMode === 'sponsor' ? [] : mapDeals}
             allocations={viewMode === 'sponsor' ? filteredCDEs : []}
             
-            searchedLocation={searchedTract ? { lat: searchedTract.coordinates[1], lng: searchedTract.coordinates[0], tract: searchedTract.geoid } : null}
+            searchedLocation={searchedTract ? { lat: searchedTract.coordinates[1], lng: searchedTract.coordinates[0], tract: searchedTract.geoid, address: searchedTract.address } : null}
           />
           
           {/* Map Overlay Controls - Top Left */}

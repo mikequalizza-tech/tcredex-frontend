@@ -51,6 +51,12 @@ export async function GET(request: NextRequest) {
   const lat = searchParams.get('lat');
   const lng = searchParams.get('lng');
 
+  // Add caching headers for all responses
+  const cacheHeaders = {
+    'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600', // 5min cache, 1h stale
+    'Vary': 'Accept-Encoding',
+  };
+
   try {
     const supabase = getSupabaseAdmin();
 
@@ -84,7 +90,7 @@ export async function GET(request: NextRequest) {
         type: 'FeatureCollection',
         features: [mapRowToFeature(rpcData[0])],
         source: 'tract_map_layer'
-      });
+      }, { headers: cacheHeaders });
     }
 
     // ===========================================
@@ -126,7 +132,7 @@ export async function GET(request: NextRequest) {
         type: 'FeatureCollection',
         features: [mapRowToFeature(pointRpcData[0])],
         source: 'tract_map_layer'
-      });
+      }, { headers: cacheHeaders });
     }
 
     // ===========================================
@@ -191,7 +197,7 @@ export async function GET(request: NextRequest) {
           count: centroidFeatures.length,
           source: rpcFunction,
           mode: 'centroids'
-        });
+        }, { headers: cacheHeaders });
       }
 
       const features = (bboxRpcData || []).map((row: TractRow) => mapRowToFeature(row));
@@ -203,7 +209,7 @@ export async function GET(request: NextRequest) {
         count: features.length,
         source: rpcFunction,
         mode: simplified ? 'simplified' : 'full'
-      });
+      }, { headers: cacheHeaders });
     }
 
     // No valid parameters

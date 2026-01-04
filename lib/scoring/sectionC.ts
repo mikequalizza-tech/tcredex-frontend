@@ -58,6 +58,7 @@ export function calculateEconomicDistress(input: ScoringInput): EconomicDistress
     unemployment: 0,
     ppc_flag: 0,
     non_metro_flag: 0,
+    high_migration_flag: 0,
     capital_desert: 0,
   };
 
@@ -72,10 +73,10 @@ export function calculateEconomicDistress(input: ScoringInput): EconomicDistress
 
   // Median Family Income vs State (0-10 points)
   // Lower MFI ratio = more distressed = higher score
-  const mfiRatio = tract.state_mfi > 0 
-    ? (tract.median_family_income / tract.state_mfi) * 100 
+  const mfiRatio = tract.state_mfi > 0
+    ? (tract.median_family_income / tract.state_mfi) * 100
     : 100;
-  
+
   if (mfiRatio <= 50) breakdown.mfi = 10;
   else if (mfiRatio <= 60) breakdown.mfi = 8;
   else if (mfiRatio <= 70) breakdown.mfi = 6;
@@ -98,6 +99,10 @@ export function calculateEconomicDistress(input: ScoringInput): EconomicDistress
   // Non-Metro Flag (0 or 3)
   breakdown.non_metro_flag = tract.is_non_metro ? 3 : 0;
 
+  // High Migration County Flag (0 or 2)
+  // High Migration Rural County LIC per American Jobs Creation Act 2004
+  breakdown.high_migration_flag = tract.is_high_migration ? 2 : 0;
+
   // Capital Desert (0-4)
   // For now, use severely distressed as proxy
   // TODO: Integrate actual CDFI Fund capital desert data
@@ -113,6 +118,7 @@ export function calculateEconomicDistress(input: ScoringInput): EconomicDistress
     breakdown.unemployment +
     breakdown.ppc_flag +
     breakdown.non_metro_flag +
+    breakdown.high_migration_flag +
     breakdown.capital_desert,
     MAX_DISTRESS
   );
@@ -383,6 +389,7 @@ export function generateReasonCodes(
   if (input.tract.is_severely_distressed) codes.push('SEVERELY_DISTRESSED_TRACT');
   if (input.tract.is_persistent_poverty_county) codes.push('PERSISTENT_POVERTY_COUNTY');
   if (input.tract.is_non_metro) codes.push('NON_METRO_RURAL');
+  if (input.tract.is_high_migration) codes.push('HIGH_MIGRATION_COUNTY');
   if (input.tract.is_opportunity_zone) codes.push('OPPORTUNITY_ZONE');
   if (distress.breakdown.poverty_rate >= 8) codes.push('HIGH_POVERTY_TRACT');
   if (distress.breakdown.mfi >= 8) codes.push('LOW_MFI_TRACT');
@@ -428,6 +435,7 @@ export function generateExplanation(
   lines.push(`  ├─ Unemployment: ${distress.breakdown.unemployment}/10`);
   lines.push(`  ├─ PPC: ${distress.breakdown.ppc_flag}/3`);
   lines.push(`  ├─ Non-Metro: ${distress.breakdown.non_metro_flag}/3`);
+  lines.push(`  ├─ High Migration: ${distress.breakdown.high_migration_flag}/2`);
   lines.push(`  └─ Capital Desert: ${distress.breakdown.capital_desert}/4`);
   lines.push('');
 
@@ -500,6 +508,7 @@ export function calculateDealScore(
       opportunity_zone: input.tract.is_opportunity_zone,
       persistent_poverty_county: input.tract.is_persistent_poverty_county,
       non_metro: input.tract.is_non_metro,
+      high_migration: input.tract.is_high_migration,
     },
     reason_codes: reasonCodes,
     score_explanation: explanation,

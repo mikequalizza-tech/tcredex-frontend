@@ -473,3 +473,190 @@ function mapInvestorToDetail(investor: any): InvestorDetail {
     contactPhone: investor.contact_phone || '',
   };
 }
+
+// =============================================================================
+// CDE ALLOCATION QUERIES
+// =============================================================================
+
+/**
+ * CDE Allocation interface
+ */
+export interface CDEAllocation {
+  id: string;
+  cdeId: string;
+  type: 'federal' | 'state';
+  year: string;
+  stateCode?: string;
+  awardedAmount: number;
+  availableOnPlatform: number;
+  deployedAmount: number;
+  percentageWon?: number;
+  deploymentDeadline?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Fetch all allocations for a specific CDE organization
+ */
+export async function fetchCDEAllocations(cdeOrgId: string): Promise<CDEAllocation[]> {
+  const supabase = getSupabase();
+
+  // First get the CDE record for this organization
+  const { data: cdeRaw, error: cdeError } = await supabase
+    .from('cdes')
+    .select('id')
+    .eq('organization_id', cdeOrgId)
+    .single();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cdeData = cdeRaw as Record<string, any> | null;
+
+  if (cdeError || !cdeData) {
+    logger.error('Error finding CDE for organization', cdeError);
+    return [];
+  }
+
+  // Now fetch allocations for this CDE
+  const { data: rawData, error } = await supabase
+    .from('cde_allocations')
+    .select('*')
+    .eq('cde_id', cdeData.id)
+    .order('year', { ascending: false });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = rawData as Record<string, any>[] | null;
+
+  if (error) {
+    logger.error('Error fetching CDE allocations', error);
+    return [];
+  }
+
+  return (data || []).map((alloc) => ({
+    id: alloc.id,
+    cdeId: alloc.cde_id,
+    type: alloc.type as 'federal' | 'state',
+    year: alloc.year,
+    stateCode: alloc.state_code,
+    awardedAmount: Number(alloc.awarded_amount) || 0,
+    availableOnPlatform: Number(alloc.available_on_platform) || 0,
+    deployedAmount: Number(alloc.deployed_amount) || 0,
+    percentageWon: alloc.percentage_won ? Number(alloc.percentage_won) : undefined,
+    deploymentDeadline: alloc.deployment_deadline,
+    notes: alloc.notes,
+    createdAt: alloc.created_at,
+    updatedAt: alloc.updated_at,
+  }));
+}
+
+/**
+ * Fetch CDE investment criteria
+ */
+export interface CDEInvestmentCriteria {
+  id: string;
+  primaryStates: string[];
+  minDealSize: number;
+  maxDealSize: number;
+  targetSectors: string[];
+  impactPriorities: string[];
+  ruralFocus: boolean;
+  urbanFocus: boolean;
+  requireSeverelyDistressed: boolean;
+  minJobsPerMillion?: number;
+}
+
+export async function fetchCDECriteria(cdeOrgId: string): Promise<CDEInvestmentCriteria | null> {
+  const supabase = getSupabase();
+
+  const { data: rawData, error } = await supabase
+    .from('cdes')
+    .select('*')
+    .eq('organization_id', cdeOrgId)
+    .single();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = rawData as Record<string, any> | null;
+
+  if (error || !data) {
+    logger.error('Error fetching CDE criteria', error);
+    return null;
+  }
+
+  return {
+    id: data.id,
+    primaryStates: data.primary_states || [],
+    minDealSize: Number(data.min_deal_size) || 0,
+    maxDealSize: Number(data.max_deal_size) || 0,
+    targetSectors: data.target_sectors || [],
+    impactPriorities: data.impact_priorities || [],
+    ruralFocus: data.rural_focus || false,
+    urbanFocus: data.urban_focus || false,
+    requireSeverelyDistressed: data.require_severely_distressed || false,
+    minJobsPerMillion: data.min_jobs_per_million ? Number(data.min_jobs_per_million) : undefined,
+  };
+}
+
+/**
+ * Fetch deals in CDE's pipeline (matched/interested deals)
+ */
+export async function fetchCDEPipelineDeals(cdeOrgId: string): Promise<Deal[]> {
+  const supabase = getSupabase();
+
+  // Get CDE record
+  const { data: cdeRaw } = await supabase
+    .from('cdes')
+    .select('id')
+    .eq('organization_id', cdeOrgId)
+    .single();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cdeData = cdeRaw as Record<string, any> | null;
+
+  if (!cdeData) return [];
+
+  // Fetch deals assigned to this CDE or where CDE has expressed interest
+  const { data, error } = await supabase
+    .from('deals')
+    .select('*')
+    .or(`assigned_cde_id.eq.${cdeData.id}`)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    logger.error('Error fetching CDE pipeline deals', error);
+    return [];
+  }
+
+  return (data || []).map((deal: any) => ({
+    id: deal.id,
+    projectName: deal.project_name,
+    sponsorName: deal.sponsor_name || 'Unknown Sponsor',
+    sponsorDescription: deal.project_description,
+    website: deal.website,
+    programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
+    programLevel: (deal.program_level) as ProgramLevel || 'federal',
+    stateProgram: deal.state_program,
+    allocation: Number(deal.nmtc_financing_requested) || 0,
+    creditPrice: 0.76,
+    state: deal.state || '',
+    city: deal.city || '',
+    tractType: (deal.tract_types || []) as TractType[],
+    status: (deal.status || 'draft') as DealStatus,
+    description: deal.project_description,
+    communityImpact: deal.community_benefit,
+    projectHighlights: [],
+    useOfFunds: [],
+    timeline: [],
+    foundedYear: 2020,
+    submittedDate: deal.created_at,
+    povertyRate: Number(deal.tract_poverty_rate) || 0,
+    medianIncome: Number(deal.tract_median_income) || 0,
+    jobsCreated: deal.jobs_created || 0,
+    visible: deal.visible ?? true,
+    coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
+    projectCost: Number(deal.total_project_cost) || 0,
+    financingGap: Number(deal.financing_gap) || 0,
+    censusTract: deal.census_tract,
+    unemployment: Number(deal.tract_unemployment) || 0,
+  }));
+}

@@ -30,17 +30,21 @@ function DealsLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Marketplace page - use AppLayout for authenticated users
+  // Marketplace page - use its own layout (it has MapFilterRail sidebar)
   if (isMarketplacePage) {
-    if (isAuthenticated) {
-      return (
-        <>
-          <AppLayout>{children}</AppLayout>
-          <ChatTC />
-        </>
-      );
-    }
-    // Public view - show with header/footer
+    return (
+      <>
+        {children}
+        <ChatTC />
+      </>
+    );
+  }
+
+  // Deal detail pages (/deals/[id], /deals/[id]/profile, /deals/[id]/card)
+  // Use clean layout without sidebar - the profile has its own stats sidebar
+  const isDealDetailPage = pathname.match(/^\/deals\/[^/]+/);
+
+  if (isDealDetailPage) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col">
         <Header />
@@ -53,22 +57,7 @@ function DealsLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // For deal detail pages (/deals/[id])
-  // Show loading spinner while checking auth
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex flex-col">
-        <Header />
-        <main className="grow flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </main>
-        <Footer />
-        <ChatTC />
-      </div>
-    );
-  }
-
-  // Authenticated users on deal detail pages - show dashboard layout
+  // Fallback for any other deal routes
   if (isAuthenticated) {
     return (
       <>
@@ -78,7 +67,6 @@ function DealsLayoutContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // PUBLIC VIEW - Marketing layout for logged-out users viewing deal details
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       <Header />

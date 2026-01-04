@@ -105,7 +105,7 @@ export async function DELETE(
       .from('documents')
       .select('file_url')
       .eq('id', id)
-      .single();
+      .single<{ file_url: string | null }>();
 
     if (fetchError) {
       if (fetchError.code === 'PGRST116') {

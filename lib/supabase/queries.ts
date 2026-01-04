@@ -77,24 +77,25 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
 export async function fetchDealById(id: string): Promise<Deal | null> {
   const supabase = getSupabase();
 
-  const { data: rawData, error } = await supabase
-    .from('deals')
-    .select('*')
-    .eq('id', id)
-    .single();
+  try {
+    const { data: rawData, error } = await supabase
+      .from('deals')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = rawData as Record<string, any> | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = rawData as Record<string, any> | null;
 
-  if (error || !data) {
-    const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
-    const isRecursion = error?.message?.toLowerCase().includes('recursion');
+    if (error || !data) {
+      const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
+      const isRecursion = error?.message?.toLowerCase().includes('recursion');
 
-    if (!isBuild || (error && !isRecursion)) {
-      logger.error('Error fetching deal by ID', error);
+      if (!isBuild || (error && !isRecursion)) {
+        logger.error('Error fetching deal by ID', error);
+      }
+      return null;
     }
-    return null;
-  }
 
   return {
     id: data.id,
@@ -135,6 +136,10 @@ export async function fetchDealById(id: string): Promise<Deal | null> {
     censusTract: data.census_tract,
     unemployment: Number(data.tract_unemployment) || 0,
   };
+  } catch (error) {
+    logger.error('Error in fetchDealById', error);
+    return null;
+  }
 }
 
 /**
@@ -503,51 +508,56 @@ export interface CDEAllocation {
 export async function fetchCDEAllocations(cdeOrgId: string): Promise<CDEAllocation[]> {
   const supabase = getSupabase();
 
-  // First get the CDE record for this organization
-  const { data: cdeRaw, error: cdeError } = await supabase
-    .from('cdes')
-    .select('id')
-    .eq('organization_id', cdeOrgId)
-    .single();
+  try {
+    // First get the CDE record for this organization
+    const { data: cdeRaw, error: cdeError } = await supabase
+      .from('cdes')
+      .select('id')
+      .eq('organization_id', cdeOrgId)
+      .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cdeData = cdeRaw as Record<string, any> | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cdeData = cdeRaw as Record<string, any> | null;
 
-  if (cdeError || !cdeData) {
-    logger.error('Error finding CDE for organization', cdeError);
+    if (cdeError || !cdeData) {
+      logger.error('Error finding CDE for organization', cdeError);
+      return [];
+    }
+
+    // Now fetch allocations for this CDE
+    const { data: rawData, error } = await supabase
+      .from('cde_allocations')
+      .select('*')
+      .eq('cde_id', cdeData.id)
+      .order('year', { ascending: false });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = rawData as Record<string, any>[] | null;
+
+    if (error) {
+      logger.error('Error fetching CDE allocations', error);
+      return [];
+    }
+
+    return (data || []).map((alloc) => ({
+      id: alloc.id,
+      cdeId: alloc.cde_id,
+      type: alloc.type as 'federal' | 'state',
+      year: alloc.year,
+      stateCode: alloc.state_code,
+      awardedAmount: Number(alloc.awarded_amount) || 0,
+      availableOnPlatform: Number(alloc.available_on_platform) || 0,
+      deployedAmount: Number(alloc.deployed_amount) || 0,
+      percentageWon: alloc.percentage_won ? Number(alloc.percentage_won) : undefined,
+      deploymentDeadline: alloc.deployment_deadline,
+      notes: alloc.notes,
+      createdAt: alloc.created_at,
+      updatedAt: alloc.updated_at,
+    }));
+  } catch (error) {
+    logger.error('Error in fetchCDEAllocations', error);
     return [];
   }
-
-  // Now fetch allocations for this CDE
-  const { data: rawData, error } = await supabase
-    .from('cde_allocations')
-    .select('*')
-    .eq('cde_id', cdeData.id)
-    .order('year', { ascending: false });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = rawData as Record<string, any>[] | null;
-
-  if (error) {
-    logger.error('Error fetching CDE allocations', error);
-    return [];
-  }
-
-  return (data || []).map((alloc) => ({
-    id: alloc.id,
-    cdeId: alloc.cde_id,
-    type: alloc.type as 'federal' | 'state',
-    year: alloc.year,
-    stateCode: alloc.state_code,
-    awardedAmount: Number(alloc.awarded_amount) || 0,
-    availableOnPlatform: Number(alloc.available_on_platform) || 0,
-    deployedAmount: Number(alloc.deployed_amount) || 0,
-    percentageWon: alloc.percentage_won ? Number(alloc.percentage_won) : undefined,
-    deploymentDeadline: alloc.deployment_deadline,
-    notes: alloc.notes,
-    createdAt: alloc.created_at,
-    updatedAt: alloc.updated_at,
-  }));
 }
 
 /**
@@ -569,32 +579,37 @@ export interface CDEInvestmentCriteria {
 export async function fetchCDECriteria(cdeOrgId: string): Promise<CDEInvestmentCriteria | null> {
   const supabase = getSupabase();
 
-  const { data: rawData, error } = await supabase
-    .from('cdes')
-    .select('*')
-    .eq('organization_id', cdeOrgId)
-    .single();
+  try {
+    const { data: rawData, error } = await supabase
+      .from('cdes')
+      .select('*')
+      .eq('organization_id', cdeOrgId)
+      .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = rawData as Record<string, any> | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = rawData as Record<string, any> | null;
 
-  if (error || !data) {
-    logger.error('Error fetching CDE criteria', error);
+    if (error || !data) {
+      logger.error('Error fetching CDE criteria', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      primaryStates: data.primary_states || [],
+      minDealSize: Number(data.min_deal_size) || 0,
+      maxDealSize: Number(data.max_deal_size) || 0,
+      targetSectors: data.target_sectors || [],
+      impactPriorities: data.impact_priorities || [],
+      ruralFocus: data.rural_focus || false,
+      urbanFocus: data.urban_focus || false,
+      requireSeverelyDistressed: data.require_severely_distressed || false,
+      minJobsPerMillion: data.min_jobs_per_million ? Number(data.min_jobs_per_million) : undefined,
+    };
+  } catch (error) {
+    logger.error('Error in fetchCDECriteria', error);
     return null;
   }
-
-  return {
-    id: data.id,
-    primaryStates: data.primary_states || [],
-    minDealSize: Number(data.min_deal_size) || 0,
-    maxDealSize: Number(data.max_deal_size) || 0,
-    targetSectors: data.target_sectors || [],
-    impactPriorities: data.impact_priorities || [],
-    ruralFocus: data.rural_focus || false,
-    urbanFocus: data.urban_focus || false,
-    requireSeverelyDistressed: data.require_severely_distressed || false,
-    minJobsPerMillion: data.min_jobs_per_million ? Number(data.min_jobs_per_million) : undefined,
-  };
 }
 
 /**

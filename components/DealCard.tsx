@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Deal } from '@/lib/data/deals';
+import { Deal, STATUS_CONFIG, PROGRAM_COLORS } from '@/lib/data/deals';
 
 interface DealCardProps {
   deal: Deal;
@@ -19,27 +19,63 @@ const formatCurrency = (amount: number | undefined) => {
 };
 
 export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCardProps) {
-  // Map fields from lib/data/deals.ts Deal to what the card expects
   const location = `${deal.city}, ${deal.state}`;
-  const financingGap = deal.allocation; // Placeholder if not available
+  const financingGap = deal.financingGap ?? deal.allocation;
+  const programColor = PROGRAM_COLORS[deal.programType];
+  const statusConfig = STATUS_CONFIG[deal.status];
 
   return (
     <div className="max-w-sm bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-700/50 hover:border-indigo-500/50 transition-colors">
+      {/* Hero Image */}
+      {deal.heroImageUrl && (
+        <div className="relative h-40 bg-gray-800">
+          <Image
+            src={deal.heroImageUrl}
+            alt={deal.projectName}
+            fill
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 to-transparent" />
+        </div>
+      )}
+
       {/* Header row */}
       <div className="p-4 flex justify-between items-start">
-        <div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${programColor.bg} ${programColor.text}`}>
+              {deal.programType}
+            </span>
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusConfig.color}`}>
+              {statusConfig.label}
+            </span>
+          </div>
           <Link href={`/deals/${deal.id}`} className="hover:text-indigo-400 transition-colors">
-            <h2 className="text-lg font-bold text-gray-100 leading-snug">{deal.projectName}</h2>
+            <h2 className="text-lg font-bold text-gray-100 leading-snug truncate">{deal.projectName}</h2>
           </Link>
           <p className="text-sm text-gray-400">{location}</p>
         </div>
-        <Image 
-          src="/brand/tcredex_transparent_256x64.png" 
-          alt="tCredex Logo" 
-          width={80} 
-          height={20}
-          className="h-5 w-auto opacity-60"
-        />
+        {/* Organization Logo or tCredex fallback */}
+        <div className="flex-shrink-0 ml-3">
+          {deal.logoUrl ? (
+            <div className="relative w-12 h-12 bg-white rounded-lg overflow-hidden">
+              <Image
+                src={deal.logoUrl}
+                alt={deal.sponsorName || 'Organization logo'}
+                fill
+                className="object-contain p-1"
+              />
+            </div>
+          ) : (
+            <Image
+              src="/brand/tcredex_transparent_256x64.png"
+              alt="tCredex Logo"
+              width={80}
+              height={20}
+              className="h-5 w-auto opacity-60"
+            />
+          )}
+        </div>
       </div>
 
       {/* Divider */}

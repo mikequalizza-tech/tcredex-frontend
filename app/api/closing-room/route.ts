@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     }
 
     // List closing rooms - query actual table instead of non-existent view
-    let query = supabase
+    const { data, error } = await supabase
       .from('closing_rooms')
       .select(`
         id,
@@ -107,6 +107,8 @@ export async function GET(request: NextRequest) {
         target_close_date,
         opened_at,
         created_at,
+        allocation_amount,
+        investment_amount,
         deals (
           id,
           project_name,
@@ -115,22 +117,37 @@ export async function GET(request: NextRequest) {
           nmtc_financing_requested,
           total_project_cost
         )
-      `)
-   
+      `) as any;
+
+    if (error) {
+      console.error('Closing rooms fetch error:', error);
+      return NextResponse.json({ error: 'Failed to fetch closing rooms' }, { status: 500 });
+    }
+
+    const typedData = (data || []) as Array<{
+      id: string;
+      deal_id: string;
+      status: string;
+      target_close_date: string | null;
+      opened_at: string | null;
+      created_at: string;
+      allocation_amount: number;
+      investment_amount: number;
+    }>;
 
     // Calculate stats
     const stats = {
-      total: data?.length || 0,
-      active: data?.filter(r => r.status === 'active').length || 0,
-      pending: data?.filter(r => r.status === 'pending').length || 0,
-      closing: data?.filter(r => r.status === 'closing').length || 0,
-      onHold: data?.filter(r => r.status === 'on_hold').length || 0,
-      totalAllocation: data?.reduce((sum, r) => sum + (r.allocation_amount || 0), 0) || 0,
-      totalInvestment: data?.reduce((sum, r) => sum + (r.investment_amount || 0), 0) || 0,
+      total: typedData?.length || 0,
+      active: typedData?.filter(r => r.status === 'active').length || 0,
+      pending: typedData?.filter(r => r.status === 'pending').length || 0,
+      closing: typedData?.filter(r => r.status === 'closing').length || 0,
+      onHold: typedData?.filter(r => r.status === 'on_hold').length || 0,
+      totalAllocation: typedData?.reduce((sum, r) => sum + (r.allocation_amount || 0), 0) || 0,
+      totalInvestment: typedData?.reduce((sum, r) => sum + (r.investment_amount || 0), 0) || 0,
     };
 
     return NextResponse.json({
-      closingRooms: data || [],
+      closingRooms: typedData || [],
       stats,
     });
 

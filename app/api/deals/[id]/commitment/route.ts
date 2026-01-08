@@ -19,7 +19,7 @@ export async function POST(
         investment_amount: 0, // Will be fetched from deal
         credit_type: 'NMTC',
         credit_rate: 0.5,
-        special_terms: body.message ? { notes: body.message } : {},
+        special_terms: body.message || undefined,
       },
       body.senderOrgId
     );

@@ -20,7 +20,7 @@ export async function POST(
         qlici_rate: 0.5,
         leverage_structure: 'standard',
         term_years: 7,
-        special_terms: body.message ? { notes: body.message } : {},
+        special_terms: body.message || undefined,
       },
       body.senderOrgId
     );

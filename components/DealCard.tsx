@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Deal, STATUS_CONFIG, PROGRAM_COLORS } from '@/lib/data/deals';
+import { scoreDealFromRecord } from '@/lib/scoring/engine';
+import { useMemo } from 'react';
 
 interface DealCardProps {
   deal: Deal;
@@ -23,6 +25,49 @@ export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCar
   const financingGap = deal.financingGap ?? deal.allocation;
   const programColor = PROGRAM_COLORS[deal.programType];
   const statusConfig = STATUS_CONFIG[deal.status];
+
+  // Calculate tCredex Score
+  const score = useMemo(() => {
+    try {
+      return scoreDealFromRecord({
+        census_tract: deal.censusTract,
+        tract_poverty_rate: deal.povertyRate,
+        tract_median_income: deal.medianIncome,
+        tract_unemployment: deal.unemployment,
+        total_project_cost: deal.projectCost,
+        nmtc_financing_requested: deal.allocation,
+        jobs_created: deal.jobsCreated,
+        site_control: 'under_contract', // Default assumption
+        pro_forma_complete: true, // Default assumption for marketplace deals
+        third_party_reports: true, // Default assumption
+        committed_capital_pct: 70, // Default assumption
+        projected_completion_date: new Date().toISOString(),
+        project_type: deal.programType,
+        target_sectors: [deal.programType],
+      });
+    } catch (error) {
+      console.error('Error calculating score:', error);
+      return null;
+    }
+  }, [deal]);
+
+  const getTierColor = (tier: number) => {
+    switch (tier) {
+      case 1: return 'text-green-400 bg-green-900/30 border-green-700/50';
+      case 2: return 'text-amber-400 bg-amber-900/30 border-amber-700/50';
+      case 3: return 'text-red-400 bg-red-900/30 border-red-700/50';
+      default: return 'text-gray-400 bg-gray-900/30 border-gray-700/50';
+    }
+  };
+
+  const getTierLabel = (tier: number) => {
+    switch (tier) {
+      case 1: return 'Greenlight';
+      case 2: return 'Watchlist';
+      case 3: return 'Defer';
+      default: return 'Unscored';
+    }
+  };
 
   return (
     <div className="max-w-sm bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-700/50 hover:border-indigo-500/50 transition-colors">
@@ -49,6 +94,12 @@ export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCar
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusConfig.color}`}>
               {statusConfig.label}
             </span>
+            {/* tCredex Score Badge */}
+            {score && (
+              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getTierColor(score.tier)}`}>
+                {score.totalScore}/100 • {getTierLabel(score.tier)}
+              </span>
+            )}
           </div>
           <Link href={`/deals/${deal.id}`} className="hover:text-indigo-400 transition-colors">
             <h2 className="text-lg font-bold text-gray-100 leading-snug truncate">{deal.projectName}</h2>

@@ -1,18 +1,23 @@
 /**
  * tCredex CDEs API
  * CRUD operations for Community Development Entities
+ * 
+ * CRITICAL: All endpoints require authentication and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-
-const supabase = getSupabaseAdmin();
+import { requireAuth, handleAuthError } from '@/lib/api/auth-middleware';
 
 // =============================================================================
 // GET /api/cdes - List CDEs with filters
 // =============================================================================
 export async function GET(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
+
     const { searchParams } = new URL(request.url);
     
     const status = searchParams.get('status');
@@ -24,12 +29,44 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('cdes')
       .select(`
-        *,
-        organization:organizations(name, slug, website, city, state),
+        id,
+        organization_id,
+        certification_number,
+        year_established,
+        primary_contact_name,
+        primary_contact_email,
+        primary_contact_phone,
+        total_allocation,
+        remaining_allocation,
+        min_deal_size,
+        max_deal_size,
+        small_deal_fund,
+        service_area_type,
+        primary_states,
+        rural_focus,
+        urban_focus,
+        mission_statement,
+        impact_priorities,
+        target_sectors,
+        nmtc_experience,
+        htc_experience,
+        status,
+        created_at,
+        organization:organizations(id, name, slug, website, city, state),
         allocations:cde_allocations(*)
       `)
       .order('remaining_allocation', { ascending: false })
       .limit(limit);
+
+    // CRITICAL: Filter by organization based on user type
+    if (user.organizationType === 'cde') {
+      // CDEs see only their own profile
+      query = query.eq('organization_id', user.organizationId);
+    } else if (user.organizationType === 'sponsor' || user.organizationType === 'investor') {
+      // Sponsors and investors see all active CDEs (public view)
+      query = query.eq('status', 'active');
+    }
+    // Admin sees all CDEs (no filter)
 
     if (status) query = query.eq('status', status);
     if (state) query = query.contains('primary_states', [state]);
@@ -40,10 +77,13 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ cdes: data });
+    return NextResponse.json({ 
+      cdes: data,
+      organizationId: user.organizationId,
+      organizationType: user.organizationType,
+    });
   } catch (error) {
-    console.error('GET /api/cdes error:', error);
-    return NextResponse.json({ error: 'Failed to fetch CDEs' }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
@@ -52,30 +92,21 @@ export async function GET(request: NextRequest) {
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication and ORG_ADMIN role
+    const user = await requireAuth(request);
+    
+    if (user.organizationType !== 'cde' || user.userRole !== 'ORG_ADMIN') {
+      return NextResponse.json(
+        { error: 'Only CDE organization admins can create CDE profiles' },
+        { status: 403 }
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
     const body = await request.json();
 
-    // First create or get organization
-    let organizationId = body.organization_id;
-    
-    if (!organizationId && body.organization_name) {
-      const slug = body.organization_name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: body.organization_name,
-          slug: slug,
-          type: 'cde',
-          website: body.website,
-          city: body.city,
-          state: body.state,
-        } as never)
-        .select()
-        .single();
-
-      if (orgError) throw orgError;
-      organizationId = (org as { id: string }).id;
-    }
+    // CRITICAL: CDE profile must belong to user's organization
+    const organizationId = user.organizationId;
 
     // Create CDE profile
     const { data, error } = await supabase
@@ -108,9 +139,10 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    const typedData = data as Record<string, unknown> & { id: string };
+
     // Create allocations if provided
     if (body.allocations && body.allocations.length > 0) {
-      const typedData = data as { id: string };
       const allocationsToInsert = body.allocations.map((a: Record<string, unknown>) => ({
         cde_id: typedData.id,
         type: a.type,
@@ -124,9 +156,11 @@ export async function POST(request: NextRequest) {
       await supabase.from('cde_allocations').insert(allocationsToInsert as never);
     }
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({
+      ...typedData,
+      organizationId: user.organizationId,
+    }, { status: 201 });
   } catch (error) {
-    console.error('POST /api/cdes error:', error);
-    return NextResponse.json({ error: 'Failed to create CDE' }, { status: 500 });
+    return handleAuthError(error);
   }
 }

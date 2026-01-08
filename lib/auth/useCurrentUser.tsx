@@ -1,27 +1,15 @@
-'use client';
+"use client";
 
 import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { User, Role, AuthContext, hasMinimumRole } from './types';
 
-// Cookie helper functions for middleware auth
-function setCookie(name: string, value: string, days: number = 7) {
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-function deleteCookie(name: string) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-}
-
-// User cache for session restoration (populated from API)
-let userCache: Record<string, User> = {};
-
 export interface ExtendedAuthContext extends AuthContext {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  refresh: () => Promise<void>;
   switchRole: (role: 'sponsor' | 'cde' | 'investor' | 'admin') => void;
   currentDemoRole: 'sponsor' | 'cde' | 'investor' | 'admin' | null;
-  orgType: 'cde' | 'sponsor' | 'investor' | undefined;
+  orgType: 'cde' | 'sponsor' | 'investor' | 'admin' | undefined;
   orgName: string;
   orgLogo?: string;
   organizationId: string | undefined;
@@ -31,48 +19,69 @@ export interface ExtendedAuthContext extends AuthContext {
 
 const AuthContextValue = createContext<ExtendedAuthContext | undefined>(undefined);
 
-function createUserFromSession(session: any): User {
-  // If we have cached user data from API, use it
-  if (session.email && userCache[session.email]) {
-    return userCache[session.email];
+const normalizeOrgType = (type?: string): 'sponsor' | 'cde' | 'investor' | 'admin' | undefined => {
+  if (!type) return undefined;
+  const lower = type.toLowerCase();
+  if (['sponsor', 'cde', 'investor', 'admin'].includes(lower)) {
+    return lower as 'sponsor' | 'cde' | 'investor' | 'admin';
+  }
+  return undefined;
+};
+
+// Map user role to permission level
+const mapUserRoleToRole = (userRole?: string): Role => {
+  if (!userRole) return Role.VIEWER;
+  
+  const upper = userRole.toUpperCase();
+  if (upper === 'ORG_ADMIN') return Role.ORG_ADMIN;
+  if (upper === 'PROJECT_ADMIN') return Role.PROJECT_ADMIN;
+  if (upper === 'MEMBER') return Role.MEMBER;
+  if (upper === 'VIEWER') return Role.VIEWER;
+  
+  // Default to VIEWER for unknown roles
+  return Role.VIEWER;
+};
+
+async function fetchMe(): Promise<User | null> {
+  const res = await fetch('/api/auth/me', { credentials: 'include' });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const apiUser = data.user;
+  if (!apiUser) return null;
+
+  // CRITICAL: Validate org type is valid
+  const orgType = normalizeOrgType(apiUser.organization?.type || apiUser.orgType);
+  if (!orgType) {
+    console.error('[Auth] Invalid organization type:', apiUser.organization?.type);
+    return null;
   }
 
-  // If session has full user data (from API response), use it
-  if (session.user) {
-    const apiUser = session.user;
-    return {
-      id: apiUser.id || 'u-' + Date.now(),
-      email: apiUser.email,
-      name: apiUser.name || 'User',
-      role: apiUser.role === 'ORG_ADMIN' ? Role.ORG_ADMIN : Role.MEMBER,
-      organizationId: apiUser.organizationId || 'org-temp',
-      organization: apiUser.organization || {
-        id: 'org-temp',
-        name: 'Organization',
-        slug: 'org',
-        type: apiUser.userType || 'cde',
-      },
-      projectAssignments: [],
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    };
+  // CRITICAL: Validate user role is valid
+  const userRole = mapUserRoleToRole(apiUser.role);
+
+  // CRITICAL: Validate organization exists
+  if (!apiUser.organization?.id && !apiUser.organizationId) {
+    console.error('[Auth] User has no organization');
+    return null;
   }
 
-  // Fallback for legacy session data
   return {
-    id: 'u-' + Date.now(),
-    email: session.email || '',
-    name: session.name || 'User',
-    role: Role.ORG_ADMIN,
-    organizationId: session.organizationId || 'org-temp',
-    organization: session.organization || {
-      id: 'org-temp',
-      name: session.orgName || 'My Organization',
-      slug: session.orgName?.toLowerCase().replace(/\s+/g, '-') || 'my-org',
-      type: (session.userType || session.role || 'cde') as 'sponsor' | 'cde' | 'investor',
+    id: apiUser.id,
+    email: apiUser.email,
+    name: apiUser.name || 'User',
+    role: userRole,
+    organizationId: apiUser.organizationId || apiUser.organization?.id || '',
+    organization: apiUser.organization ? {
+      ...apiUser.organization,
+      type: orgType,
+    } : {
+      id: apiUser.organizationId || 'org-unknown',
+      name: 'Organization',
+      slug: 'org',
+      type: orgType,
     },
     projectAssignments: [],
-    createdAt: session.registeredAt || new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString(),
   };
 }
@@ -80,147 +89,95 @@ function createUserFromSession(session: any): User {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentDemoRole, setCurrentDemoRole] = useState<'sponsor' | 'cde' | 'investor' | 'admin' | null>(null);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof window !== 'undefined') {
-          const savedSession = localStorage.getItem('tcredex_session');
-          if (savedSession) {
-            const session = JSON.parse(savedSession);
-            const role = session.role as 'sponsor' | 'cde' | 'investor' | 'admin';
-            setCurrentDemoRole(role);
-            setUser(createUserFromSession(session));
-            // Ensure cookie is synced for middleware
-            setCookie('tcredex_session', savedSession);
-          }
-        }
-      } catch (error) {
-        console.error('Auth init error:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    initAuth();
+  const refresh = useCallback(async () => {
+    try {
+      const u = await fetchMe();
+      setUser(u);
+    } catch (err) {
+      console.error('[Auth] refresh error', err);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // Clean up any conflicting localStorage data on app startup
+    if (typeof window !== 'undefined') {
+      try {
+        // Only clear if we detect mixed auth systems
+        const hasOldSession = localStorage.getItem('tcredex_session');
+        if (hasOldSession) {
+          console.log('[Auth] Cleaning up old localStorage auth data');
+          localStorage.removeItem('tcredex_session');
+          localStorage.removeItem('tcredex_demo_role');
+          localStorage.removeItem('tcredex_registered_user');
+        }
+      } catch (err) {
+        console.error('[Auth] startup cleanup error', err);
+      }
+    }
+    
+    refresh();
+  }, [refresh]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    const normalizedEmail = email.toLowerCase().trim();
-
     try {
-      // Call the demo login API to authenticate against Supabase tables
-      const response = await fetch('/api/auth/demo-login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, password }),
+        body: JSON.stringify({ email: email.toLowerCase().trim(), password }),
       });
 
-      const data = await response.json();
-
-      if (response.ok && data.success && data.user) {
-        // Create user from API response
-        const apiUser = data.user;
-        const role = apiUser.userType as 'sponsor' | 'cde' | 'investor' | 'admin';
-
-        const userData: User = {
-          id: apiUser.id,
-          email: apiUser.email,
-          name: apiUser.name,
-          role: apiUser.role === 'ORG_ADMIN' ? Role.ORG_ADMIN : Role.MEMBER,
-          organizationId: apiUser.organizationId || '',
-          organization: apiUser.organization || {
-            id: 'org-' + Date.now(),
-            name: 'Organization',
-            slug: 'org',
-            type: role,
-          },
-          projectAssignments: [],
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-        };
-
-        // Cache the user for session restoration
-        userCache[normalizedEmail] = userData;
-
-        setCurrentDemoRole(role);
-        setUser(userData);
-
-        if (typeof window !== 'undefined') {
-          const sessionData = {
-            role,
-            email: normalizedEmail,
-            userType: role,
-            user: apiUser,
-            orgRole: apiUser.role,
-          };
-          localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
-          setCookie('tcredex_session', JSON.stringify(sessionData));
-        }
-        return { success: true };
+      const data = await res.json();
+      if (!res.ok || !data.user) {
+        return { success: false, error: data.error || 'Invalid email or password' };
       }
 
-      // API returned an error
-      return { success: false, error: data.error || 'Login failed' };
-
+      // Cookie is set server-side; just refresh state
+      await refresh();
+      return { success: true };
     } catch (error) {
-      console.error('[Login] API error:', error);
-
-      // Fallback: Check localStorage for registered users
-      if (typeof window !== 'undefined') {
-        const registeredUser = localStorage.getItem('tcredex_registered_user');
-        if (registeredUser) {
-          try {
-            const userData = JSON.parse(registeredUser);
-            if (userData.email === normalizedEmail && userData.password === password) {
-              setCurrentDemoRole(userData.role);
-              setUser(createUserFromSession(userData));
-              const sessionData = { ...userData, orgRole: Role.ORG_ADMIN };
-              localStorage.setItem('tcredex_session', JSON.stringify(sessionData));
-              setCookie('tcredex_session', JSON.stringify(sessionData));
-              return { success: true };
-            }
-          } catch (e) {
-            console.error('Error parsing registered user data:', e);
-            localStorage.removeItem('tcredex_registered_user');
-          }
-        }
-      }
-
-      return { success: false, error: 'Login failed. Please check your credentials.' };
+      console.error('[Login] error', error);
+      return { success: false, error: 'Login failed. Please try again.' };
     }
-  }, []);
+  }, [refresh]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      // Call logout API to clear server-side session
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('[Auth] logout API error', err);
+      // Continue with client-side cleanup even if API fails
+    }
+    
+    // Clear client-side state
     setUser(null);
-    setCurrentDemoRole(null);
+    
+    // Clear any localStorage data that might cause conflicts
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('tcredex_session');
-      // Delete cookie for middleware
-      deleteCookie('tcredex_session');
-      window.location.href = '/';
+      try {
+        const keysToRemove = [
+          'tcredex_session',
+          'tcredex_demo_role', 
+          'tcredex_registered_user',
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      } catch (err) {
+        console.error('[Auth] localStorage cleanup error', err);
+      }
+      
+      // Redirect to signin page
+      window.location.href = '/signin';
     }
   }, []);
 
-  const switchRole = useCallback((role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
-    if (!user) return;
-    // Role switching is deprecated - users should log in as a different user
-    // Just update the displayed role without changing user data
-    setCurrentDemoRole(role);
-    if (typeof window !== 'undefined') {
-      const savedSession = localStorage.getItem('tcredex_session');
-      if (savedSession) {
-        try {
-          const session = JSON.parse(savedSession);
-          session.role = role;
-          session.userType = role;
-          localStorage.setItem('tcredex_session', JSON.stringify(session));
-          setCookie('tcredex_session', JSON.stringify(session));
-        } catch { /* ignore */ }
-      }
-    }
-  }, [user]);
+  const switchRole = useCallback((_role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
+    // Role switching disabled; real role comes from server
+    console.warn('switchRole is disabled; log in with the correct account.');
+  }, []);
 
   const canViewDocument = (documentOwnerId: string, projectId?: string): boolean => {
     if (!user) return false;
@@ -285,9 +242,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasProjectAccess,
     login,
     logout,
+    refresh,
     switchRole,
-    currentDemoRole,
-    orgType: user?.organization.type,
+    currentDemoRole: null,
+    orgType: user?.organization?.type,
     orgName: user?.organization.name || '',
     orgLogo: user?.organization.logo,
     organizationId: user?.organizationId,

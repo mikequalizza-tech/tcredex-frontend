@@ -32,7 +32,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/dashboard/documents': 'Documents',
   '/dashboard/team': 'Team',
   '/dashboard/settings': 'Settings',
-  '/map': 'Deal Map',
+  '/map': 'Marketplace Map',
   '/deals': 'Marketplace',
   '/closing-room': 'Closing Room',
   '/pricing': 'Pricing Coach',
@@ -95,7 +95,7 @@ export default function InternalHeader({
 
     // Base items everyone can search - pages and their own stuff
     const baseSearchItems = [
-      { type: 'page', title: 'Deal Map', href: '/map' },
+      { type: 'page', title: 'Marketplace Map', href: '/map' },
       { type: 'page', title: 'Marketplace', href: '/deals' },
       { type: 'page', title: 'Dashboard', href: '/dashboard' },
       { type: 'page', title: 'Documents', href: '/dashboard/documents' },

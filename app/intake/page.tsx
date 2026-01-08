@@ -1,61 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCurrentUser } from '@/lib/auth';
 import { IntakeShell, IntakeData } from '@/components/intake-v4';
 import { DealCardPreview } from '@/components/deals';
 import { generateDealFromIntake, validateForDealCard, DealCardGeneratorResult } from '@/lib/deals';
 import { Deal } from '@/lib/data/deals';
+import { fetchDealById } from '@/lib/supabase/queries';
 
 interface DraftInfo {
   id: string;
   project_name: string;
   updated_at: string;
-  data: IntakeData;
-  readiness_score: number;
-}
-
-// Step 1: Ask for email
-function EmailStep({ onSubmit, savedEmail }: { onSubmit: (email: string) => void; savedEmail: string | null }) {
-  const [email, setEmail] = useState(savedEmail || '');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.includes('@')) {
-      localStorage.setItem('tcredex_user_email', email.toLowerCase());
-      onSubmit(email.toLowerCase());
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full">
-        <h2 className="text-xl font-bold text-white mb-2">Let&apos;s save your work</h2>
-        <p className="text-gray-400 text-sm mb-6">
-          Enter your email so you can continue from any device.
-        </p>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@email.com"
-            autoFocus
-            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none mb-4"
-            required
-          />
-          <button
-            type="submit"
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
-          >
-            Continue →
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+  draft_data?: IntakeData;
+  intake_data?: IntakeData;
+  readiness_score?: number;
+  status?: string;
 }
 
 // Step 2: Show draft options if draft exists
@@ -176,38 +138,113 @@ function AccessDenied({ orgType }: { orgType: string | undefined }) {
   );
 }
 
-// Main Page
-export default function IntakePage() {
+// Loading fallback for Suspense
+function IntakeLoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+}
+
+// Inner component that uses useSearchParams
+function IntakePageContent() {
   const router = useRouter();
-  const { orgType, isLoading: authLoading, isAuthenticated } = useCurrentUser();
-  const [step, setStep] = useState<'loading' | 'email' | 'draft-prompt' | 'form'>('loading');
+  const searchParams = useSearchParams();
+  const dealId = searchParams.get('dealId'); // Edit mode if dealId is present
+
+  const { orgType, isLoading: authLoading, isAuthenticated, organizationId, userEmail: authEmail } = useCurrentUser();
+  const [step, setStep] = useState<'loading' | 'draft-prompt' | 'form'>('loading');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [existingDraft, setExistingDraft] = useState<DraftInfo | null>(null);
   const [initialData, setInitialData] = useState<Partial<IntakeData> | undefined>(undefined);
-  
+  const [saveToast, setSaveToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [editLoadError, setEditLoadError] = useState<string | null>(null);
+
   // Preview state
   const [previewResult, setPreviewResult] = useState<DealCardGeneratorResult | null>(null);
   const [currentData, setCurrentData] = useState<IntakeData | null>(null);
 
-  // Check for saved email and draft on mount
+  // Check for edit mode (dealId in URL)
   useEffect(() => {
-    const checkForDraft = async () => {
-      const savedEmail = localStorage.getItem('tcredex_user_email');
-      
-      if (!savedEmail) {
-        setStep('email');
+    const loadDealForEdit = async () => {
+      if (!dealId) return;
+
+      try {
+        const deal = await fetchDealById(dealId);
+
+        if (!deal) {
+          setEditLoadError('Deal not found');
+          return;
+        }
+
+        // Verify ownership
+        if (deal.sponsorOrganizationId !== organizationId) {
+          setEditLoadError('You do not have permission to edit this deal');
+          return;
+        }
+
+        setEditingDeal(deal);
+        setIsEditMode(true);
+
+        // Convert Deal to IntakeData format
+        const intakeData: Partial<IntakeData> = {
+          projectName: deal.projectName,
+          projectDescription: deal.description || '',
+          city: deal.city,
+          state: deal.state,
+          censusTract: deal.censusTract || '',
+          totalProjectCost: deal.projectCost || 0,
+          nmtcFinancingRequested: deal.allocation,
+          communityBenefit: deal.communityImpact || '',
+          // Add more field mappings as needed
+        };
+
+        setInitialData(intakeData);
+        setStep('form');
+      } catch (error) {
+        console.error('[Intake] Failed to load deal for editing:', error);
+        setEditLoadError('Failed to load deal');
+      }
+    };
+
+    if (dealId && isAuthenticated && !authLoading) {
+      loadDealForEdit();
+    }
+  }, [dealId, isAuthenticated, authLoading, organizationId]);
+
+  // Hydrate email from authenticated user (preferred) or local fallback and fetch draft
+  useEffect(() => {
+    if (dealId) return; // Skip draft check in edit mode
+    if (authLoading) return;
+
+    const skipDraftCheck = searchParams.get('new') === 'true'; // Skip if user explicitly wants new deal
+
+    const hydrateAndLoadDraft = async () => {
+      if (!organizationId) {
+        setStep('form');
         return;
       }
 
-      setUserEmail(savedEmail);
+      setUserEmail(authEmail || null);
 
-      // Check for existing draft
+      // If user explicitly wants a new deal, skip draft check
+      if (skipDraftCheck) {
+        setStep('form');
+        return;
+      }
+
       try {
-        const response = await fetch(`/api/drafts?email=${encodeURIComponent(savedEmail)}`);
+        const response = await fetch(`/api/drafts?orgId=${encodeURIComponent(organizationId)}`);
         const result = await response.json();
-        
+
         if (result.draft) {
           setExistingDraft(result.draft);
+          setInitialData(result.draft.draft_data || result.draft.intake_data);
           setStep('draft-prompt');
         } else {
           setStep('form');
@@ -218,42 +255,22 @@ export default function IntakePage() {
       }
     };
 
-    checkForDraft();
-  }, []);
-
-  // Handle email submit
-  const handleEmailSubmit = async (email: string) => {
-    setUserEmail(email);
-
-    // Check for existing draft
-    try {
-      const response = await fetch(`/api/drafts?email=${encodeURIComponent(email)}`);
-      const result = await response.json();
-      
-      if (result.draft) {
-        setExistingDraft(result.draft);
-        setStep('draft-prompt');
-      } else {
-        setStep('form');
-      }
-    } catch {
-      setStep('form');
-    }
-  };
+    hydrateAndLoadDraft();
+  }, [authEmail, authLoading, dealId, organizationId, searchParams]);
 
   // Continue with existing draft
   const handleContinueDraft = () => {
-    if (existingDraft?.data) {
-      setInitialData(existingDraft.data);
+    if (existingDraft?.draft_data || existingDraft?.intake_data) {
+      setInitialData(existingDraft.draft_data || existingDraft.intake_data);
     }
     setStep('form');
   };
 
   // Start fresh (delete draft)
   const handleStartFresh = async () => {
-    if (userEmail) {
+    if (organizationId) {
       try {
-        await fetch(`/api/drafts?email=${encodeURIComponent(userEmail)}`, {
+        await fetch(`/api/drafts?orgId=${encodeURIComponent(organizationId)}`, {
           method: 'DELETE'
         });
       } catch (error) {
@@ -267,21 +284,67 @@ export default function IntakePage() {
 
   // Save draft
   const handleSave = useCallback(async (data: IntakeData, readinessScore: number) => {
-    if (!userEmail) return;
+    if (!organizationId) {
+      setSaveToast({ type: 'error', message: 'Missing organization. Please sign in again.' });
+      setTimeout(() => setSaveToast(null), 3000);
+      return;
+    }
 
     try {
-      await fetch('/api/drafts', {
+      const response = await fetch('/api/drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail, data, readinessScore })
+        body: JSON.stringify({ organizationId, data, readinessScore, dealId: existingDraft?.id })
       });
-      // Also backup to localStorage
+      const result = await response.json();
+      
+      // Enhanced error logging
+      console.log('[Intake] Save response:', { 
+        ok: response.ok, 
+        status: response.status, 
+        result 
+      });
+      
       localStorage.setItem('tcredex_draft', JSON.stringify(data));
+      
+      if (!response.ok || !result?.success) {
+        const errorMsg = result?.error || result?.message || `HTTP ${response.status}: Save failed`;
+        console.error('[Intake] Save API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          result,
+          errorMsg
+        });
+        throw new Error(errorMsg);
+      }
+      
+      setSaveToast({ type: 'success', message: 'Draft saved to your account' });
+      setExistingDraft(result.draft ?? existingDraft);
+      setInitialData(result.draft?.draft_data || result.draft?.intake_data || data);
+      setTimeout(() => setSaveToast(null), 3000);
     } catch (error) {
-      console.error('[Intake] Save failed:', error);
+      console.error('[Intake] Save failed - Full error:', error);
+      console.error('[Intake] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        organizationId,
+        dataKeys: Object.keys(data),
+        timestamp: new Date().toISOString()
+      });
+      
       localStorage.setItem('tcredex_draft', JSON.stringify(data));
+      
+      // Show more detailed error message and keep it longer
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setSaveToast({ 
+        type: 'error', 
+        message: `Save failed: ${errorMessage}. Saved locally; will sync when online` 
+      });
+      
+      // Keep error message for 8 seconds instead of 3
+      setTimeout(() => setSaveToast(null), 8000);
     }
-  }, [userEmail]);
+  }, [existingDraft, organizationId]);
 
   // Submit
   const handleSubmit = async (data: IntakeData, readinessScore: number) => {
@@ -307,7 +370,8 @@ export default function IntakePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           intakeData: currentData,
-          saveOnly: false
+          saveOnly: false,
+          dealId: existingDraft?.id || undefined,
         })
       });
 
@@ -315,8 +379,8 @@ export default function IntakePage() {
 
       if (result.success) {
         // Clear draft
-        if (userEmail) {
-          await fetch(`/api/drafts?email=${encodeURIComponent(userEmail)}`, { method: 'DELETE' });
+        if (organizationId) {
+          await fetch(`/api/drafts?orgId=${encodeURIComponent(organizationId)}`, { method: 'DELETE' });
         }
         localStorage.removeItem('tcredex_draft');
         
@@ -335,12 +399,35 @@ export default function IntakePage() {
   // ========================================
   // ROLE-BASED ACCESS CONTROL
   // ========================================
-  
+
   // Show loading while auth is checking
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Edit mode error
+  if (editLoadError) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center max-w-md p-8 bg-gray-900 rounded-xl border border-gray-800">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-100 mb-2">Cannot Edit Deal</h1>
+          <p className="text-gray-400 mb-6">{editLoadError}</p>
+          <Link
+            href="/deals"
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+          >
+            Back to Marketplace
+          </Link>
+        </div>
       </div>
     );
   }
@@ -363,15 +450,11 @@ export default function IntakePage() {
     );
   }
 
-  if (step === 'email') {
-    return <EmailStep onSubmit={handleEmailSubmit} savedEmail={null} />;
-  }
-
-  if (step === 'draft-prompt' && existingDraft && userEmail) {
+  if (step === 'draft-prompt' && existingDraft) {
     return (
       <DraftPrompt
         draft={existingDraft}
-        email={userEmail}
+        email={userEmail || 'your account'}
         onContinue={handleContinueDraft}
         onStartFresh={handleStartFresh}
       />
@@ -381,12 +464,71 @@ export default function IntakePage() {
   // Form step
   return (
     <>
+      {saveToast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm border ${
+          saveToast.type === 'success'
+            ? 'bg-emerald-900/80 border-emerald-600 text-emerald-100'
+            : 'bg-amber-900/80 border-amber-600 text-amber-100'
+        }`}
+        >
+          {saveToast.message}
+        </div>
+      )}
+
+      {/* Navigation Header */}
+      <div className="bg-gray-900 border-b border-gray-800">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link 
+            href="/dashboard"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Dashboard
+          </Link>
+          
+          {/* tCredex Logo */}
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">tC</span>
+            </div>
+            <span className="text-xl font-bold text-white">tCredex</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Edit Mode Header */}
+      {isEditMode && editingDeal && (
+        <div className="bg-amber-900/30 border-b border-amber-500/30">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <div>
+                <p className="text-amber-200 font-medium">Editing: {editingDeal.projectName}</p>
+                <p className="text-amber-300/70 text-xs">Project name cannot be changed after submission</p>
+              </div>
+            </div>
+            <Link
+              href={`/deals/${dealId}`}
+              className="px-3 py-1.5 text-sm text-amber-200 hover:text-white border border-amber-500/50 rounded-lg hover:bg-amber-500/20 transition-colors"
+            >
+              Cancel
+            </Link>
+          </div>
+        </div>
+      )}
+
       <IntakeShell
         initialData={initialData}
         onSave={handleSave}
         onSubmit={handleSubmit}
+        isEditMode={isEditMode}
+        lockedProjectName={isEditMode ? editingDeal?.projectName : undefined}
       />
-      
+
       {previewResult && (
         <DealCardPreview
           result={previewResult}
@@ -396,5 +538,14 @@ export default function IntakePage() {
         />
       )}
     </>
+  );
+}
+
+// Main Page - wraps content in Suspense for useSearchParams
+export default function IntakePage() {
+  return (
+    <Suspense fallback={<IntakeLoadingFallback />}>
+      <IntakePageContent />
+    </Suspense>
   );
 }

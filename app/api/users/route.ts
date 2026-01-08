@@ -1,59 +1,95 @@
 /**
  * tCredex Users API
- * User management with Supabase
+ * User management with proper auth and org filtering
+ * CRITICAL: Users are team members within organizations, not created during registration
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-
-const supabase = getSupabaseAdmin();
+import { requireAuth, requireOrgAdmin, handleAuthError, verifyOrgAccess } from '@/lib/api/auth-middleware';
 
 // =============================================================================
-// GET /api/users - List users (with org filter)
+// GET /api/users - List team members in user's organization
 // =============================================================================
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    
-    const organizationId = searchParams.get('organization_id');
-    const role = searchParams.get('role');
-    const email = searchParams.get('email');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
 
-    let query = supabase
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    // Get specific user
+    if (id) {
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          organization:organizations(id, name, slug, type)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      const typedData = data as { organization_id: string };
+
+      // CRITICAL: Verify user belongs to same org or is admin
+      if (user.organizationId !== typedData.organization_id && user.organizationType !== 'admin') {
+        return NextResponse.json(
+          { error: 'You do not have access to this user' },
+          { status: 403 }
+        );
+      }
+
+      return NextResponse.json({ user: data });
+    }
+
+    // List team members in user's organization
+    const { data, error } = await supabase
       .from('users')
       .select(`
         *,
         organization:organizations(id, name, slug, type)
       `)
+      .eq('organization_id', user.organizationId)
       .eq('is_active', true)
-      .limit(limit);
-
-    if (organizationId) query = query.eq('organization_id', organizationId);
-    if (role) query = query.eq('role', role);
-    if (email) query = query.eq('email', email);
-
-    const { data, error } = await query;
+      .order('name');
 
     if (error) throw error;
 
     return NextResponse.json({ users: data });
   } catch (error) {
-    console.error('GET /api/users error:', error);
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
 // =============================================================================
-// POST /api/users - Create user
+// POST /api/users - Create team member (org admin only)
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Require org admin
+    const user = await requireOrgAdmin(request);
+    const supabase = getSupabaseAdmin();
+
     const body = await request.json();
 
     if (!body.email || !body.name) {
       return NextResponse.json(
         { error: 'email and name are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate role
+    const validRoles = ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'];
+    if (body.role && !validRoles.includes(body.role)) {
+      return NextResponse.json(
+        { error: 'Invalid role' },
         { status: 400 }
       );
     }
@@ -72,16 +108,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create user in user's organization
     const { data, error } = await supabase
       .from('users')
       .insert({
         email: body.email,
         name: body.name,
         role: body.role || 'MEMBER',
-        organization_id: body.organization_id,
+        organization_id: user.organizationId, // CRITICAL: Use user's org
         phone: body.phone,
         title: body.title,
         avatar_url: body.avatar_url,
+        is_active: true,
       } as never)
       .select(`
         *,
@@ -91,9 +129,30 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Log to ledger
+    await supabase.from('ledger_events').insert({
+      actor_type: 'human',
+      actor_id: user.id,
+      entity_type: 'user',
+      entity_id: (data as { id: string }).id,
+      action: 'user_created',
+      payload_json: { email: body.email, name: body.name },
+      hash: generateHash(data as Record<string, unknown>),
+    } as never);
+
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    console.error('POST /api/users error:', error);
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+    return handleAuthError(error);
   }
+}
+
+function generateHash(data: Record<string, unknown>): string {
+  const str = JSON.stringify(data) + Date.now();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16).padStart(16, '0');
 }

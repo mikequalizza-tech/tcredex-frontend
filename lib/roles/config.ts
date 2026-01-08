@@ -55,27 +55,27 @@ export interface MarketplaceConfig {
 
 export const MARKETPLACE_CONFIG: Record<OrgType, MarketplaceConfig> = {
   sponsor: {
-    entityType: 'cdes', // Sponsors see CDEs and Investors
-    title: 'Find CDEs & Investors',
-    description: 'Browse CDEs with available allocation and investors seeking opportunities',
-    emptyStateMessage: 'No CDEs or investors match your project criteria yet.',
+    entityType: 'investors', // Sponsors primarily see INVESTORS (LIHTC is bigger market)
+    title: 'Find Investors & CDEs',
+    description: 'Browse investors seeking tax credit opportunities and CDEs with NMTC allocation',
+    emptyStateMessage: 'No investors or CDEs match your project criteria yet.',
     showMatchScore: true,
     showRequestButton: true,
     requestButtonLabel: 'Request Info',
   },
   cde: {
     entityType: 'deals', // CDEs see Projects/Deals
-    title: 'Project Pipeline',
-    description: 'Review projects seeking NMTC allocation that match your criteria',
-    emptyStateMessage: 'No projects match your investment criteria yet.',
+    title: 'NMTC Project Pipeline',
+    description: 'Review NMTC projects seeking allocation that match your criteria',
+    emptyStateMessage: 'No NMTC projects match your investment criteria yet.',
     showMatchScore: true,
     showRequestButton: true,
     requestButtonLabel: 'Review Deal',
   },
   investor: {
     entityType: 'deals', // Investors see Projects/Deals
-    title: 'Investment Opportunities',
-    description: 'Discover tax credit investment opportunities matching your preferences',
+    title: 'Tax Credit Investment Opportunities',
+    description: 'Discover LIHTC, HTC, OZ, and other tax credit investment opportunities',
     emptyStateMessage: 'No investment opportunities match your criteria yet.',
     showMatchScore: true,
     showRequestButton: true,
@@ -95,21 +95,21 @@ export interface MapConfig {
 export const MAP_CONFIG: Record<OrgType, MapConfig> = {
   sponsor: {
     showDealCards: false,      // Sponsors don't need to see other deals
-    showCDECards: true,        // Sponsors see CDE locations
-    showInvestorCards: true,   // Sponsors see Investor locations
-    cardClickAction: 'view_cde',
+    showCDECards: true,        // Sponsors see CDE locations (for NMTC only)
+    showInvestorCards: true,   // Sponsors see Investor locations (primary for LIHTC/HTC/OZ)
+    cardClickAction: 'view_investor', // Primary action is investor (LIHTC is bigger market)
     filterByMatch: true,
   },
   cde: {
-    showDealCards: true,       // CDEs see project locations
+    showDealCards: true,       // CDEs see NMTC project locations only
     showCDECards: false,       // CDEs don't need to see other CDEs
     showInvestorCards: false,  // CDEs connect with investors elsewhere
     cardClickAction: 'view_deal',
     filterByMatch: true,
   },
   investor: {
-    showDealCards: true,       // Investors see project locations
-    showCDECards: false,       // Investors work with CDEs on deals
+    showDealCards: true,       // Investors see all project locations (LIHTC, HTC, OZ, NMTC)
+    showCDECards: false,       // Investors work with CDEs on NMTC deals only
     showInvestorCards: false,  // Investors don't need to see other investors
     cardClickAction: 'view_deal',
     filterByMatch: true,

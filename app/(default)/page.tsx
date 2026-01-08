@@ -1,10 +1,10 @@
 import HeroHome from "@/components/HeroHome";
-import Features from "@/components/features";
 import FeaturedDeals from "@/components/FeaturedDeals";
 import Workflows from "@/components/workflows";
 import NoRiskSection from "@/components/NoRiskSection";
 import Cta from "@/components/cta";
 import MapSection from "@/components/MapSection";
+import Features from "@/components/features";
 
 // Preload the map component on initial page load
 // This import starts loading the component module immediately

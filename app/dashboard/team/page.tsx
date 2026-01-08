@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useCurrentUser } from '@/lib/auth';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
@@ -17,74 +17,6 @@ interface TeamMember {
   phone?: string;
   department?: string;
 }
-
-const DEMO_TEAM: TeamMember[] = [
-  {
-    id: 'user-001',
-    name: 'John Smith',
-    email: 'john.smith@example.com',
-    title: 'Development Director',
-    role: 'owner',
-    lastActive: '2 minutes ago',
-    status: 'active',
-    phone: '(555) 123-4567',
-    department: 'Executive',
-  },
-  {
-    id: 'user-002',
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@example.com',
-    title: 'Project Manager',
-    role: 'admin',
-    lastActive: '1 hour ago',
-    status: 'active',
-    phone: '(555) 234-5678',
-    department: 'Operations',
-  },
-  {
-    id: 'user-003',
-    name: 'David Chen',
-    email: 'david.chen@example.com',
-    title: 'Financial Analyst',
-    role: 'member',
-    lastActive: '3 hours ago',
-    status: 'active',
-    phone: '(555) 345-6789',
-    department: 'Finance',
-  },
-  {
-    id: 'user-004',
-    name: 'Emily Davis',
-    email: 'emily.davis@example.com',
-    title: 'Compliance Officer',
-    role: 'member',
-    lastActive: 'Yesterday',
-    status: 'active',
-    phone: '(555) 456-7890',
-    department: 'Compliance',
-  },
-  {
-    id: 'user-005',
-    name: 'Robert Wilson',
-    email: 'robert.wilson@example.com',
-    title: 'Legal Counsel',
-    role: 'viewer',
-    lastActive: '2 days ago',
-    status: 'active',
-    phone: '(555) 567-8901',
-    department: 'Legal',
-  },
-  {
-    id: 'user-006',
-    name: 'Jennifer Martinez',
-    email: 'jennifer.martinez@example.com',
-    title: 'Accountant',
-    role: 'member',
-    lastActive: 'Pending',
-    status: 'pending',
-    department: 'Finance',
-  },
-];
 
 const ROLE_LABELS: Record<MemberRole, string> = {
   owner: 'Owner',
@@ -107,9 +39,54 @@ const STATUS_COLORS = {
 };
 
 export default function TeamPage() {
-  const { userName, userEmail, orgName, orgType } = useCurrentUser();
-  const [members, setMembers] = useState<TeamMember[]>(DEMO_TEAM);
+  const { userName, userEmail, orgName, orgType, organizationId } = useCurrentUser();
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
+
+  // Fetch team members from API
+  const fetchTeamMembers = useCallback(async () => {
+    if (!organizationId) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/team?organizationId=${organizationId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMembers(data.members || []);
+      } else {
+        // If API fails or no members, show current user as the only member (owner)
+        setMembers([{
+          id: 'current-user',
+          name: userName || 'You',
+          email: userEmail || '',
+          title: 'Organization Owner',
+          role: 'owner',
+          lastActive: 'Now',
+          status: 'active',
+        }]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch team members:', error);
+      // Show current user as owner on error
+      setMembers([{
+        id: 'current-user',
+        name: userName || 'You',
+        email: userEmail || '',
+        title: 'Organization Owner',
+        role: 'owner',
+        lastActive: 'Now',
+        status: 'active',
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId, userName, userEmail]);
+
+  // Fetch on mount
+  useEffect(() => {
+    fetchTeamMembers();
+  }, [fetchTeamMembers]);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [showOrgSettingsModal, setShowOrgSettingsModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
@@ -219,6 +196,17 @@ export default function TeamPage() {
     pending: members.filter(m => m.status === 'pending').length,
     admins: members.filter(m => m.role === 'admin' || m.role === 'owner').length,
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="p-8">
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">

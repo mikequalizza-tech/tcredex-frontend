@@ -47,7 +47,7 @@ export default function Cta() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Schedule Demo
+                  Schedule a Live Demo
                 </a>
               </div>
             </div>

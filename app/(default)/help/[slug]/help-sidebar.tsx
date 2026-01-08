@@ -8,24 +8,24 @@ export default function HelpSidebar() {
 
   const links = [
     {
-      name: "FAQ's - General Topics",
-      href: "/help/frequently-asked-questions",
+      name: "Help Center",
+      href: "/help",
     },
     {
-      name: "What is Open PRO",
-      href: "/help/what-is-open-pro",
+      name: "What is tCredex?",
+      href: "/help/what-is-tcredex",
     },
     {
-      name: "Open PRO plan’s features",
-      href: "/help/open-pro-plans-features",
-    },
-    {
-      name: "Get started",
+      name: "Getting Started",
       href: "/help/get-started",
     },
     {
-      name: "Payments FAQ’s",
-      href: "/help/payments-faqs",
+      name: "tCredex Plans",
+      href: "/help/tcredex-plans",
+    },
+    {
+      name: "FAQ's",
+      href: "/help/frequently-asked-questions",
     },
   ];
 

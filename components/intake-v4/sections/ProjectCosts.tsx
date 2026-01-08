@@ -138,23 +138,25 @@ export function ProjectCosts({ data, onChange }: ProjectCostsProps) {
         </div>
       </div>
 
-      {/* Requested Allocation */}
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
-          Requested NMTC Allocation
-        </label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-          <input
-            type="text"
-            value={formatCurrency(data.requestedAllocation)}
-            onChange={(e) => onChange({ requestedAllocation: parseCurrency(e.target.value) })}
-            placeholder="0"
-            className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          />
+      {/* Requested Allocation - Only for NMTC deals */}
+      {data.programs?.includes('NMTC') && (
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Requested NMTC Allocation
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+            <input
+              type="text"
+              value={formatCurrency(data.requestedAllocation)}
+              onChange={(e) => onChange({ requestedAllocation: parseCurrency(e.target.value) })}
+              placeholder="0"
+              className="w-full pl-8 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Qualified Equity Investment (QEI) amount being requested</p>
         </div>
-        <p className="text-xs text-gray-500 mt-1">Qualified Equity Investment (QEI) amount being requested</p>
-      </div>
+      )}
     </div>
   );
 }

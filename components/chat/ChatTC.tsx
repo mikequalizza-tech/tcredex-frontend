@@ -6,6 +6,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   showContactForm?: 'support' | 'advisory';
+  isTechnicalQuestion?: boolean;
 }
 
 interface ContactFormData {
@@ -14,22 +15,6 @@ interface ContactFormData {
   topic: string;
   message: string;
 }
-
-const SYSTEM_PROMPT = `You are ChatTC, the AI assistant for tCredex - an AI-powered tax credit marketplace platform. You help users understand:
-
-1. **Tax Credit Programs**: LIHTC, NMTC, HTC, Opportunity Zones, and Brownfield credits
-2. **Eligibility**: Census tract qualifications, QALICB tests, distressed area requirements
-3. **Platform Features**: Deal matching, pricing guidance, closing room workflow
-4. **General Questions**: How the marketplace works, user roles (Sponsors, CDEs, Investors)
-
-Key Facts:
-- NMTC provides 39% credit over 7 years (5% first 3 years, 6% last 4 years)
-- LIHTC provides 9% or 4% credits over 10 years for affordable housing
-- HTC provides 20% credit for rehabilitating certified historic buildings
-- Opportunity Zones offer capital gains deferral and exclusion
-- Brownfield credits vary by state for contaminated property cleanup
-
-Be helpful, concise, and direct. If you don't know something specific about tCredex, say so but offer to help with general tax credit questions.`;
 
 // Embedded Contact Form Component
 function EmbeddedContactForm({ 
@@ -160,6 +145,7 @@ export default function ChatTC() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showContactForm, setShowContactForm] = useState<'support' | 'advisory' | null>(null);
+  const [technicalQuestionCount, setTechnicalQuestionCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -170,11 +156,35 @@ export default function ChatTC() {
     scrollToBottom();
   }, [messages, showContactForm]);
 
+  // Detect if a question is technical/deal-related that ChatTC CANNOT answer
+  const isUnansweredTechnicalQuestion = (userText: string, assistantResponse: string): boolean => {
+    // These are questions ChatTC CANNOT answer and should refer to AIV
+    const unansweredKeywords = [
+      'help me with my deal', 'help me close', 'help me structure', 'help me find',
+      'deal structuring', 'cde matching', 'investor intro', 'closing support',
+      'transaction support', 'need an advisor', 'need a consultant', 'need help with',
+      'recommend someone', 'who can help me', 'can you help me close',
+      'can you help me structure', 'can you help me find'
+    ];
+    
+    // If the response contains an actual answer (not a referral), don't count it
+    const hasActualAnswer = assistantResponse.length > 200 && 
+                           !assistantResponse.toLowerCase().includes('contact aiv') &&
+                           !assistantResponse.toLowerCase().includes('american impact ventures') &&
+                           !assistantResponse.toLowerCase().includes('deals@americanimpactventures');
+    
+    if (hasActualAnswer) return false; // ChatTC answered it, don't count
+    
+    const lower = userText.toLowerCase();
+    return unansweredKeywords.some(keyword => lower.includes(keyword));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
+    
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
@@ -191,17 +201,24 @@ export default function ChatTC() {
       if (!response.ok) throw new Error('Failed to get response');
 
       const data = await response.json();
+      const assistantResponse = data.content;
       
-      // Check if the response suggests contacting support or AIV
+      // Only count as unanswered technical question if ChatTC couldn't answer it
+      const isUnanswered = isUnansweredTechnicalQuestion(userMessage, assistantResponse);
+      const newCount = isUnanswered ? technicalQuestionCount + 1 : technicalQuestionCount;
+      
+      // Only suggest AIV after 3+ unanswered technical questions
       let formType: 'support' | 'advisory' | undefined;
-      const content = data.content.toLowerCase();
-      if (content.includes('support@tcredex.com') || content.includes('platform support')) {
-        formType = 'support';
-      } else if (content.includes('americanimpactventures.com') || content.includes('aiv') || content.includes('contact-aiv')) {
+      const content = assistantResponse.toLowerCase();
+      
+      if (newCount >= 3 && (content.includes('americanimpactventures') || content.includes('aiv') || content.includes('deals@'))) {
         formType = 'advisory';
+      } else if (content.includes('support@tcredex.com') || content.includes('platform support')) {
+        formType = 'support';
       }
 
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.content, showContactForm: formType }]);
+      setTechnicalQuestionCount(newCount);
+      setMessages((prev) => [...prev, { role: 'assistant', content: assistantResponse, showContactForm: formType }]);
     } catch (error) {
       console.error('Chat error:', error);
       setMessages((prev) => [

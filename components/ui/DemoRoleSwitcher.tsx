@@ -4,11 +4,17 @@ import { useState } from 'react';
 import { useCurrentUser } from '@/lib/auth';
 
 export default function DemoRoleSwitcher() {
-  const { currentDemoRole, switchRole, userName, orgName, isAuthenticated } = useCurrentUser();
+  const { currentDemoRole, switchRole, userName, orgName, isAuthenticated, user } = useCurrentUser();
   const [isOpen, setIsOpen] = useState(false);
 
   // Don't render if user is not logged in
   if (!isAuthenticated) {
+    return null;
+  }
+
+  // Don't render for real authenticated users (only for demo mode)
+  // If user has a real email from Supabase, don't show demo switcher
+  if (user && user.email && !user.email.includes('demo')) {
     return null;
   }
 

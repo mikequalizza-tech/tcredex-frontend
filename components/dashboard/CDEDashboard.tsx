@@ -1,33 +1,76 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useCurrentUser } from '@/lib/auth/useCurrentUser';
+import { fetchCDEPipelineDeals, fetchCDEAllocations, type CDEAllocation } from '@/lib/supabase/queries';
+import { Deal } from '@/lib/data/deals';
 
 interface CDEDashboardProps {
   userName: string;
   orgName: string;
 }
 
-const PIPELINE_DEALS = [
-  { id: 'deal-001', projectName: 'Downtown Community Center', sponsor: 'Metro Development Corp', program: 'NMTC', allocation: 15000000, stage: 'closing', daysInStage: 12 },
-  { id: 'deal-008', projectName: 'Rural Health Clinic Network', sponsor: 'HealthFirst Foundation', program: 'NMTC', allocation: 12000000, stage: 'underwriting', daysInStage: 5 },
-  { id: 'deal-012', projectName: 'Workforce Training Center', sponsor: 'Skills Development Corp', program: 'NMTC', allocation: 9000000, stage: 'review', daysInStage: 3 },
-  { id: 'deal-010', projectName: 'Eastside Grocery Co-Op', sponsor: 'Food Access Initiative', program: 'NMTC', allocation: 4500000, stage: 'new', daysInStage: 1 },
-];
-
 const STAGE_COLORS: Record<string, string> = {
-  new: 'bg-blue-900/50 text-blue-400',
-  review: 'bg-purple-900/50 text-purple-400',
-  underwriting: 'bg-amber-900/50 text-amber-400',
+  draft: 'bg-gray-900/50 text-gray-400',
+  submitted: 'bg-blue-900/50 text-blue-400',
+  under_review: 'bg-purple-900/50 text-purple-400',
+  available: 'bg-amber-900/50 text-amber-400',
+  seeking_capital: 'bg-amber-900/50 text-amber-400',
+  matched: 'bg-green-900/50 text-green-400',
   closing: 'bg-green-900/50 text-green-400',
+  closed: 'bg-gray-900/50 text-gray-400',
+  withdrawn: 'bg-red-900/50 text-red-400',
 };
 
 export default function CDEDashboard({ userName, orgName }: CDEDashboardProps) {
+  const { user } = useCurrentUser();
+  const [pipelineDeals, setPipelineDeals] = useState<Deal[]>([]);
+  const [allocations, setAllocations] = useState<CDEAllocation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadCDEData() {
+      if (!user?.organizationId) return;
+      
+      try {
+        const [deals, allocs] = await Promise.all([
+          fetchCDEPipelineDeals(user.organizationId),
+          fetchCDEAllocations(user.organizationId)
+        ]);
+        
+        setPipelineDeals(deals);
+        setAllocations(allocs);
+      } catch (error) {
+        console.error('Error loading CDE data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadCDEData();
+  }, [user?.organizationId]);
+
   const formatCurrency = (num: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(num);
 
-  const allocationRemaining = 45000000;
-  const allocationUsed = 85000000;
-  const totalAllocation = allocationRemaining + allocationUsed;
+  // Calculate allocation totals from real data
+  const totalAllocation = allocations.reduce((sum, alloc) => sum + alloc.awardedAmount, 0);
+  const deployedAmount = allocations.reduce((sum, alloc) => sum + alloc.deployedAmount, 0);
+  const remainingAllocation = totalAllocation - deployedAmount;
+
+  // Calculate pipeline stats from real deals
+  const pipelineStats = {
+    new: pipelineDeals.filter(d => d.status === 'submitted' || d.status === 'available').length,
+    review: pipelineDeals.filter(d => d.status === 'under_review').length,
+    underwriting: pipelineDeals.filter(d => d.status === 'seeking_capital').length,
+    closing: pipelineDeals.filter(d => d.status === 'matched' || d.status === 'closing').length,
+  };
+
+  const getDaysInStage = (deal: Deal) => {
+    const submittedDate = new Date(deal.submittedDate);
+    const now = new Date();
+    return Math.floor((now.getTime() - submittedDate.getTime()) / (1000 * 60 * 60 * 24));
+  };
 
   return (
     <div className="space-y-6">
@@ -54,40 +97,40 @@ export default function CDEDashboard({ userName, orgName }: CDEDashboardProps) {
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="text-center">
             <p className="text-sm text-gray-400">Total Allocation</p>
-            <p className="text-xl font-bold text-gray-100">{formatCurrency(totalAllocation)}</p>
+            <p className="text-xl font-bold text-gray-100">{loading ? '...' : formatCurrency(totalAllocation)}</p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-400">Deployed</p>
-            <p className="text-xl font-bold text-green-400">{formatCurrency(allocationUsed)}</p>
+            <p className="text-xl font-bold text-green-400">{loading ? '...' : formatCurrency(deployedAmount)}</p>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-400">Available</p>
-            <p className="text-xl font-bold text-indigo-400">{formatCurrency(allocationRemaining)}</p>
+            <p className="text-xl font-bold text-indigo-400">{loading ? '...' : formatCurrency(remainingAllocation)}</p>
           </div>
         </div>
         <div className="w-full bg-gray-800 rounded-full h-3">
-          <div className="bg-gradient-to-r from-green-500 to-indigo-500 h-3 rounded-full" style={{ width: `${(allocationUsed / totalAllocation) * 100}%` }} />
+          <div className="bg-gradient-to-r from-green-500 to-indigo-500 h-3 rounded-full" style={{ width: totalAllocation > 0 ? `${(deployedAmount / totalAllocation) * 100}%` : '0%' }} />
         </div>
-        <p className="text-xs text-gray-500 mt-2">{((allocationUsed / totalAllocation) * 100).toFixed(0)}% deployed • QEI deadline: Dec 31, 2024</p>
+        <p className="text-xs text-gray-500 mt-2">{totalAllocation > 0 ? ((deployedAmount / totalAllocation) * 100).toFixed(0) : 0}% deployed • QEI deadline: Dec 31, 2025</p>
       </div>
 
       {/* Pipeline Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
           <p className="text-sm text-gray-400">New Submissions</p>
-          <p className="text-2xl font-bold text-blue-400 mt-1">3</p>
+          <p className="text-2xl font-bold text-blue-400 mt-1">{loading ? '...' : pipelineStats.new}</p>
         </div>
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
           <p className="text-sm text-gray-400">In Review</p>
-          <p className="text-2xl font-bold text-purple-400 mt-1">5</p>
+          <p className="text-2xl font-bold text-purple-400 mt-1">{loading ? '...' : pipelineStats.review}</p>
         </div>
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
           <p className="text-sm text-gray-400">Underwriting</p>
-          <p className="text-2xl font-bold text-amber-400 mt-1">4</p>
+          <p className="text-2xl font-bold text-amber-400 mt-1">{loading ? '...' : pipelineStats.underwriting}</p>
         </div>
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
           <p className="text-sm text-gray-400">In Closing</p>
-          <p className="text-2xl font-bold text-green-400 mt-1">2</p>
+          <p className="text-2xl font-bold text-green-400 mt-1">{loading ? '...' : pipelineStats.closing}</p>
         </div>
       </div>
 
@@ -110,24 +153,38 @@ export default function CDEDashboard({ userName, orgName }: CDEDashboardProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {PIPELINE_DEALS.map((deal) => (
-                <tr key={deal.id} className="hover:bg-gray-800/50">
-                  <td className="px-6 py-4">
-                    <p className="font-medium text-gray-100">{deal.projectName}</p>
-                  </td>
-                  <td className="px-6 py-4 text-gray-400">{deal.sponsor}</td>
-                  <td className="px-6 py-4 text-gray-300">{formatCurrency(deal.allocation)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STAGE_COLORS[deal.stage]}`}>
-                      {deal.stage.charAt(0).toUpperCase() + deal.stage.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-400">{deal.daysInStage}d</td>
-                  <td className="px-6 py-4">
-                    <Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm">View →</Link>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                    Loading pipeline deals...
                   </td>
                 </tr>
-              ))}
+              ) : pipelineDeals.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                    No deals in pipeline yet. <Link href="/deals" className="text-indigo-400 hover:text-indigo-300">Browse marketplace</Link> to find opportunities.
+                  </td>
+                </tr>
+              ) : (
+                pipelineDeals.slice(0, 4).map((deal) => (
+                  <tr key={deal.id} className="hover:bg-gray-800/50">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-100">{deal.projectName}</p>
+                    </td>
+                    <td className="px-6 py-4 text-gray-400">{deal.sponsorName}</td>
+                    <td className="px-6 py-4 text-gray-300">{formatCurrency(deal.allocation)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STAGE_COLORS[deal.status] || STAGE_COLORS.draft}`}>
+                        {deal.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-400">{getDaysInStage(deal)}d</td>
+                    <td className="px-6 py-4">
+                      <Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm">View →</Link>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

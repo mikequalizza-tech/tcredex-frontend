@@ -78,7 +78,7 @@ export default function DealMapView() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-indigo-300">tCredex</h1>
-            <span className="text-sm text-gray-400">Deal Map</span>
+            <span className="text-sm text-gray-400">Marketplace</span>
           </div>
 
           {/* View Toggle */}

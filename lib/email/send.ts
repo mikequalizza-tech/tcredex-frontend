@@ -47,6 +47,10 @@ async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; i
   }
 
   try {
+    console.log(`[Email] Sending to: ${Array.isArray(to) ? to.join(', ') : to}`);
+    console.log(`[Email] Subject: ${subject}`);
+    console.log(`[Email] From: ${FROM_EMAIL}`);
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -66,13 +70,20 @@ async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; i
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Email send error:', data);
+      console.error('[Email] Send failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: data,
+        to,
+        subject
+      });
       return { success: false, error: data.message || 'Failed to send email' };
     }
 
+    console.log(`[Email] Sent successfully! ID: ${data.id}`);
     return { success: true, id: data.id };
   } catch (error) {
-    console.error('Email send error:', error);
+    console.error('[Email] Send exception:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

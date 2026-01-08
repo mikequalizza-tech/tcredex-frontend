@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+
 import Link from 'next/link';
 
 type OrgType = 'sponsor' | 'cde' | 'investor' | 'consultant';
@@ -20,8 +20,15 @@ const scheduleNames: Record<OrgType, string> = {
   consultant: 'Schedule D (Consultants)',
 };
 
+const roleDisplayNames: Record<OrgType, string> = {
+  sponsor: 'Project Sponsor',
+  cde: 'CDE',
+  investor: 'Investor',
+  consultant: 'Consultant',
+};
+
 export default function SignUp() {
-  const router = useRouter();
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -56,32 +63,41 @@ export default function SignUp() {
 
     setIsSubmitting(true);
 
-    // Demo: Store registration locally and auto-login
-    // In production, this would call an API
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      // Call registration API
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          password,
+          name,
+          organizationName: orgName,
+          role: orgType === 'consultant' ? 'sponsor' : orgType, // Consultants use sponsor flow for now
+        }),
+      });
 
-      // Create demo session
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      // Create local session with API response
       const session = {
         role: orgType,
         email: email.toLowerCase(),
         name,
         orgName,
-        registeredAt: new Date().toISOString(),
-        termsAcceptedAt: new Date().toISOString(),
-        showWelcomeModal: true, // Flag for first login modal
+        organizationId: data.user?.organization?.id,
+        userId: data.user?.id,
+        token: data.token,
       };
 
-      localStorage.setItem('tcredex_session', JSON.stringify(session));
-      localStorage.setItem('tcredex_registered_user', JSON.stringify({
-        ...session,
-        password, // In production, never store passwords client-side
-      }));
-
-      // Redirect to dashboard
-      router.push('/dashboard');
-    } catch {
-      setError('Registration failed. Please try again.');
+      // Registration successful - redirect to signin for proper authentication
+      setRegistrationSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -116,6 +132,45 @@ export default function SignUp() {
       color: 'amber',
     },
   ];
+
+  if (registrationSuccess) {
+    return (
+      <section>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="py-12 md:py-20">
+            <div className="mx-auto max-w-[500px] text-center">
+              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-10 h-10 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-gray-100 mb-4">Account Created Successfully!</h1>
+              <p className="text-gray-400 mb-6">
+                Welcome to tCredex, {name}! Your {orgType && roleDisplayNames[orgType]} account for <strong className="text-gray-200">{orgName}</strong> has been created.
+              </p>
+              <div className="bg-indigo-900/30 border border-indigo-500/50 rounded-xl p-6 mb-8">
+                <div className="flex items-center gap-3 mb-3">
+                  <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <h2 className="text-lg font-semibold text-indigo-200">Check Your Email</h2>
+                </div>
+                <p className="text-indigo-200/80 text-sm">
+                  We sent a confirmation email to <strong>{email}</strong>. Please click the link to verify your email address and activate your account.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <Link href="/signin" className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]">
+                  Continue to Sign In
+                </Link>
+                <p className="text-xs text-gray-500">Didn&apos;t receive the email? Check your spam folder or contact support.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section>
@@ -344,3 +399,4 @@ export default function SignUp() {
     </section>
   );
 }
+

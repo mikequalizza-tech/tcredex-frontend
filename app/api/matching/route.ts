@@ -2,20 +2,28 @@
  * tCredex Matching API - AutoMatch AI
  * 
  * POST /api/matching - Find CDE matches for a deal
- * POST /api/matching/batch - Run batch matching (admin only)
+ * GET /api/matching - Get existing matches for a deal
+ * 
+ * CRITICAL: All endpoints require authentication and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth, handleAuthError, verifyDealAccess } from '@/lib/api/auth-middleware';
 import { findMatches, MATCH_THRESHOLDS } from '@/lib/automatch';
 
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
     const body = await request.json();
     const { dealId, cdeId, minScore, maxResults } = body;
 
     // If dealId provided, find CDEs for this deal
     if (dealId) {
+      // CRITICAL: Verify user can access this deal
+      await verifyDealAccess(request, user, dealId, 'view');
+
       const result = await findMatches(dealId, {
         minScore: minScore || MATCH_THRESHOLDS.fair,
         maxResults: maxResults || 10,
@@ -39,11 +47,20 @@ export async function POST(request: NextRequest) {
           reasons: m.reasons,
         })),
         rule: '3-deal rule applied - showing top 3 matches only',
+        organizationId: user.organizationId,
       });
     }
 
     // If cdeId provided, find deals for this CDE
     if (cdeId) {
+      // CRITICAL: Verify user's org is the CDE or user is admin
+      if (user.organizationType === 'cde' && user.organizationId !== cdeId) {
+        return NextResponse.json(
+          { error: 'You can only view matches for your organization' },
+          { status: 403 }
+        );
+      }
+
       const supabase = getSupabaseAdmin();
 
       // Get CDE info
@@ -103,6 +120,7 @@ export async function POST(request: NextRequest) {
         totalMatchesFound: matches.length,
         matches: topMatches,
         rule: '3-deal rule applied - showing top 3 matches only',
+        organizationId: user.organizationId,
       });
     }
 
@@ -111,11 +129,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
-    console.error('Matching API error:', error);
-    return NextResponse.json(
-      { error: 'Failed to compute matches' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }
 
@@ -124,6 +138,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
     const { searchParams } = new URL(request.url);
     const dealId = searchParams.get('dealId');
 
@@ -133,6 +149,9 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // CRITICAL: Verify user can access this deal
+    await verifyDealAccess(request, user, dealId, 'view');
 
     const supabase = getSupabaseAdmin();
 
@@ -165,7 +184,10 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       // Table might not exist yet
-      return NextResponse.json({ matches: [] });
+      return NextResponse.json({ 
+        matches: [],
+        organizationId: user.organizationId,
+      });
     }
 
     const formatted = (matches || []).map(m => {
@@ -195,12 +217,9 @@ export async function GET(request: NextRequest) {
       dealId,
       matches: formatted.slice(0, 3), // 3-deal rule
       totalMatchesFound: formatted.length,
+      organizationId: user.organizationId,
     });
   } catch (error) {
-    console.error('Get matches error:', error);
-    return NextResponse.json(
-      { error: 'Failed to get matches' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }

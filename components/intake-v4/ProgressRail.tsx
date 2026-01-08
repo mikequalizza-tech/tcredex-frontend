@@ -12,45 +12,8 @@ interface Section {
 }
 
 // =============================================================================
-// SECTION DEFINITIONS WITH TIERS
+// SECTION DEFINITIONS WITH TIERS - Now consistent with ReadinessMeter
 // =============================================================================
-
-const BASE_SECTIONS: Section[] = [
-  // TIER 1 - DealCard Ready (40%) - ONLY checks asterisk-marked fields
-  { id: 'basics', label: 'Project Basics', required: true, tier: 1, isComplete: (data) => !!(data.projectName && data.sponsorName && data.projectType) },
-  { id: 'sponsor', label: 'Sponsor Details', required: false, tier: 2, isComplete: (data) => !!(data.organizationType) },
-  // Location: Only asterisk field is Address - census tract auto-fills
-  { id: 'location', label: 'Location & Census Tract', required: true, tier: 1, isComplete: (data) => !!(data.address) },
-  { id: 'programs', label: 'Programs Selected', required: true, tier: 1, isComplete: (data) => !!(data.programs && data.programs.length > 0) },
-  // Costs: Only asterisk field is Total Project Cost
-  { id: 'costs', label: 'Project Costs & Gap', required: true, tier: 1, isComplete: (data) => !!(data.totalProjectCost) },
-  
-  // TIER 2 - Project Profile Ready (70%) - More lenient checks
-  { id: 'impact', label: 'Social Investment Criteria', required: false, tier: 2, isComplete: (data) => !!(data.communitySupport || data.communityImpact) },
-  { id: 'benefits', label: 'Economic & Social Benefits', required: false, tier: 2, isComplete: (data) => data.permanentJobsFTE !== undefined || data.constructionJobsFTE !== undefined },
-  { id: 'team', label: 'Project Team', required: false, tier: 2, isComplete: (data) => !!(data.ownersRepresentative) },
-  { id: 'capital', label: 'Capital Stack', required: false, tier: 2, isComplete: (data) => (data.financingSources?.length || 0) > 0 },
-  { id: 'site', label: 'Site Control', required: false, tier: 2, isComplete: (data) => !!data.siteControl },
-  { id: 'timeline', label: 'Timeline', required: false, tier: 2, isComplete: (data) => !!data.constructionStartDate || !!data.targetClosingDate },
-  
-  // TIER 3 - Due Diligence Ready (100%) - Optional for initial submission
-  { id: 'readiness', label: 'Due Diligence Status', required: false, tier: 3, isComplete: (data) => data.phaseIEnvironmental === 'Complete' || data.zoningApproval === 'Complete' },
-  { id: 'documents', label: 'Due Diligence Documents', required: false, tier: 3, isComplete: (data) => (data.documents?.length || 0) >= 1 },
-];
-
-const PROGRAM_SECTIONS: Section[] = [
-  // NMTC
-  { id: 'nmtc_qalicb', label: 'QALICB Tests', required: true, tier: 2, program: 'NMTC', isComplete: (data) => (data.qalicbGrossIncome ?? 0) >= 50 && (data.qalicbTangibleProperty ?? 0) >= 40 && (data.qalicbEmployeeServices ?? 0) >= 40 && data.isProhibitedBusiness === false },
-  
-  // HTC
-  { id: 'htc_status', label: 'Historic Status', required: true, tier: 2, program: 'HTC', isComplete: (data) => !!data.historicStatus && data.historicStatus !== 'none' },
-  
-  // LIHTC
-  { id: 'lihtc_housing', label: 'Housing Metrics', required: true, tier: 2, program: 'LIHTC', isComplete: (data) => data.totalUnits !== undefined && data.affordableUnits !== undefined },
-  
-  // OZ
-  { id: 'oz_eligibility', label: 'OZ Eligibility', required: true, tier: 2, program: 'OZ', isComplete: (data) => !!data.ozInvestmentDate },
-];
 
 // =============================================================================
 // TIER CONFIGURATION
@@ -70,16 +33,52 @@ interface ProgressRailProps {
 }
 
 export function ProgressRail({ data, programs, activeSection, onSectionClick }: ProgressRailProps) {
-  // Get applicable sections based on selected programs
+  // Use the same section definitions as ReadinessMeter for consistency
+  const BASE_SECTIONS: Section[] = [
+    // TIER 1 - DealCard Ready
+    { id: 'basics', label: 'Project Basics', required: true, tier: 1, isComplete: (data) => !!(data.projectName && data.sponsorName && data.projectType) },
+    { id: 'location', label: 'Location & Census Tract', required: true, tier: 1, isComplete: (data) => !!(data.address) },
+    { id: 'programs', label: 'Programs Selected', required: true, tier: 1, isComplete: (data) => !!(data.programs && data.programs.length > 0) },
+    { id: 'costs', label: 'Project Costs & Gap', required: true, tier: 1, isComplete: (data) => !!(data.totalProjectCost) },
+    
+    // TIER 2 - Project Profile Ready
+    { id: 'sponsor', label: 'Sponsor Details', required: false, tier: 2, isComplete: (data) => !!(data.organizationType) },
+    { id: 'impact', label: 'Social Investment Criteria', required: false, tier: 2, isComplete: (data) => !!(data.communitySupport || data.communityImpact) },
+    { id: 'benefits', label: 'Economic & Social Benefits', required: false, tier: 2, isComplete: (data) => data.permanentJobsFTE !== undefined || data.constructionJobsFTE !== undefined },
+    { id: 'team', label: 'Project Team', required: false, tier: 2, isComplete: (data) => !!(data.ownersRepresentative) },
+    { id: 'capital', label: 'Capital Stack', required: false, tier: 2, isComplete: (data) => (data.financingSources?.length || 0) > 0 },
+    { id: 'site', label: 'Site Control', required: false, tier: 2, isComplete: (data) => !!data.siteControl },
+    { id: 'timeline', label: 'Timeline', required: false, tier: 2, isComplete: (data) => !!data.constructionStartDate || !!data.targetClosingDate },
+    
+    // TIER 3 - Due Diligence Ready
+    { id: 'readiness', label: 'Due Diligence Status', required: false, tier: 3, isComplete: (data) => data.phaseIEnvironmental === 'Complete' || data.zoningApproval === 'Complete' },
+    { id: 'documents', label: 'Due Diligence Documents', required: false, tier: 3, isComplete: (data) => (data.documents?.length || 0) >= 1 },
+  ];
+
+  const PROGRAM_SECTIONS: Section[] = [
+    // NMTC
+    { id: 'nmtc_qalicb', label: 'QALICB Tests', required: true, tier: 2, program: 'NMTC', isComplete: (data) => (data.qalicbGrossIncome ?? 0) >= 50 && (data.qalicbTangibleProperty ?? 0) >= 40 && (data.qalicbEmployeeServices ?? 0) >= 40 && data.isProhibitedBusiness === false },
+    
+    // HTC
+    { id: 'htc_status', label: 'Historic Status', required: true, tier: 2, program: 'HTC', isComplete: (data) => !!data.historicStatus && data.historicStatus !== 'none' },
+    
+    // LIHTC
+    { id: 'lihtc_housing', label: 'Housing Metrics', required: true, tier: 2, program: 'LIHTC', isComplete: (data) => data.totalUnits !== undefined && data.affordableUnits !== undefined },
+    
+    // OZ
+    { id: 'oz_eligibility', label: 'OZ Eligibility', required: true, tier: 2, program: 'OZ', isComplete: (data) => !!data.ozInvestmentDate },
+  ];
+  
+  // Get applicable sections based on selected programs (same as ReadinessMeter)
   const applicableSections = [
     ...BASE_SECTIONS,
     ...PROGRAM_SECTIONS.filter(s => s.program && programs.includes(s.program))
   ];
   
-  // Calculate completion by tier
-  const tier1Sections = applicableSections.filter(s => s.tier === 1 && s.required);
-  const tier2Sections = applicableSections.filter(s => s.tier <= 2 && s.required);
-  const tier3Sections = applicableSections.filter(s => s.required);
+  // Calculate completion by tier (same logic as ReadinessMeter)
+  const tier1Sections = applicableSections.filter(s => s.tier === 1);
+  const tier2Sections = applicableSections.filter(s => s.tier <= 2);
+  const tier3Sections = applicableSections;
   
   const tier1Complete = tier1Sections.filter(s => s.isComplete(data)).length;
   const tier2Complete = tier2Sections.filter(s => s.isComplete(data)).length;

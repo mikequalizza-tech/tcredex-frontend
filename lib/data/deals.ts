@@ -4,6 +4,8 @@
  * Core types for deals - NO MOCK DATA, just type definitions
  */
 
+import { ProjectImage } from '@/types/intake';
+
 // Program Types
 export type ProgramType = 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
 export type ProgramLevel = 'federal' | 'state';
@@ -23,6 +25,7 @@ export interface Deal {
   id: string;
   projectName: string;
   sponsorName: string;
+  sponsorOrganizationId?: string;  // For ownership detection
   sponsorDescription?: string;
   website?: string;
   programType: ProgramType;
@@ -55,6 +58,8 @@ export interface Deal {
   // Profile media fields
   logoUrl?: string;
   heroImageUrl?: string;
+  projectImages?: ProjectImage[];
+  draftData?: Record<string, unknown>;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;

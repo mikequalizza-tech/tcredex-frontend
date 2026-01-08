@@ -13,8 +13,25 @@ export default function FeaturedDeals() {
     async function loadDeals() {
       try {
         const allDeals = await fetchMarketplaceDeals();
-        // Get first 3 deals as featured
-        const featured = allDeals.slice(0, 3);
+        console.log('All marketplace deals:', allDeals.map(d => ({ name: d.projectName, program: d.programType, visible: d.visible })));
+        
+        // Ensure we always include LIHTC deals if available
+        const lihtcDeals = allDeals.filter(deal => deal.programType === 'LIHTC');
+        const otherDeals = allDeals.filter(deal => deal.programType !== 'LIHTC');
+        
+        console.log('LIHTC deals found:', lihtcDeals.length);
+        console.log('Other deals found:', otherDeals.length);
+        
+        // Shuffle other deals for variety
+        const shuffledOthers = [...otherDeals].sort(() => Math.random() - 0.5);
+        
+        // Combine: prioritize LIHTC deals, then fill with others
+        const featured = [
+          ...lihtcDeals.slice(0, 2), // Show up to 2 LIHTC deals
+          ...shuffledOthers.slice(0, 4 - Math.min(lihtcDeals.length, 2)) // Fill remaining slots
+        ].slice(0, 4);
+        
+        console.log('Featured deals:', featured.map(d => ({ name: d.projectName, program: d.programType })));
         setDeals(featured);
       } catch (error) {
         console.error('Failed to load featured deals:', error);
@@ -23,6 +40,10 @@ export default function FeaturedDeals() {
       }
     }
     loadDeals();
+    
+    // Rotate deals every 30 seconds for variety
+    const interval = setInterval(loadDeals, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

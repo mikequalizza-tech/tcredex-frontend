@@ -29,10 +29,10 @@ const TEAM_ROLES: TeamRole[] = [
   { field: 'complianceReporter', label: 'Compliance Reporter', required: false, category: 'operations', placeholder: 'Compliance firm or contact' },
   { field: 'fundraiser', label: 'Fundraiser / Capital Advisor', required: false, category: 'operations', placeholder: 'If applicable' },
   
-  // NMTC Team
-  { field: 'nmtcConsultant', label: 'NMTC Consultant', required: false, category: 'nmtc', placeholder: 'NMTC advisory firm' },
-  { field: 'nmtcAttorney', label: 'NMTC Attorney', required: false, category: 'nmtc', placeholder: 'Legal counsel for NMTC' },
-  { field: 'nmtcAccountantModeler', label: 'NMTC Accountant / Modeler', required: false, category: 'nmtc', placeholder: 'Financial modeling firm' },
+  // Tax Credit Specialists Team
+  { field: 'nmtcConsultant', label: 'Tax Credit Consultant', required: false, category: 'nmtc', placeholder: 'Tax credit advisory firm' },
+  { field: 'nmtcAttorney', label: 'Tax Credit Attorney', required: false, category: 'nmtc', placeholder: 'Legal counsel for tax credits' },
+  { field: 'nmtcAccountantModeler', label: 'Tax Credit Accountant / Modeler', required: false, category: 'nmtc', placeholder: 'Financial modeling firm' },
 ];
 
 // Helper functions
@@ -142,7 +142,7 @@ export function ProjectTeam({ data, onChange }: ProjectTeamProps) {
         />
         <CategorySection 
           category="nmtc" 
-          title="NMTC Specialists" 
+          title="Tax Credit Specialists" 
           icon="💼"
           data={data}
           onChange={onChange}
@@ -165,15 +165,15 @@ export function ProjectTeam({ data, onChange }: ProjectTeamProps) {
         </div>
       )}
 
-      {/* Tip for NMTC specialists */}
-      {data.programs?.includes('NMTC') && !data.nmtcConsultant && !data.nmtcAttorney && (
+      {/* Tip for tax credit specialists */}
+      {(data.programs?.includes('NMTC') || data.programs?.includes('LIHTC') || data.programs?.includes('HTC')) && !data.nmtcConsultant && !data.nmtcAttorney && (
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <span className="text-xl">💡</span>
             <div>
-              <p className="text-gray-300 font-medium text-sm">NMTC Team Recommendation</p>
+              <p className="text-gray-300 font-medium text-sm">Tax Credit Team Recommendation</p>
               <p className="text-xs text-gray-400 mt-1">
-                NMTC transactions are complex. Most sponsors engage specialized NMTC consultants 
+                Tax credit transactions are complex. Most sponsors engage specialized tax credit consultants 
                 and attorneys. If you need referrals, tCredex can connect you with experienced professionals.
               </p>
             </div>

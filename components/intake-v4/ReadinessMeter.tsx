@@ -10,41 +10,56 @@ interface ReadinessMeterProps {
 }
 
 export function ReadinessMeter({ data, programs, onScoreChange }: ReadinessMeterProps) {
-  // Calculate tier completion
-  const tier1Fields: (keyof IntakeData)[] = [
-    'projectName', 'sponsorName', 'address', 'censusTract', 
-    'programs', 'totalProjectCost', 'financingGap'
+  // Use the same section definitions as ProgressRail for consistency
+  const BASE_SECTIONS = [
+    // TIER 1 - DealCard Ready
+    { id: 'basics', tier: 1, isComplete: (data: IntakeData) => !!(data.projectName && data.sponsorName && data.projectType) },
+    { id: 'location', tier: 1, isComplete: (data: IntakeData) => !!(data.address) },
+    { id: 'programs', tier: 1, isComplete: (data: IntakeData) => !!(data.programs && data.programs.length > 0) },
+    { id: 'costs', tier: 1, isComplete: (data: IntakeData) => !!(data.totalProjectCost) },
+    
+    // TIER 2 - Project Profile Ready
+    { id: 'impact', tier: 2, isComplete: (data: IntakeData) => !!(data.communitySupport || data.communityImpact) },
+    { id: 'benefits', tier: 2, isComplete: (data: IntakeData) => data.permanentJobsFTE !== undefined || data.constructionJobsFTE !== undefined },
+    { id: 'team', tier: 2, isComplete: (data: IntakeData) => !!(data.ownersRepresentative) },
+    { id: 'capital', tier: 2, isComplete: (data: IntakeData) => (data.financingSources?.length || 0) > 0 },
+    { id: 'site', tier: 2, isComplete: (data: IntakeData) => !!data.siteControl },
+    { id: 'timeline', tier: 2, isComplete: (data: IntakeData) => !!data.constructionStartDate || !!data.targetClosingDate },
+    
+    // TIER 3 - Due Diligence Ready
+    { id: 'readiness', tier: 3, isComplete: (data: IntakeData) => data.phaseIEnvironmental === 'Complete' || data.zoningApproval === 'Complete' },
+    { id: 'documents', tier: 3, isComplete: (data: IntakeData) => (data.documents?.length || 0) >= 1 },
   ];
+
+  const PROGRAM_SECTIONS = [
+    // NMTC
+    { id: 'nmtc_qalicb', tier: 2, program: 'NMTC', isComplete: (data: IntakeData) => (data.qalicbGrossIncome ?? 0) >= 50 && (data.qalicbTangibleProperty ?? 0) >= 40 && (data.qalicbEmployeeServices ?? 0) >= 40 && data.isProhibitedBusiness === false },
+    // HTC
+    { id: 'htc_status', tier: 2, program: 'HTC', isComplete: (data: IntakeData) => !!data.historicStatus && data.historicStatus !== 'none' },
+    // LIHTC
+    { id: 'lihtc_housing', tier: 2, program: 'LIHTC', isComplete: (data: IntakeData) => data.totalUnits !== undefined && data.affordableUnits !== undefined },
+    // OZ
+    { id: 'oz_eligibility', tier: 2, program: 'OZ', isComplete: (data: IntakeData) => !!data.ozInvestmentDate },
+  ];
+
+  // Get applicable sections based on selected programs (same as ProgressRail)
+  const applicableSections = [
+    ...BASE_SECTIONS,
+    ...PROGRAM_SECTIONS.filter(s => s.program && programs.includes(s.program as ProgramType))
+  ];
+
+  // Calculate completion by tier (same logic as ProgressRail)
+  const tier1Sections = applicableSections.filter(s => s.tier === 1);
+  const tier2Sections = applicableSections.filter(s => s.tier <= 2);
+  const tier3Sections = applicableSections;
   
-  const tier2Fields: (keyof IntakeData)[] = [
-    ...tier1Fields,
-    'projectDescription', 'communityImpact', 'permanentJobsFTE', 
-    'constructionJobsFTE', 'siteControl', 'constructionStartDate',
-    'qalicbGrossIncome', 'qalicbTangibleProperty', 'qalicbEmployeeServices'
-  ];
-  
-  const tier3Fields: (keyof IntakeData)[] = [
-    ...tier2Fields,
-    'phaseIEnvironmental', 'zoningApproval', 'buildingPermits',
-    'constructionDrawings', 'constructionContract'
-  ];
+  const tier1Complete = tier1Sections.filter(s => s.isComplete(data)).length;
+  const tier2Complete = tier2Sections.filter(s => s.isComplete(data)).length;
+  const tier3Complete = tier3Sections.filter(s => s.isComplete(data)).length;
 
-  const countComplete = (fields: (keyof IntakeData)[]) => {
-    return fields.filter(field => {
-      const val = data[field];
-      if (val === undefined || val === null || val === '') return false;
-      if (Array.isArray(val) && val.length === 0) return false;
-      return true;
-    }).length;
-  };
-
-  const tier1Complete = countComplete(tier1Fields);
-  const tier2Complete = countComplete(tier2Fields);
-  const tier3Complete = countComplete(tier3Fields);
-
-  const tier1Pct = Math.round((tier1Complete / tier1Fields.length) * 100);
-  const tier2Pct = Math.round((tier2Complete / tier2Fields.length) * 100);
-  const tier3Pct = Math.round((tier3Complete / tier3Fields.length) * 100);
+  const tier1Pct = tier1Sections.length > 0 ? Math.round((tier1Complete / tier1Sections.length) * 100) : 0;
+  const tier2Pct = tier2Sections.length > 0 ? Math.round((tier2Complete / tier2Sections.length) * 100) : 0;
+  const tier3Pct = tier3Sections.length > 0 ? Math.round((tier3Complete / tier3Sections.length) * 100) : 0;
 
   // Determine current tier
   const currentTier = tier3Pct >= 95 ? 3 : tier2Pct >= 70 ? 2 : tier1Pct >= 80 ? 1 : 0;

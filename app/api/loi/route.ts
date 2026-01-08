@@ -3,11 +3,15 @@
  * 
  * GET /api/loi - List LOIs (filtered by query params)
  * POST /api/loi - Create new LOI
+ * 
+ * CRITICAL: All endpoints require authentication and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getLOIService } from '@/lib/loi';
 import { CreateLOIInput, LOIStatus } from '@/types/loi';
+import { requireAuth, handleAuthError, verifyDealAccess } from '@/lib/api/auth-middleware';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 // =============================================================================
 // GET /api/loi
@@ -15,6 +19,10 @@ import { CreateLOIInput, LOIStatus } from '@/types/loi';
 
 export async function GET(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
+
     const { searchParams } = new URL(request.url);
     const dealId = searchParams.get('deal_id');
     const cdeId = searchParams.get('cde_id');
@@ -27,10 +35,26 @@ export async function GET(request: NextRequest) {
     let lois;
 
     if (dealId) {
+      // CRITICAL: Verify user can access this deal
+      await verifyDealAccess(request, user, dealId, 'view');
       lois = await service.getByDeal(dealId);
     } else if (cdeId) {
+      // CRITICAL: Verify user's org is the CDE or user is admin
+      if (user.organizationType === 'cde' && user.organizationId !== cdeId) {
+        return NextResponse.json(
+          { success: false, error: 'You can only view LOIs for your organization' },
+          { status: 403 }
+        );
+      }
       lois = await service.getByCDE(cdeId, status);
     } else if (sponsorId) {
+      // CRITICAL: Verify user's org is the sponsor or user is admin
+      if (user.organizationType === 'sponsor' && user.organizationId !== sponsorId) {
+        return NextResponse.json(
+          { success: false, error: 'You can only view LOIs for your organization' },
+          { status: 403 }
+        );
+      }
       lois = await service.getBySponsor(sponsorId, status);
     } else {
       return NextResponse.json(
@@ -43,13 +67,10 @@ export async function GET(request: NextRequest) {
       success: true,
       lois,
       total: lois.length,
+      organizationId: user.organizationId,
     });
   } catch (error) {
-    console.error('LOI GET error:', error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }
 
@@ -59,6 +80,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
     const body = await request.json();
     const { input, issued_by } = body as { input: CreateLOIInput; issued_by: string };
 
@@ -77,18 +100,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // CRITICAL: Verify user's org is the CDE issuing the LOI
+    if (user.organizationType === 'cde' && user.organizationId !== input.cde_id) {
+      return NextResponse.json(
+        { success: false, error: 'You can only issue LOIs for your organization' },
+        { status: 403 }
+      );
+    }
+
+    // CRITICAL: Verify user can access the deal
+    await verifyDealAccess(request, user, input.deal_id, 'view');
+
     const service = getLOIService();
     const loi = await service.create(input, issued_by);
 
     return NextResponse.json({
       success: true,
       loi,
+      organizationId: user.organizationId,
     });
   } catch (error) {
-    console.error('LOI POST error:', error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }

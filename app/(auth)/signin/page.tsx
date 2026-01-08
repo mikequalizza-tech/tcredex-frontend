@@ -16,14 +16,19 @@ interface DemoUser {
 function SignInForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/dashboard';
-  const { login, isAuthenticated, isLoading } = useCurrentUser();
+  const { login, refresh, isAuthenticated, isLoading } = useCurrentUser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [demoUsers, setDemoUsers] = useState<DemoUser[]>([]);
   const [loadingDemoUsers, setLoadingDemoUsers] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
   const hasRedirected = useRef(false);
+  const confirmHandled = useRef(false);
+
+  const confirmed = searchParams.get('confirmed') === '1';
+  const token = searchParams.get('token');
 
   // Fetch demo users from API
   useEffect(() => {
@@ -50,6 +55,37 @@ function SignInForm() {
       window.location.href = redirectTo;
     }
   }, [isLoading, isAuthenticated, redirectTo]);
+
+  // Auto-complete confirmation if token present
+  useEffect(() => {
+    const runConfirm = async () => {
+      if (!confirmed || !token || confirmHandled.current) return;
+      confirmHandled.current = true;
+      setIsSubmitting(true);
+      setError('');
+      try {
+        const res = await fetch(`/api/auth/confirm-token?token=${encodeURIComponent(token)}`, {
+          method: 'POST',
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error || 'Confirmation failed');
+          setIsSubmitting(false);
+          return;
+        }
+        await refresh();
+        setShowWelcome(true);
+        setTimeout(() => {
+          window.location.href = redirectTo;
+        }, 1200);
+      } catch (err) {
+        console.error('Confirm-token error', err);
+        setError('Confirmation failed');
+        setIsSubmitting(false);
+      }
+    };
+    runConfirm();
+  }, [confirmed, token, redirectTo, refresh]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +141,20 @@ function SignInForm() {
     <section>
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="py-12 md:py-20">
+          {showWelcome && (
+            <div className="mb-4 rounded-lg border border-green-600/60 bg-green-900/30 p-4 text-green-200 shadow-lg">
+              <div className="font-semibold">Welcome to tCredex!</div>
+              <div className="text-sm text-green-100/90 mt-1">
+                Your email is confirmed. Jump into your dashboard to start exploring deals, read the latest blog posts, or open ChatTC for help.
+              </div>
+              <div className="mt-3 flex gap-3 text-sm">
+                <Link href="/dashboard" className="text-green-200 underline hover:text-green-100">Go to dashboard</Link>
+                <Link href="/blog" className="text-green-200 underline hover:text-green-100">Blog</Link>
+                <Link href="/help" className="text-green-200 underline hover:text-green-100">Help</Link>
+                <Link href="/chat" className="text-green-200 underline hover:text-green-100">ChatTC</Link>
+              </div>
+            </div>
+          )}
           {/* Section header */}
           <div className="pb-12 text-center">
             <h1 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text font-nacelle text-3xl font-semibold text-transparent md:text-4xl">

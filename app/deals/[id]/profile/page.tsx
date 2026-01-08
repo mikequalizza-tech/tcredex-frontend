@@ -6,11 +6,13 @@ import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { fetchDealById } from '@/lib/supabase/queries';
 import { Deal } from '@/lib/data/deals';
+import { ProjectImage } from '@/types/intake';
 
 // Extended profile data generator
 function generateProfileData(deal: Deal) {
   const totalProjectCost = deal.projectCost || deal.allocation * 2.5;
   const financingGap = deal.financingGap || deal.allocation * 0.2;
+  const tractTypes = deal.tractType || [];
 
   // Use real census tract if available, otherwise generate mock
   let censusTract = deal.censusTract;
@@ -37,6 +39,12 @@ function generateProfileData(deal: Deal) {
           { name: 'Soft Costs', amount: totalProjectCost * 0.15 },
         ];
 
+  const projectImages: ProjectImage[] = deal.projectImages?.length
+    ? deal.projectImages
+    : deal.heroImageUrl
+      ? [{ id: 'hero', name: `${deal.projectName} image`, url: deal.heroImageUrl, size: 0 }]
+      : [];
+
   return {
     // Header
     projectName: deal.projectName,
@@ -45,14 +53,15 @@ function generateProfileData(deal: Deal) {
 
     // Media
     logoUrl: deal.logoUrl,
-    heroImageUrl: deal.heroImageUrl,
+    heroImageUrl: projectImages[0]?.url || deal.heroImageUrl,
+    projectImages,
 
     // Stats
     parent: deal.sponsorName,
     location: `${deal.city}, ${deal.state}`,
     censusTract: censusTract,
-    status: deal.tractType.includes('SD') ? 'Severely Distressed' :
-            deal.tractType.includes('QCT') ? 'Qualified Census Tract' : 'Low-Income Community',
+        status: tractTypes.includes('SD') ? 'Severely Distressed' :
+          tractTypes.includes('QCT') ? 'Qualified Census Tract' : 'Low-Income Community',
     povertyRate: deal.povertyRate || 28.5,
     medianIncome: deal.medianIncome ? `${deal.medianIncome}%` : '41.98%',
     unemployment: deal.unemployment || 8.2,
@@ -69,9 +78,9 @@ function generateProfileData(deal: Deal) {
     contactEmail: deal.contactEmail || 'deals@tcredex.com',
 
     // Content
-    projectDescription: deal.description || `${deal.projectName} represents a transformative investment in the ${deal.city} community. This ${deal.programType} project will create quality jobs and provide essential services to residents of this ${deal.tractType.includes('SD') ? 'severely distressed' : 'qualified'} census tract. The development addresses critical community needs while generating measurable economic impact.`,
+    projectDescription: deal.description || `${deal.projectName} represents a transformative investment in the ${deal.city} community. This ${deal.programType} project will create quality jobs and provide essential services to residents of this ${tractTypes.includes('SD') ? 'severely distressed' : 'qualified'} census tract. The development addresses critical community needs while generating measurable economic impact.`,
 
-    communityImpact: deal.communityImpact || `Located in a ${deal.tractType.includes('SD') ? 'Severely Distressed Census Tract' : 'Qualified Census Tract'}, this project will bring over ${Math.floor(deal.allocation / 150000)} construction jobs and ${Math.floor(deal.allocation / 300000)} permanent roles. Annual impact includes community services for ${Math.floor(deal.allocation / 10000)}+ individuals served. The project continues to serve the greater ${deal.city} area through comprehensive community development programs.`,
+    communityImpact: deal.communityImpact || `Located in a ${tractTypes.includes('SD') ? 'Severely Distressed Census Tract' : 'Qualified Census Tract'}, this project will bring over ${Math.floor(deal.allocation / 150000)} construction jobs and ${Math.floor(deal.allocation / 300000)} permanent roles. Annual impact includes community services for ${Math.floor(deal.allocation / 10000)}+ individuals served. The project continues to serve the greater ${deal.city} area through comprehensive community development programs.`,
 
     // Financing
     sources,
@@ -86,6 +95,7 @@ export default function ProjectProfilePage() {
   const dealId = params.id as string;
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,6 +114,12 @@ export default function ProjectProfilePage() {
   }, [dealId]);
 
   const profile = deal ? generateProfileData(deal) : null;
+  const projectImages = profile?.projectImages || [];
+  const activeImage = projectImages[activeImageIndex]?.url || profile?.heroImageUrl;
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [dealId, projectImages.length]);
   
   if (loading) {
     return (
@@ -282,10 +298,10 @@ export default function ProjectProfilePage() {
               <p className="text-lg text-teal-600 mb-6">{profile.city}, {profile.state}</p>
 
               {/* Project Hero Image */}
-              <div className="w-full h-64 bg-gradient-to-br from-teal-100 to-green-100 rounded-lg mb-8 flex items-center justify-center border border-gray-200 overflow-hidden relative">
-                {profile.heroImageUrl ? (
+              <div className="w-full h-64 bg-gradient-to-br from-teal-100 to-green-100 rounded-lg mb-4 flex items-center justify-center border border-gray-200 overflow-hidden relative">
+                {activeImage ? (
                   <Image
-                    src={profile.heroImageUrl}
+                    src={activeImage}
                     alt={profile.projectName}
                     fill
                     className="object-cover"
@@ -299,6 +315,25 @@ export default function ProjectProfilePage() {
                   </div>
                 )}
               </div>
+
+              {projectImages.length > 1 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-8">
+                  {projectImages.map((image, idx) => (
+                    <button
+                      key={image.id || `${image.name}-${idx}`}
+                      onClick={() => setActiveImageIndex(idx)}
+                      className={`relative aspect-video rounded-md overflow-hidden border ${idx === activeImageIndex ? 'border-teal-500 ring-2 ring-teal-300' : 'border-gray-200'} hover:border-teal-400 transition-colors`}
+                    >
+                      <Image
+                        src={image.url}
+                        alt={image.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* The Project Section */}
               <section className="mb-8">

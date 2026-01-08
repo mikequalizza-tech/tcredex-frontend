@@ -93,7 +93,7 @@ const ClosingRoomIcon = () => (
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: <HomeIcon /> },
   { name: 'Map', href: '/map', icon: <MapIcon /> },
-  { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, roles: ['sponsor'] },
+  // { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, roles: ['sponsor'] }, // HIDDEN per user request
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: <PipelineIcon />, roles: ['cde'] },
   { name: 'AutoMatch AI', href: '/dashboard/automatch', icon: <AutoMatchIcon />, roles: ['cde', 'investor'] },
   { name: 'Deals', href: '/deals', icon: <DealsIcon /> },

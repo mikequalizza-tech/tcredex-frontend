@@ -119,7 +119,7 @@ function MapSectionContent({
   };
 
   return (
-    <section className="relative">
+    <section className="relative" id="address-lookup">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="py-12 md:py-20">
           {/* Section header */}

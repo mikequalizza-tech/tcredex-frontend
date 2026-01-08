@@ -1,28 +1,23 @@
 /**
  * tCredex Investors API
- * CRUD operations for Investors with Supabase
+ * CRUD operations for Investors
+ * 
+ * CRITICAL: All endpoints require authentication and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-// Lazy init
-let supabase: SupabaseClient | null = null;
-function getSupabase() {
-  if (!supabase) {
-    supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-  }
-  return supabase;
-}
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth, handleAuthError } from '@/lib/api/auth-middleware';
 
 // =============================================================================
 // GET /api/investors - List investors with filters
 // =============================================================================
 export async function GET(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
+
     const { searchParams } = new URL(request.url);
     
     const creditType = searchParams.get('credit_type');
@@ -30,14 +25,36 @@ export async function GET(request: NextRequest) {
     const craMotivated = searchParams.get('cra_motivated');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = getSupabase()
+    let query = supabase
       .from('investors')
       .select(`
-        *,
+        id,
+        organization_id,
+        primary_contact_name,
+        primary_contact_email,
+        investor_type,
+        cra_motivated,
+        min_investment,
+        max_investment,
+        target_credit_types,
+        target_states,
+        accredited,
+        status,
+        created_at,
         organization:organizations(id, name, slug, city, state)
       `)
       .order('max_investment', { ascending: false })
       .limit(limit);
+
+    // CRITICAL: Filter by organization based on user type
+    if (user.organizationType === 'investor') {
+      // Investors see only their own profile
+      query = query.eq('organization_id', user.organizationId);
+    } else if (user.organizationType === 'sponsor' || user.organizationType === 'cde') {
+      // Sponsors and CDEs see all active investors (public view)
+      query = query.eq('status', 'active');
+    }
+    // Admin sees all investors (no filter)
 
     if (creditType) query = query.contains('target_credit_types', [creditType]);
     if (minInvestment) query = query.gte('max_investment', parseInt(minInvestment));
@@ -47,10 +64,13 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ investors: data });
+    return NextResponse.json({ 
+      investors: data,
+      organizationId: user.organizationId,
+      organizationType: user.organizationType,
+    });
   } catch (error) {
-    console.error('GET /api/investors error:', error);
-    return NextResponse.json({ error: 'Failed to fetch investors' }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
@@ -59,32 +79,24 @@ export async function GET(request: NextRequest) {
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-
-    // Create or get organization
-    let organizationId = body.organization_id;
+    // CRITICAL: Require authentication and ORG_ADMIN role
+    const user = await requireAuth(request);
     
-    if (!organizationId && body.organization_name) {
-      const slug = body.organization_name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      
-      const { data: org, error: orgError } = await getSupabase()
-        .from('organizations')
-        .insert({
-          name: body.organization_name,
-          slug,
-          type: 'investor',
-          city: body.city,
-          state: body.state,
-        })
-        .select()
-        .single();
-
-      if (orgError) throw orgError;
-      organizationId = org.id;
+    if (user.organizationType !== 'investor' || user.userRole !== 'ORG_ADMIN') {
+      return NextResponse.json(
+        { error: 'Only investor organization admins can create investor profiles' },
+        { status: 403 }
+      );
     }
 
+    const supabase = getSupabaseAdmin();
+    const body = await request.json();
+
+    // CRITICAL: Investor profile must belong to user's organization
+    const organizationId = user.organizationId;
+
     // Create investor profile
-    const { data, error } = await getSupabase()
+    const { data, error } = await supabase
       .from('investors')
       .insert({
         organization_id: organizationId,
@@ -97,15 +109,20 @@ export async function POST(request: NextRequest) {
         target_credit_types: body.target_credit_types || ['NMTC'],
         target_states: body.target_states,
         accredited: body.accredited ?? true,
-      })
+        status: 'active',
+      } as never)
       .select()
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json(data, { status: 201 });
+    const typedData = data as Record<string, unknown>;
+
+    return NextResponse.json({
+      ...typedData,
+      organizationId: user.organizationId,
+    }, { status: 201 });
   } catch (error) {
-    console.error('POST /api/investors error:', error);
-    return NextResponse.json({ error: 'Failed to create investor' }, { status: 500 });
+    return handleAuthError(error);
   }
 }

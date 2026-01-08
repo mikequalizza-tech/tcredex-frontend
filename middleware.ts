@@ -53,6 +53,8 @@ const PUBLIC_ROUTES = [
   '/blog',
   '/help',
   '/who-we-serve',
+  '/auth/debug', // Debug page for auth troubleshooting
+  '/role-test', // Role system test page
   // NOTE: /map and /intake are PROTECTED - require login
 ];
 
@@ -64,7 +66,7 @@ const PUBLIC_PREFIXES = [
   '/api/geo/',         // Geo/tract resolution APIs
   '/api/tracts/',      // Tract data APIs
   '/api/map/',         // Map tracts API - Source of Truth map
-  '/api/tiles/',       // <--- ADD THIS LINE (Public Map Tiles)
+  '/api/tiles/',       // Map tiles
   '/api/pricing',      // Pricing calculator
   '/api/founders/',    // Founders registration
   '/api/deals',        // Marketplace deals - public read
@@ -176,9 +178,8 @@ export async function middleware(request: NextRequest) {
   // Check if this is a protected route
   const isProtectedRoute = PROTECTED_PREFIXES.some(prefix => pathname.startsWith(prefix));
   
-  // Get session
-  const sessionToken = request.cookies.get('tcredex_session')?.value;
-  const sessionRole = request.cookies.get('tcredex_role')?.value;
+  // Get session - only check the new auth-token cookie
+  const sessionToken = request.cookies.get('auth-token')?.value;
   const authHeader = request.headers.get('x-tcredex-auth');
 
   if (!sessionToken && !authHeader) {
@@ -193,15 +194,6 @@ export async function middleware(request: NextRequest) {
     const signinUrl = new URL('/signin', request.url);
     signinUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(signinUrl);
-  }
-
-  // Validate session for admin routes
-  if (pathname.startsWith('/admin')) {
-    if (sessionRole !== 'admin') {
-      const signinUrl = new URL('/signin', request.url);
-      signinUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(signinUrl);
-    }
   }
 
   return NextResponse.next();

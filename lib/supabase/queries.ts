@@ -2,6 +2,25 @@ import { getSupabase } from '../supabase';
 import { CDEDealCard } from '@/lib/types/cde';
 import { Deal, ProgramType, ProgramLevel, DealStatus, TractType } from '@/lib/data/deals';
 import { logger } from '@/lib/utils/logger';
+import { getNMTCAllocation } from '@/lib/utils/fieldMapping';
+
+/**
+ * Helper function to map allocation based on program type
+ */
+function mapAllocationByProgram(deal: any, programType: ProgramType): number {
+  switch (programType) {
+    case 'LIHTC':
+      return Number(deal.project_gross_htc) || Number(deal.htc_amount) || Number(deal.lihtc_basis) || Number(deal.total_project_cost) || 0;
+    case 'HTC':
+      return Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0;
+    case 'NMTC':
+      return Number(deal.nmtc_financing_requested) || Number(deal.fed_nmtc_allocation_request) || 0;
+    case 'OZ':
+      return Number(deal.oz_investment) || Number(deal.total_project_cost) || 0;
+    default:
+      return Number(deal.nmtc_financing_requested) || 0;
+  }
+}
 
 /**
  * Fetch all deals from Supabase and map them to the Deal interface from lib/data/deals
@@ -30,112 +49,105 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
     return [];
   }
 
-  return (data || []).map((deal: any) => ({
-    id: deal.id,
-    projectName: deal.project_name,
-    sponsorName: deal.sponsor_name || 'Unknown Sponsor',
-    sponsorDescription: deal.project_description,
-    website: deal.website,
-    programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
-    programLevel: (deal.program_level) as ProgramLevel || 'federal',
-    stateProgram: deal.state_program,
-    allocation: Number(deal.nmtc_financing_requested) || 0,
-    creditPrice: 0.76,
-    state: deal.state || '',
-    city: deal.city || '',
-    tractType: (deal.tract_types || []) as TractType[],
-    status: (deal.status || 'draft') as DealStatus,
-    description: deal.project_description,
-    communityImpact: deal.community_benefit,
-    projectHighlights: [],
-    useOfFunds: deal.total_project_cost ? [
-      { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
-      { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
-      { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
-    ].filter(item => item.amount > 0) : [],
-    timeline: [
-      { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
-      { milestone: 'Projected Completion', date: deal.projected_completion_date || 'TBD', completed: false },
-    ].filter(item => item.date !== 'TBD'),
-    foundedYear: 2020,
-    submittedDate: deal.created_at,
-    povertyRate: Number(deal.tract_poverty_rate) || 0,
-    medianIncome: Number(deal.tract_median_income) || 0,
-    jobsCreated: deal.jobs_created || 0,
-    visible: deal.visible ?? true,
-    coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
-    projectCost: Number(deal.total_project_cost) || 0,
-    financingGap: Number(deal.financing_gap) || 0,
-    censusTract: deal.census_tract,
-    unemployment: Number(deal.tract_unemployment) || 0,
-  }));
+  return (data || []).map((deal: any) => {
+    const programType = (deal.programs && deal.programs[0]) as ProgramType || 'NMTC';
+    return {
+      id: deal.id,
+      projectName: deal.project_name,
+      sponsorName: deal.sponsor_name || 'Unknown Sponsor',
+      sponsorDescription: deal.project_description,
+      website: deal.website,
+      programType,
+      programLevel: (deal.program_level) as ProgramLevel || 'federal',
+      stateProgram: deal.state_program,
+      allocation: mapAllocationByProgram(deal, programType),
+      creditPrice: 0.76,
+      state: deal.state || '',
+      city: deal.city || '',
+      tractType: (deal.tract_types || []) as TractType[],
+      status: (deal.status || 'draft') as DealStatus,
+      description: deal.project_description,
+      communityImpact: deal.community_benefit,
+      projectHighlights: [],
+      useOfFunds: deal.total_project_cost ? [
+        { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
+        { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
+        { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
+      ].filter(item => item.amount > 0) : [],
+      timeline: [
+        { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
+        { milestone: 'Projected Completion', date: deal.projected_completion_date || 'TBD', completed: false },
+      ].filter(item => item.date !== 'TBD'),
+      foundedYear: 2020,
+      submittedDate: deal.created_at,
+      povertyRate: Number(deal.tract_poverty_rate) || 0,
+      medianIncome: Number(deal.tract_median_income) || 0,
+      jobsCreated: deal.jobs_created || 0,
+      visible: deal.visible ?? true,
+      coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
+      projectCost: Number(deal.total_project_cost) || 0,
+      financingGap: Number(deal.financing_gap) || 0,
+      censusTract: deal.census_tract,
+      unemployment: Number(deal.tract_unemployment) || 0,
+    };
+  });
 }
 
 /**
  * Fetch a single deal by ID
  */
 export async function fetchDealById(id: string): Promise<Deal | null> {
-  const supabase = getSupabase();
-
   try {
-    const { data: rawData, error } = await supabase
-      .from('deals')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = rawData as Record<string, any> | null;
-
-    if (error || !data) {
-      const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
-      const isRecursion = error?.message?.toLowerCase().includes('recursion');
-
-      if (!isBuild || (error && !isRecursion)) {
-        logger.error('Error fetching deal by ID', error);
-      }
+    const res = await fetch(`/api/deals?id=${encodeURIComponent(id)}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      logger.error('Error fetching deal by ID', data.error || res.statusText);
       return null;
     }
+    const json = await res.json();
+    const data = json.deal as Record<string, any> | null;
+    if (!data) return null;
 
-  return {
-    id: data.id,
-    projectName: data.project_name,
-    sponsorName: data.sponsor_name || 'Unknown Sponsor',
-    sponsorDescription: data.project_description,
-    website: data.website,
-    programType: (data.programs && data.programs[0]) as ProgramType || 'NMTC',
-    programLevel: (data.program_level) as ProgramLevel || 'federal',
-    stateProgram: data.state_program,
-    allocation: Number(data.nmtc_financing_requested) || 0,
-    creditPrice: 0.76,
-    state: data.state || '',
-    city: data.city || '',
-    tractType: (data.tract_types || []) as TractType[],
-    status: (data.status || 'draft') as DealStatus,
-    description: data.project_description,
-    communityImpact: data.community_benefit,
-    projectHighlights: [],
-    useOfFunds: data.total_project_cost ? [
-      { category: 'Construction', amount: Number(data.construction_cost) || 0 },
-      { category: 'Acquisition', amount: Number(data.acquisition_cost) || 0 },
-      { category: 'Soft Costs', amount: Number(data.soft_costs) || 0 },
-    ].filter(item => item.amount > 0) : [],
-    timeline: [
-      { milestone: 'Construction Start', date: data.construction_start_date || 'TBD', completed: !!data.construction_start_date },
-      { milestone: 'Projected Completion', date: data.projected_completion_date || 'TBD', completed: false },
-    ].filter(item => item.date !== 'TBD'),
-    foundedYear: 2020,
-    submittedDate: data.created_at,
-    povertyRate: Number(data.tract_poverty_rate) || 0,
-    medianIncome: Number(data.tract_median_income) || 0,
-    jobsCreated: data.jobs_created || 0,
-    visible: data.visible ?? true,
-    coordinates: data.latitude && data.longitude ? [data.longitude, data.latitude] : undefined,
-    projectCost: Number(data.total_project_cost) || 0,
-    financingGap: Number(data.financing_gap) || 0,
-    censusTract: data.census_tract,
-    unemployment: Number(data.tract_unemployment) || 0,
-  };
+    return {
+      id: data.id,
+      projectName: data.project_name,
+      sponsorName: data.sponsor_name || 'Unknown Sponsor',
+      sponsorOrganizationId: data.sponsor_organization_id,
+      sponsorDescription: data.project_description,
+      website: data.website,
+      programType: (data.programs && data.programs[0]) as ProgramType || 'NMTC',
+      programLevel: (data.program_level) as ProgramLevel || 'federal',
+      stateProgram: data.state_program,
+      allocation: mapAllocationByProgram(data, (data.programs && data.programs[0]) as ProgramType || 'NMTC'),
+      creditPrice: 0.76,
+      state: data.state || '',
+      city: data.city || '',
+      tractType: (data.tract_types || []) as TractType[],
+      status: (data.status || 'draft') as DealStatus,
+      description: data.project_description,
+      communityImpact: data.community_benefit,
+      projectHighlights: [],
+      useOfFunds: data.total_project_cost ? [
+        { category: 'Construction', amount: Number(data.construction_cost) || 0 },
+        { category: 'Acquisition', amount: Number(data.acquisition_cost) || 0 },
+        { category: 'Soft Costs', amount: Number(data.soft_costs) || 0 },
+      ].filter(item => item.amount > 0) : [],
+      timeline: [
+        { milestone: 'Construction Start', date: data.construction_start_date || 'TBD', completed: !!data.construction_start_date },
+        { milestone: 'Projected Completion', date: data.projected_completion_date || 'TBD', completed: false },
+      ].filter(item => item.date !== 'TBD'),
+      foundedYear: 2020,
+      submittedDate: data.created_at,
+      povertyRate: Number(data.tract_poverty_rate) || 0,
+      medianIncome: Number(data.tract_median_income) || 0,
+      jobsCreated: data.jobs_created || 0,
+      visible: data.visible ?? true,
+      coordinates: data.latitude && data.longitude ? [data.longitude, data.latitude] : undefined,
+      projectCost: Number(data.total_project_cost) || 0,
+      financingGap: Number(data.financing_gap) || 0,
+      censusTract: data.census_tract,
+      unemployment: Number(data.tract_unemployment) || 0,
+    };
   } catch (error) {
     logger.error('Error in fetchDealById', error);
     return null;
@@ -156,70 +168,131 @@ export async function fetchMarketplaceDeals(): Promise<Deal[]> {
 export async function fetchDealsByOrganization(orgId: string, userEmail?: string): Promise<Deal[]> {
   const supabase = getSupabase();
 
-  // If orgId is empty/undefined, just fetch all deals
+  // If orgId is empty/undefined, return empty array (user has no deals yet)
   if (!orgId || orgId === 'undefined' || orgId === 'null') {
-    logger.info('fetchDealsByOrganization: No valid orgId, fetching all deals');
-    return fetchDeals();
-  }
-
-  // Build the OR conditions for organization matching
-  const orConditions = `sponsor_organization_id.eq.${orgId},assigned_cde_id.eq.${orgId},investor_id.eq.${orgId}`;
-
-  const { data, error } = await supabase
-    .from('deals')
-    .select('*')
-    .or(orConditions)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
-    const isRecursion = error.message?.toLowerCase().includes('recursion');
-    
-    if (!isBuild || !isRecursion) {
-      logger.error('Error fetching deals by organization', error);
-    }
+    logger.info('fetchDealsByOrganization: No valid orgId, returning empty');
     return [];
   }
 
-  return (data || []).map((deal: any) => ({
-    id: deal.id,
-    projectName: deal.project_name,
-    sponsorName: deal.sponsor_name || 'Unknown Sponsor',
-    sponsorDescription: deal.project_description,
-    website: deal.website,
-    programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
-    programLevel: (deal.program_level) as ProgramLevel || 'federal',
-    stateProgram: deal.state_program,
-    allocation: Number(deal.nmtc_financing_requested) || 0,
-    creditPrice: 0.76,
-    state: deal.state || '',
-    city: deal.city || '',
-    tractType: (deal.tract_types || []) as TractType[],
-    status: (deal.status || 'draft') as DealStatus,
-    description: deal.project_description,
-    communityImpact: deal.community_benefit,
-    projectHighlights: [],
-    useOfFunds: deal.total_project_cost ? [
-      { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
-      { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
-      { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
-    ].filter(item => item.amount > 0) : [],
-    timeline: [
-      { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
-      { milestone: 'Projected Completion', date: deal.projected_completion_date || 'TBD', completed: false },
-    ].filter(item => item.date !== 'TBD'),
-    foundedYear: 2020,
-    submittedDate: deal.created_at,
-    povertyRate: Number(deal.tract_poverty_rate) || 0,
-    medianIncome: Number(deal.tract_median_income) || 0,
-    jobsCreated: deal.jobs_created || 0,
-    visible: deal.visible ?? true,
-    coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
-    projectCost: Number(deal.total_project_cost) || 0,
-    financingGap: Number(deal.financing_gap) || 0,
-    censusTract: deal.census_tract,
-    unemployment: Number(deal.tract_unemployment) || 0,
-  }));
+  try {
+    // First, determine what type of organization this is and get the relevant record IDs
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .select('type')
+      .eq('id', orgId)
+      .single();
+
+    if (orgError || !orgData) {
+      logger.error('Error fetching organization type', orgError);
+      return [];
+    }
+
+    let orConditions = '';
+
+    // Build conditions based on organization type
+    if ((orgData as any).type === 'sponsor') {
+      // For sponsors, use the organization_id directly
+      orConditions = `sponsor_organization_id.eq.${orgId}`;
+    } else if ((orgData as any).type === 'cde') {
+      // For CDEs, find the CDE record and use its ID
+      const { data: cdeData } = await supabase
+        .from('cdes')
+        .select('id')
+        .eq('organization_id', orgId)
+        .single();
+      
+      if (cdeData) {
+        orConditions = `assigned_cde_id.eq.${(cdeData as any).id}`;
+      } else {
+        // No CDE record found, return empty
+        logger.info('No CDE record found for organization', orgId);
+        return [];
+      }
+    } else if ((orgData as any).type === 'investor') {
+      // For investors, find the investor record and use its ID
+      const { data: investorData } = await supabase
+        .from('investors')
+        .select('id')
+        .eq('organization_id', orgId)
+        .single();
+      
+      if (investorData) {
+        orConditions = `investor_id.eq.${(investorData as any).id}`;
+      } else {
+        // No investor record found, return empty
+        logger.info('No investor record found for organization', orgId);
+        return [];
+      }
+    } else {
+      // Unknown organization type, return empty
+      logger.info('Unknown organization type', (orgData as any).type);
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('deals')
+      .select('*')
+      .or(orConditions)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
+      const isRecursion = error.message?.toLowerCase().includes('recursion');
+      
+      if (!isBuild || !isRecursion) {
+        logger.error('Error fetching deals by organization', error);
+      }
+      return [];
+    }
+
+    logger.info(`Found ${data?.length || 0} deals for ${(orgData as any).type} organization ${orgId}`);
+    return (data || []).map((deal: any) => ({
+      id: deal.id,
+      projectName: deal.project_name,
+      sponsorName: deal.sponsor_name || 'Unknown Sponsor',
+      sponsorDescription: deal.project_description,
+      website: deal.website,
+      programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
+      programLevel: (deal.program_level) as ProgramLevel || 'federal',
+      stateProgram: deal.state_program,
+      allocation: deal.programType === 'LIHTC' 
+        ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
+        : deal.programType === 'HTC'
+        ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
+        : Number(deal.nmtc_financing_requested) || 0,
+      creditPrice: 0.76,
+      state: deal.state || '',
+      city: deal.city || '',
+      tractType: (deal.tract_types || []) as TractType[],
+      status: (deal.status || 'draft') as DealStatus,
+      description: deal.project_description,
+      communityImpact: deal.community_benefit,
+      projectHighlights: [],
+      useOfFunds: deal.total_project_cost ? [
+        { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
+        { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
+        { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
+      ].filter(item => item.amount > 0) : [],
+      timeline: [
+        { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
+        { milestone: 'Projected Completion', date: deal.projected_completion_date || 'TBD', completed: false },
+      ].filter(item => item.date !== 'TBD'),
+      foundedYear: 2020,
+      submittedDate: deal.created_at,
+      povertyRate: Number(deal.tract_poverty_rate) || 0,
+      medianIncome: Number(deal.tract_median_income) || 0,
+      jobsCreated: deal.jobs_created || 0,
+      visible: deal.visible ?? true,
+      coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
+      projectCost: Number(deal.total_project_cost) || 0,
+      financingGap: Number(deal.financing_gap) || 0,
+      censusTract: deal.census_tract,
+      unemployment: Number(deal.tract_unemployment) || 0,
+    }));
+  } catch (error) {
+    logger.error('Error in fetchDealsByOrganization', error);
+    return [];
+  }
 }
 
 /**
@@ -651,7 +724,7 @@ export async function fetchCDEPipelineDeals(cdeOrgId: string): Promise<Deal[]> {
     programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
     programLevel: (deal.program_level) as ProgramLevel || 'federal',
     stateProgram: deal.state_program,
-    allocation: Number(deal.nmtc_financing_requested) || 0,
+    allocation: mapAllocationByProgram(deal, (deal.programs && deal.programs[0]) as ProgramType || 'NMTC'),
     creditPrice: 0.76,
     state: deal.state || '',
     city: deal.city || '',

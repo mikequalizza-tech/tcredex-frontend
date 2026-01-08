@@ -83,12 +83,12 @@ export default function DocumentsPage() {
 
   // Upload state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadCategory, setUploadCategory] = useState<DocumentCategory>('project');
-  const [uploadDealId, setUploadDealId] = useState<string>('');
+  const [uploadProjectId, setUploadProjectId] = useState<string>(''); // Changed from uploadCategory to uploadProjectId
   const [uploadDescription, setUploadDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [pipelineProjects, setPipelineProjects] = useState<Array<{id: string, name: string}>>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchDocuments = useCallback(async () => {
@@ -126,7 +126,23 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     fetchDocuments();
+    loadPipelineProjects(); // Load pipeline projects for upload dropdown
   }, [fetchDocuments]);
+
+  // Load pipeline projects for upload dropdown
+  const loadPipelineProjects = async () => {
+    try {
+      const response = await fetch('/api/deals'); // Get user's deals
+      const deals = await response.json();
+      const projects = deals.map((deal: any) => ({
+        id: deal.id,
+        name: deal.projectName || deal.project_name || 'Untitled Project'
+      }));
+      setPipelineProjects(projects);
+    } catch (error) {
+      console.error('Failed to load pipeline projects:', error);
+    }
+  };
 
   // Client-side search filtering
   const filteredDocs = documents.filter((doc) => {
@@ -241,6 +257,11 @@ export default function DocumentsPage() {
       return;
     }
 
+    if (!uploadProjectId) {
+      setUploadError('Please select a project or choose "Other"');
+      return;
+    }
+
     setIsUploading(true);
     setUploadError(null);
 
@@ -248,8 +269,8 @@ export default function DocumentsPage() {
       // Step 1: Upload file directly to Supabase via our API
       const formData = new FormData();
       formData.append('file', uploadFile);
-      if (uploadDealId) {
-        formData.append('dealId', uploadDealId);
+      if (uploadProjectId && uploadProjectId !== 'other') {
+        formData.append('dealId', uploadProjectId);
       }
 
       const uploadResponse = await fetch('/api/documents', {
@@ -273,8 +294,8 @@ export default function DocumentsPage() {
           file_url: publicUrl,
           file_size: uploadFile.size,
           mime_type: uploadFile.type,
-          category: uploadCategory,
-          deal_id: uploadDealId || undefined,
+          category: 'project', // Always set to project since we're linking to projects
+          deal_id: uploadProjectId && uploadProjectId !== 'other' ? uploadProjectId : undefined,
         }),
       });
 
@@ -298,8 +319,7 @@ export default function DocumentsPage() {
 
   const resetUploadForm = () => {
     setUploadFile(null);
-    setUploadCategory('project');
-    setUploadDealId('');
+    setUploadProjectId(''); // Reset to empty instead of 'project'
     setUploadDescription('');
     setUploadError(null);
     if (fileInputRef.current) {
@@ -646,17 +666,19 @@ export default function DocumentsPage() {
                 </div>
               )}
 
-              {/* Category Selection */}
+              {/* Project Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Category *</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Project *</label>
                 <select
-                  value={uploadCategory}
-                  onChange={(e) => setUploadCategory(e.target.value as DocumentCategory)}
+                  value={uploadProjectId}
+                  onChange={(e) => setUploadProjectId(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
-                  {Object.entries(CATEGORY_LABELS).filter(([k]) => k !== 'all').map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                  <option value="">Select a project...</option>
+                  {pipelineProjects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
                   ))}
+                  <option value="other">Other (General Document)</option>
                 </select>
               </div>
 
@@ -747,7 +769,7 @@ export default function DocumentsPage() {
               </button>
               <button
                 onClick={handleUpload}
-                disabled={!uploadFile || isUploading}
+                disabled={!uploadFile || !uploadProjectId || isUploading}
                 className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-800 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isUploading ? (

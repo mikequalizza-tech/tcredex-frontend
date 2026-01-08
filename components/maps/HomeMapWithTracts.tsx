@@ -516,18 +516,34 @@ export default function HomeMapWithTracts({
       // Initial load
       loadTractsForViewport();
 
-      // Add deal markers
-      if (initialDeals && initialDeals.length > 0) {
-        addDealMarkers(initialDeals);
-      } else {
-        fetchDeals().then(addDealMarkers).catch(console.error);
-      }
+      // TEMPORARILY DISABLED: Add deal markers (will be post-MVP feature)
+      // Clear any existing deal markers to ensure clean map
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      
+      // if (initialDeals && initialDeals.length > 0) {
+      //   addDealMarkers(initialDeals);
+      // } else {
+      //   fetchDeals().then(addDealMarkers).catch(console.error);
+      // }
     });
 
     return () => {
       // Clean up event listeners
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('resize', handleResize);
+
+      // Clean up search marker
+      if (searchMarkerRef.current) {
+        searchMarkerRef.current.remove();
+        searchMarkerRef.current = null;
+      }
+
+      // Clean up popup
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
 
       if (map.current) {
         map.current.remove();

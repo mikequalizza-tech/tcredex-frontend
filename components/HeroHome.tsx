@@ -7,40 +7,58 @@ export default function HeroHome() {
       <PageIllustration />
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         {/* Hero content */}
-        <div className="pb-12 pt-32 md:pb-20 md:pt-40">
+        <div className="py-12 md:py-20">
           {/* Section header */}
-          <div className="pb-12 text-center md:pb-16">
-            <div
-              className="mb-6 border-y border-gray-800 [border-image:linear-gradient(to_right,transparent,--theme(--color-gray-700/.7),transparent)_1]"
-              data-aos="zoom-y-out"
-            >
-              <div className="-my-px mx-auto max-w-[36rem] [background:linear-gradient(to_right,transparent,--theme(--color-gray-800),transparent)_border-box]">
-                <div className="bg-gray-900/60 relative px-4 py-3">
-                  <span className="bg-linear-to-r from-indigo-500 to-indigo-200 bg-clip-text text-transparent">
-                    The AI-Powered Tax Credit Marketplace
-                  </span>
-                </div>
-              </div>
-            </div>
+          <div className="pb-12 text-center md:pb-20">
             <h1
-              className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-4 font-nacelle text-4xl font-semibold text-transparent md:text-5xl"
-              data-aos="zoom-y-out"
-              data-aos-delay={150}
+              className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text pb-5 font-nacelle text-4xl font-semibold text-transparent md:text-5xl"
+              data-aos="fade-up"
             >
-              Connect Deals. Deploy Capital.
-              <br className="max-lg:hidden" />
-              Transform Communities.
+              Welcome to tCredex.com — The New AI-Powered Tax Credit Marketplace — All 5 Programs, Zero Barriers
             </h1>
             <div className="mx-auto max-w-3xl">
               <p
-                className="mb-8 text-lg text-indigo-200/65"
-                data-aos="zoom-y-out"
+                className="mb-8 text-xl text-indigo-200/65"
+                data-aos="fade-up"
+                data-aos-delay={200}
+              >
+                The AI-powered marketplace for Federal & State NMTC, LIHTC, HTC, Brownfields, and Opportunity Zones. Tailored workflows for Sponsors/Developers, CDEs, and Investors—connecting the entire tax credit ecosystem in one intelligent platform.
+              </p>
+              
+              {/* Why TCredex section */}
+              <div 
+                className="mb-8 text-left mx-auto max-w-2xl"
+                data-aos="fade-up"
                 data-aos-delay={300}
               >
-                tCredex brings together Project Sponsors, CDEs, and Investors on a single intelligent platform. 
-                From census tract eligibility to closing room — powered by AI matching across NMTC, LIHTC, HTC, 
-                Opportunity Zones, and Brownfield credits.
-              </p>
+                <h2 className="text-2xl font-semibold text-gray-200 mb-4">Why tCredex?</h2>
+                <ul className="space-y-3 text-lg text-indigo-200/65">
+                  <li className="flex items-start">
+                    <span className="mr-3 text-indigo-500">•</span>
+                    <span><strong>Universal Coverage:</strong> NMTC, HTC, Federal LIHTC, State LIHTC, Brownfields, Opportunity Zones, and more—all programs in one place</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-3 text-indigo-500">•</span>
+                    <span><strong>True Marketplace:</strong> Custom homepages for Sponsors/Developers, CDEs, and Investors with secure and encrypted Data storage systems. Your Data is safe with tCredex.</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-3 text-indigo-500">•</span>
+                    <span><strong>Lightning Fast Onboarding:</strong> Get started in ~20 minutes</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-3 text-indigo-500">•</span>
+                    <span><strong>Free to Use:</strong> Pay-for-performance pricing model</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-3 text-indigo-500">•</span>
+                    <span><strong>Automatch AI™:</strong> Intelligent matching of Deals, CDEs, Investors, and Census Tract data that is then AutoMatched by criteria and other variables using AI</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-3 text-indigo-500">•</span>
+                    <span><strong>SOT Map-Based Intelligence:</strong> The tax credit industry's first "Source of Truth" map using data directly from Government sources with comprehensive results that are based on Address Lookup with SOT results that drive the systems AI for all Role types</span>
+                  </li>
+                </ul>
+              </div>
               <div className="relative before:absolute before:inset-0 before:border-y before:[border-image:linear-gradient(to_right,transparent,--theme(--color-gray-700/.7),transparent)_1]">
                 <div
                   className="mx-auto max-w-xs sm:flex sm:max-w-none sm:justify-center"
@@ -49,17 +67,17 @@ export default function HeroHome() {
                 >
                   <Link
                     className="btn group mb-4 w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] sm:mb-0 sm:w-auto"
-                    href="/signin?redirect=/map"
+                    href="/#address-lookup"
                   >
                     <span className="relative inline-flex items-center">
-                      Sign In to Explore Map
+                      Address Lookup
                       <span className="ml-1 tracking-normal text-white/50 transition-transform group-hover:translate-x-0.5">
                         →
                       </span>
                     </span>
                   </Link>
                   <Link
-                    className="btn relative w-full bg-linear-to-b from-gray-800 to-gray-800/60 bg-[length:100%_100%] bg-[bottom] text-gray-300 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border before:border-transparent before:[background:linear-gradient(to_right,var(--color-gray-800),var(--color-gray-700),var(--color-gray-800))_border-box] before:[mask-composite:exclude_!important] before:[mask:linear-gradient(white_0_0)_padding-box,_linear-gradient(white_0_0)] hover:bg-[length:100%_150%] sm:ml-4 sm:w-auto"
+                    className="btn relative w-full bg-linear-to-b from-purple-600 to-purple-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%] sm:ml-4 sm:w-auto"
                     href="/how-it-works"
                   >
                     How It Works

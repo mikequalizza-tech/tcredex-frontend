@@ -136,6 +136,8 @@ export function generateDealFromIntake(
     unemployment: intake.tractUnemployment,
     shovelReady,
     completionDate: intake.constructionEndDate,
+    heroImageUrl: intake.projectImages?.[0]?.url,
+    projectImages: intake.projectImages,
   };
 
   return {

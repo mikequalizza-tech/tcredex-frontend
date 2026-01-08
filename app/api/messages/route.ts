@@ -2,14 +2,19 @@
  * tCredex API - Messages
  * GET /api/messages?dealId=X - Get messages for a deal
  * POST /api/messages - Send a message
+ * 
+ * CRITICAL: All endpoints require authentication and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth, handleAuthError, verifyDealAccess } from '@/lib/api/auth-middleware';
 import { notify } from '@/lib/notifications';
 
 export async function GET(request: NextRequest) {
   try {
+    // CRITICAL: Use requireAuth instead of supabase.auth.getUser()
+    const user = await requireAuth(request);
     const supabase = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
     const dealId = searchParams.get('dealId');
@@ -21,14 +26,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Verify auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // CRITICAL: Verify user can access this deal
+    await verifyDealAccess(request, user, dealId, 'view');
 
     const { data: messagesData, error } = await supabase
       .from('messages')
@@ -59,7 +58,10 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Messages query error:', error);
-      return NextResponse.json([]);
+      return NextResponse.json({
+        messages: [],
+        organizationId: user.organizationId,
+      });
     }
 
     const formatted = (messages || []).map(m => ({
@@ -74,26 +76,21 @@ export async function GET(request: NextRequest) {
       isOwn: m.sender_id === user.id,
     }));
 
-    return NextResponse.json(formatted);
+    return NextResponse.json({
+      messages: formatted,
+      organizationId: user.organizationId,
+    });
   } catch (error) {
-    console.error('Messages error:', error);
-    return NextResponse.json([]);
+    return handleAuthError(error);
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Use requireAuth instead of supabase.auth.getUser()
+    const user = await requireAuth(request);
     const supabase = getSupabaseAdmin();
     
-    // Verify auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { dealId, content, attachments } = await request.json();
 
     if (!dealId || !content) {
@@ -102,6 +99,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // CRITICAL: Verify user can access this deal
+    await verifyDealAccess(request, user, dealId, 'edit');
 
     // Get sender profile
     const { data: profileData } = await supabase
@@ -180,14 +180,11 @@ export async function POST(request: NextRequest) {
       attachments: typedMessage.attachments,
       createdAt: typedMessage.created_at,
       isOwn: true,
+      organizationId: user.organizationId,
     };
 
     return NextResponse.json(formatted, { status: 201 });
   } catch (error) {
-    console.error('Message creation error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }

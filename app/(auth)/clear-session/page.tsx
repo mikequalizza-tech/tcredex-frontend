@@ -6,15 +6,27 @@ export default function ClearSession() {
   const [cleared, setCleared] = useState(false);
 
   useEffect(() => {
-    // Clear all auth-related localStorage
-    localStorage.removeItem('tcredex_session');
-    localStorage.removeItem('tcredex_demo_role');
-    localStorage.removeItem('tcredex_registered_user');
+    // Clear all auth-related localStorage that might cause conflicts
+    const keysToRemove = [
+      'tcredex_session',
+      'tcredex_demo_role', 
+      'tcredex_registered_user',
+      'tcredex_draft', // Also clear any draft data
+    ];
+
+    keysToRemove.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        console.warn(`Failed to remove ${key}:`, e);
+      }
+    });
+
     setCleared(true);
     
-    // Redirect after a moment
+    // Redirect to signin for proper authentication
     setTimeout(() => {
-      window.location.href = '/';
+      window.location.href = '/signin';
     }, 1500);
   }, []);
 
@@ -31,7 +43,7 @@ export default function ClearSession() {
                   </svg>
                 </div>
                 <h1 className="text-2xl font-semibold text-gray-200">Session Cleared</h1>
-                <p className="text-gray-400 mt-2">Redirecting to home page...</p>
+                <p className="text-gray-400 mt-2">Redirecting to sign in...</p>
               </>
             ) : (
               <>

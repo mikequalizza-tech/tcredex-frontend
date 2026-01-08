@@ -2,12 +2,19 @@
  * tCredex API - Register
  * POST /api/auth/register
  *
- * Flow:
- * 1. Create Supabase auth user
- * 2. Create/find organization
- * 3. Create profile
- * 4. Send confirmation email
- * 5. Send role-based welcome email
+ * CRITICAL FLOW:
+ * 1. Create Supabase auth user (email confirmed)
+ * 2. Create organization (always new, unique slug)
+ * 3. Create user record in users table (links auth to org)
+ * 4. Create role-specific record (sponsors/cdes/investors)
+ * 5. Send confirmation email
+ * 6. Return session token
+ *
+ * KEY POINTS:
+ * - Users table is source of truth for roles and org membership
+ * - Each registration creates ONE new organization
+ * - User role is ORG_ADMIN (they own their org)
+ * - Organization type determines dashboard and permissions
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -36,120 +43,146 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
-    // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
+    // Step 1: Create auth user with email confirmed
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: email.toLowerCase(),
       password,
-      options: {
-        data: {
-          full_name: name,
-          role: role,
-        },
+      email_confirm: true, // Email confirmed on creation
+      user_metadata: {
+        full_name: name,
+        role: role,
       },
     });
 
-    if (authError) {
+    if (authError || !authData.user) {
       return NextResponse.json(
-        { error: authError.message },
+        { error: authError?.message || 'Failed to create user' },
         { status: 400 }
       );
     }
 
-    if (!authData.user) {
+    // Step 2: Create organization (ALWAYS new with unique slug)
+    const baseSlug = organizationName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .substring(0, 80);
+    const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+
+    const { data: newOrg, error: orgError } = await supabase
+      .from('organizations')
+      .insert({
+        name: organizationName,
+        slug: uniqueSlug,
+        type: role, // org type matches role: 'sponsor', 'cde', or 'investor'
+      } as never)
+      .select()
+      .single();
+
+    if (orgError || !newOrg) {
+      console.error('[Register] Org creation error:', orgError);
       return NextResponse.json(
-        { error: 'Failed to create user' },
-        { status: 500 }
+        { error: `Organization creation failed: ${orgError?.message || 'Unknown error'}` },
+        { status: 400 }
       );
     }
 
-    // Create or find organization
-    let organization;
-    const { data: existingOrg } = await supabase
-      .from('organizations')
-      .select('*')
-      .ilike('name', organizationName)
-      .single();
+    const typedOrg = newOrg as { id: string; name: string; type: string };
 
-    type OrgData = { id: string; name: string; type: string };
-    const typedExistingOrg = existingOrg as OrgData | null;
-
-    if (typedExistingOrg) {
-      organization = typedExistingOrg;
-    } else {
-      const { data: newOrg, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: organizationName,
-          type: role === 'cde' ? 'CDE' : role === 'investor' ? 'Investor' : 'Sponsor',
-        } as never)
-        .select()
-        .single();
-
-      if (orgError) {
-        console.error('Org creation error:', orgError);
-        // Continue without org - profile will be created without org link
-      } else {
-        organization = newOrg as OrgData | null;
-      }
-    }
-
-    // Create profile
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
+    // Step 3: Create user record in users table
+    // CRITICAL: This is the source of truth for user roles and org membership
+    const { error: userError } = await supabase
+      .from('users')
+      .insert({
         id: authData.user.id,
-        full_name: name,
-        email: email,
-        role: role,
-        organization_id: organization?.id || null,
+        email: email.toLowerCase(),
+        name: name,
+        role: 'ORG_ADMIN', // User is admin of their own org
+        organization_id: typedOrg.id,
+        is_active: true,
+        email_verified: true,
       } as never);
 
-    if (profileError) {
-      console.error('Profile creation error:', profileError);
+    if (userError) {
+      console.error('[Register] User record creation error:', userError);
+      // Don't fail - auth user exists, user record can be created on first login
     }
 
-    // =========================================
-    // SEND EMAILS
-    // =========================================
+    // Step 4: Create role-specific record
+    try {
+      if (role === 'sponsor') {
+        const { error: sponsorError } = await supabase
+          .from('sponsors')
+          .insert({
+            organization_id: typedOrg.id,
+            primary_contact_name: name,
+            primary_contact_email: email.toLowerCase(),
+          } as never);
+        if (sponsorError) {
+          console.error('[Register] Sponsor record error:', sponsorError);
+        }
+      } else if (role === 'cde') {
+        const { error: cdeError } = await supabase
+          .from('cdes')
+          .insert({
+            organization_id: typedOrg.id,
+            primary_contact_name: name,
+            primary_contact_email: email.toLowerCase(),
+            status: 'active',
+          } as never);
+        if (cdeError) {
+          console.error('[Register] CDE record error:', cdeError);
+        }
+      } else if (role === 'investor') {
+        const { error: investorError } = await supabase
+          .from('investors')
+          .insert({
+            organization_id: typedOrg.id,
+            primary_contact_name: name,
+            primary_contact_email: email.toLowerCase(),
+          } as never);
+        if (investorError) {
+          console.error('[Register] Investor record error:', investorError);
+        }
+      }
+    } catch (roleError) {
+      console.error('[Register] Role-specific record creation error:', roleError);
+    }
+
+    // Step 5: Send emails
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tcredex.com';
+    console.log(`[Register] Sending emails to ${email} (role: ${role})`);
 
-    // 1. Send email confirmation (if Supabase email confirmation is disabled)
-    // Note: Supabase can handle this automatically if configured
-    // This is a backup/custom flow
     try {
-      const confirmUrl = `${baseUrl}/api/auth/confirm?token=${authData.session?.access_token || authData.user.id}`;
-      await emailService.confirmEmail(email, name, confirmUrl);
-      console.log(`[Email] Confirmation sent to ${email}`);
+      const confirmUrl = `${baseUrl}/signin?confirmed=1`;
+      await emailService.confirmEmail(email.toLowerCase(), name, confirmUrl);
     } catch (emailError) {
-      console.error('[Email] Confirmation send failed:', emailError);
-      // Don't fail registration if email fails
+      console.error('[Register] Confirmation email error:', emailError);
     }
 
-    // 2. Send role-based welcome email
     try {
-      await emailService.welcome(email, name, role as 'sponsor' | 'cde' | 'investor');
-      console.log(`[Email] Welcome (${role}) sent to ${email}`);
+      await emailService.welcome(email.toLowerCase(), name, role as 'sponsor' | 'cde' | 'investor');
     } catch (emailError) {
-      console.error('[Email] Welcome send failed:', emailError);
-      // Don't fail registration if email fails
+      console.error('[Register] Welcome email error:', emailError);
     }
 
+    // Step 6: Return success
     return NextResponse.json({
-      token: authData.session?.access_token,
+      success: true,
       user: {
         id: authData.user.id,
         email: authData.user.email,
         name: name,
-        role: role,
-        organization: organization ? {
-          id: organization.id,
-          name: organization.name,
-          type: organization.type,
-        } : null,
+        role: 'ORG_ADMIN',
+        organization: {
+          id: typedOrg.id,
+          name: typedOrg.name,
+          type: typedOrg.type,
+        },
       },
     });
   } catch (error) {
-    console.error('Register error:', error);
+    console.error('[Register] Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

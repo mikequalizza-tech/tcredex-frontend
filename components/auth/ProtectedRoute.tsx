@@ -8,7 +8,7 @@ import { Role, hasMinimumRole } from '@/lib/auth/types';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: Role;
-  allowedOrgTypes?: ('cde' | 'sponsor' | 'investor')[];
+  allowedOrgTypes?: ('cde' | 'sponsor' | 'investor' | 'admin')[];
   fallbackUrl?: string;
 }
 

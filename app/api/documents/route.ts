@@ -1,18 +1,22 @@
 /**
  * tCredex Documents API
  * Document upload and management
+ * 
+ * CRITICAL: All endpoints require authentication and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-
-const supabase = getSupabaseAdmin();
+import { requireAuth, handleAuthError, verifyDealAccess } from '@/lib/api/auth-middleware';
 
 // =============================================================================
 // GET /api/documents - List documents with filters
 // =============================================================================
 export async function GET(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
     
     const dealId = searchParams.get('deal_id');
@@ -20,13 +24,28 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const status = searchParams.get('status');
 
+    // CRITICAL: Validate org access
+    if (organizationId && organizationId !== user.organizationId && user.organizationType !== 'admin') {
+      return NextResponse.json(
+        { error: 'You can only view documents for your organization' },
+        { status: 403 }
+      );
+    }
+
     let query = supabase
       .from('documents')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (dealId) query = query.eq('deal_id', dealId);
-    if (organizationId) query = query.eq('organization_id', organizationId);
+    // CRITICAL: Filter by user's organization
+    const queryOrgId = organizationId || user.organizationId;
+    query = query.eq('organization_id', queryOrgId);
+
+    if (dealId) {
+      // CRITICAL: Verify user can access this deal
+      await verifyDealAccess(request, user, dealId, 'view');
+      query = query.eq('deal_id', dealId);
+    }
     if (category) query = query.eq('category', category);
     if (status) query = query.eq('status', status);
 
@@ -34,10 +53,12 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ documents: data });
+    return NextResponse.json({ 
+      documents: data,
+      organizationId: user.organizationId,
+    });
   } catch (error) {
-    console.error('GET /api/documents error:', error);
-    return NextResponse.json({ error: 'Failed to fetch documents' }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
@@ -46,6 +67,9 @@ export async function GET(request: NextRequest) {
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
     const body = await request.json();
 
     if (!body.name || !body.file_url) {
@@ -55,13 +79,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // CRITICAL: Validate org access
+    if (body.organization_id && body.organization_id !== user.organizationId && user.organizationType !== 'admin') {
+      return NextResponse.json(
+        { error: 'You can only create documents for your organization' },
+        { status: 403 }
+      );
+    }
+
+    // CRITICAL: If deal_id provided, verify user can access it
+    if (body.deal_id) {
+      await verifyDealAccess(request, user, body.deal_id, 'edit');
+    }
+
     const { data, error } = await supabase
       .from('documents')
       .insert({
-        organization_id: body.organization_id,
+        organization_id: body.organization_id || user.organizationId,
         deal_id: body.deal_id,
         closing_room_id: body.closing_room_id,
-        uploaded_by: body.uploaded_by,
+        uploaded_by: body.uploaded_by || user.id,
         name: body.name,
         file_url: body.file_url,
         file_size: body.file_size,
@@ -75,25 +112,29 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    const typedData = data as Record<string, unknown>;
+
     // Log to ledger
     await supabase.from('ledger_events').insert({
       actor_type: 'human',
-      actor_id: body.uploaded_by || 'unknown',
+      actor_id: user.id,
       entity_type: 'document',
-      entity_id: (data as { id: string }).id,
+      entity_id: (typedData as { id: string }).id,
       action: 'document_uploaded',
       payload_json: {
         name: body.name,
         category: body.category,
         deal_id: body.deal_id,
       },
-      hash: generateHash(data as Record<string, unknown>),
+      hash: generateHash(typedData),
     } as never);
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({
+      ...typedData,
+      organizationId: user.organizationId,
+    }, { status: 201 });
   } catch (error) {
-    console.error('POST /api/documents error:', error);
-    return NextResponse.json({ error: 'Failed to create document' }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
@@ -102,6 +143,10 @@ export async function POST(request: NextRequest) {
 // =============================================================================
 export async function PUT(request: NextRequest) {
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
+
     // Check content type to determine if this is a file upload or JSON request
     const contentType = request.headers.get('content-type') || '';
 
@@ -115,14 +160,19 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'No file provided' }, { status: 400 });
       }
 
+      // CRITICAL: If deal_id provided, verify user can access it
+      if (dealId) {
+        await verifyDealAccess(request, user, dealId, 'edit');
+      }
+
       const timestamp = Date.now();
       const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
       const path = dealId
         ? `deals/${dealId}/${timestamp}-${safeName}`
-        : `uploads/${timestamp}-${safeName}`;
+        : `orgs/${user.organizationId}/${timestamp}-${safeName}`;
 
       // Ensure bucket exists
-      await ensureBucketExists();
+      await ensureBucketExists(supabase);
 
       // Upload file directly
       const fileBuffer = await file.arrayBuffer();
@@ -150,6 +200,7 @@ export async function PUT(request: NextRequest) {
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type,
+        organizationId: user.organizationId,
       });
     } else {
       // JSON request for signed URL (legacy support)
@@ -160,13 +211,18 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'fileName is required' }, { status: 400 });
       }
 
+      // CRITICAL: If deal_id provided, verify user can access it
+      if (dealId) {
+        await verifyDealAccess(request, user, dealId, 'edit');
+      }
+
       const timestamp = Date.now();
       const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
       const path = dealId
         ? `deals/${dealId}/${timestamp}-${safeName}`
-        : `uploads/${timestamp}-${safeName}`;
+        : `orgs/${user.organizationId}/${timestamp}-${safeName}`;
 
-      await ensureBucketExists();
+      await ensureBucketExists(supabase);
 
       // Create signed upload URL
       const { data, error } = await supabase.storage
@@ -185,19 +241,16 @@ export async function PUT(request: NextRequest) {
         uploadUrl: data.signedUrl,
         path,
         publicUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/documents/${path}`,
+        organizationId: user.organizationId,
       });
     }
   } catch (error) {
-    console.error('PUT /api/documents error:', error);
-    return NextResponse.json({
-      error: 'Failed to upload',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
 // Helper to ensure the documents bucket exists
-async function ensureBucketExists() {
+async function ensureBucketExists(supabase: ReturnType<typeof getSupabaseAdmin>) {
   const { data: buckets } = await supabase.storage.listBuckets();
   const bucketExists = buckets?.some(b => b.name === 'documents');
 

@@ -319,15 +319,18 @@ function formatEligibilityResponse(
       opportunity_zone: data.is_oz_designated || false,
       htc_eligible: isHtcEligible,
       htc_is_nhl: isNHL,
-      poverty_rate: data.poverty_rate,
-      poverty_qualifies: data.poverty_rate ? Number(data.poverty_rate) >= 20 : false,
-      median_income_pct: data.mfi_percent,
-      income_qualifies: data.mfi_percent ? Number(data.mfi_percent) <= 80 : false,
-      unemployment_rate: data.unemployment_rate,
-      severely_distressed: data.is_nmtc_eligible && (
-        (data.poverty_rate && Number(data.poverty_rate) >= 30) ||
-        (data.mfi_percent && Number(data.mfi_percent) <= 60)
-      )
+      // Use nmtc_* prefixed columns from database
+      poverty_rate: data.nmtc_poverty_rate ?? 0,
+      poverty_qualifies: data.nmtc_poverty_rate ? Number(data.nmtc_poverty_rate) >= 20 : false,
+      median_income_pct: data.nmtc_mfi_percent ?? 0,
+      income_qualifies: data.nmtc_mfi_percent ? Number(data.nmtc_mfi_percent) <= 80 : false,
+      unemployment_rate: data.nmtc_unemployment_rate ?? 0,
+      unemployment_qualifies: data.nmtc_unemployment_rate ? Number(data.nmtc_unemployment_rate) >= 6 : false, // 1.5x ~4% national avg
+      metro_status: data.metro_status || 'N/A',
+      severely_distressed: data.is_severely_distressed || (data.is_nmtc_eligible && (
+        (data.nmtc_poverty_rate && Number(data.nmtc_poverty_rate) >= 30) ||
+        (data.nmtc_mfi_percent && Number(data.nmtc_mfi_percent) <= 60)
+      ))
     },
 
     // HTC: Historic buildings at/near this address (property-based, not tract-based)
@@ -344,6 +347,15 @@ function formatEligibilityResponse(
     state: {
       nmtc: data.has_state_nmtc || false,
       lihtc: data.has_state_lihtc || false,
+      htc: data.has_state_htc || false,
+      brownfield: data.has_brownfield_credit || false,
+    },
+
+    // Location info
+    location: {
+      state: data.state_name || '',
+      county: data.county_name || '',
+      metro_status: data.metro_status || 'N/A',
     },
 
     // Reason

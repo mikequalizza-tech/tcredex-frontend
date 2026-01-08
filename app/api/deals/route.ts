@@ -1,43 +1,77 @@
 /**
  * tCredex Deals API
- * CRUD operations for deals with Supabase persistence
+ * CRUD operations for deals with proper auth and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth, handleAuthError, verifyDealAccess } from '@/lib/api/auth-middleware';
 
 // =============================================================================
-// GET /api/deals - List deals with filters
+// GET /api/deals - List deals with filters or fetch single deal by id
 // =============================================================================
 export async function GET(request: NextRequest) {
-  const supabase = getSupabaseAdmin();
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
+
     const { searchParams } = new URL(request.url);
-    
-    // Parse query params
+    const id = searchParams.get('id');
+
+    // Fetch single deal by ID
+    if (id) {
+      // Verify user can access this deal
+      await verifyDealAccess(request, user, id, 'view');
+
+      const { data, error } = await supabase
+        .from('deals')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({ deal: data }, { status: 200 });
+    }
+
+    // List deals with org filtering
     const status = searchParams.get('status');
     const state = searchParams.get('state');
     const program = searchParams.get('program');
-    const sponsorId = searchParams.get('sponsor_id');
-    const cdeId = searchParams.get('cde_id');
-    const visible = searchParams.get('visible');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // Build query
+    // Build query with org filtering based on user type
     let query = supabase
       .from('deals')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // Apply filters
+    // CRITICAL: Filter by organization and role
+    if (user.organizationType === 'sponsor') {
+      // Sponsors see only their own deals
+      query = query.eq('sponsor_organization_id', user.organizationId);
+    } else if (user.organizationType === 'cde') {
+      // CDEs see: assigned deals + public deals
+      query = query.or(
+        `assigned_cde_id.in.(${user.organizationId}),status.in.(available,seeking_capital,matched)`
+      );
+    } else if (user.organizationType === 'investor') {
+      // Investors see: public deals + deals with their commitments
+      query = query.or(
+        `status.in.(available,seeking_capital,matched),investor_id.eq.${user.organizationId}`
+      );
+    }
+    // Admin sees all deals (no filter)
+
+    // Apply additional filters
     if (status) query = query.eq('status', status);
     if (state) query = query.eq('state', state);
     if (program) query = query.contains('programs', [program]);
-    if (sponsorId) query = query.eq('sponsor_id', sponsorId);
-    if (cdeId) query = query.eq('assigned_cde_id', cdeId);
-    if (visible === 'true') query = query.eq('visible', true);
 
     const { data, error, count } = await query;
 
@@ -50,11 +84,7 @@ export async function GET(request: NextRequest) {
       offset,
     });
   } catch (error) {
-    console.error('GET /api/deals error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch deals' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }
 
@@ -62,9 +92,27 @@ export async function GET(request: NextRequest) {
 // POST /api/deals - Create new deal
 // =============================================================================
 export async function POST(request: NextRequest) {
-  const supabase = getSupabaseAdmin();
   try {
+    // CRITICAL: Require authentication and org admin role
+    const user = await requireAuth(request);
+    
+    if (user.userRole !== 'ORG_ADMIN') {
+      return NextResponse.json(
+        { error: 'Only organization admins can create deals' },
+        { status: 403 }
+      );
+    }
+
+    // Only sponsors can create deals
+    if (user.organizationType !== 'sponsor') {
+      return NextResponse.json(
+        { error: 'Only sponsors can create deals' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
+    const supabase = getSupabaseAdmin();
 
     // Validate required fields
     if (!body.project_name) {
@@ -74,14 +122,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert deal
+    // Insert deal with user's organization as sponsor
     const { data, error } = await supabase
       .from('deals')
       .insert({
         project_name: body.project_name,
-        sponsor_id: body.sponsor_id,
+        sponsor_organization_id: user.organizationId, // CRITICAL: Use user's org
         sponsor_name: body.sponsor_name,
-        sponsor_organization_id: body.sponsor_organization_id,
         programs: body.programs || ['NMTC'],
         program_level: body.program_level || 'federal',
         address: body.address,
@@ -113,21 +160,17 @@ export async function POST(request: NextRequest) {
     // Log to ledger
     await supabase.from('ledger_events').insert({
       actor_type: 'human',
-      actor_id: body.created_by || 'unknown',
-      entity_type: 'application',
+      actor_id: user.id,
+      entity_type: 'deal',
       entity_id: (data as { id: string }).id,
-      action: 'application_created',
+      action: 'deal_created',
       payload_json: { project_name: body.project_name },
       hash: generateHash(data as Record<string, unknown>),
     } as never);
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    console.error('POST /api/deals error:', error);
-    return NextResponse.json(
-      { error: 'Failed to create deal' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }
 

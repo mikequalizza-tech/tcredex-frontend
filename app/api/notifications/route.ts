@@ -2,23 +2,19 @@
  * tCredex API - Notifications
  * GET /api/notifications - Get user notifications
  * POST /api/notifications/read-all - Mark all as read
+ * 
+ * CRITICAL: All endpoints require authentication and org filtering
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth, handleAuthError } from '@/lib/api/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
+    // CRITICAL: Use requireAuth instead of supabase.auth.getUser()
+    const user = await requireAuth(request);
     const supabase = getSupabaseAdmin();
-    
-    // Verify auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     const { data: notificationsData, error } = await supabase
       .from('notifications')
@@ -41,7 +37,10 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Notifications query error:', error);
       // Return empty array if table doesn't exist yet
-      return NextResponse.json([]);
+      return NextResponse.json({
+        notifications: [],
+        organizationId: user.organizationId,
+      });
     }
 
     // Transform to mobile-friendly format
@@ -55,25 +54,20 @@ export async function GET(request: NextRequest) {
       createdAt: n.created_at,
     }));
 
-    return NextResponse.json(formatted);
+    return NextResponse.json({
+      notifications: formatted,
+      organizationId: user.organizationId,
+    });
   } catch (error) {
-    console.error('Notifications error:', error);
-    return NextResponse.json([]);
+    return handleAuthError(error);
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Use requireAuth instead of supabase.auth.getUser()
+    const user = await requireAuth(request);
     const supabase = getSupabaseAdmin();
-    
-    // Verify auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
 
     // Mark all as read
     const { error } = await supabase
@@ -86,12 +80,11 @@ export async function POST(request: NextRequest) {
       console.error('Mark all read error:', error);
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true,
+      organizationId: user.organizationId,
+    });
   } catch (error) {
-    console.error('Mark all read error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }

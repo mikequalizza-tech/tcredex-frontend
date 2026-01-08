@@ -12,6 +12,7 @@ import { calculateCDEMatchScore } from '@/lib/cde/matchScore';
 import { CDEDealCard } from '@/lib/types/cde';
 import { useCurrentUser } from '@/lib/auth';
 import { mapDealToCard } from '@/lib/utils/dealCardMapper';
+import AppLayout from '@/components/layout/AppLayout';
 
 // Dynamic import of the map to avoid SSR issues
 const HomeMapWithTracts = dynamic(
@@ -57,13 +58,17 @@ export default function MapPlatformPage() {
       <div className="h-screen w-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-gray-400">Loading Deal Map...</p>
+          <p className="text-sm text-gray-400">Loading Marketplace...</p>
         </div>
       </div>
     );
   }
 
-  return <MapContent />;
+  return (
+    <AppLayout showRoleSwitcher={false}>
+      <MapContent />
+    </AppLayout>
+  );
 }
 
 function MapContent() {
@@ -202,50 +207,7 @@ function MapContent() {
   const panelInfo = getPanelInfo();
 
   return (
-    <div className="h-screen w-screen bg-gray-950 text-white overflow-hidden flex flex-col">
-      {/* Top Navigation Bar */}
-      <div className="flex-none h-12 bg-gray-900 border-b border-gray-800 px-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            <span className="text-sm">Dashboard</span>
-          </Link>
-          <div className="h-4 w-px bg-gray-700" />
-          <Link href="/" className="flex items-center gap-2">
-            <img src="/brand/tcredex_256x64.png" alt="tCredex" className="h-6 w-auto" />
-          </Link>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* User Type Badge - Shows their locked view */}
-          <span className={`px-2 py-1 text-xs font-medium rounded ${
-            viewMode === 'sponsor' ? 'bg-green-900/50 text-green-400' :
-            viewMode === 'cde' ? 'bg-purple-900/50 text-purple-400' :
-            'bg-blue-900/50 text-blue-400'
-          }`}>
-            {viewMode === 'sponsor' ? 'Sponsor' : viewMode === 'cde' ? 'CDE' : 'Investor'}
-          </span>
-          {isAuthenticated && (
-            <>
-              {viewMode === 'sponsor' && (
-                <Link href="/deals/new" className="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-500 rounded-lg transition-colors">
-                  + Submit Project
-                </Link>
-              )}
-              {viewMode === 'cde' && (
-                <Link href="/cde/profile/edit" className="px-3 py-1.5 text-xs font-medium bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors">
-                  Edit CDE Profile
-                </Link>
-              )}
-              <Link href="/deals" className="text-sm text-gray-400 hover:text-white transition-colors">
-                {viewMode === 'sponsor' ? 'My Projects' : 'Pipeline'}
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
-
+    <div className="h-full w-full bg-gray-950 text-white overflow-hidden flex flex-col">
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left: Filter Rail */}

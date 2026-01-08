@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useCurrentUser } from '@/lib/auth';
 import Link from 'next/link';
 
 type RequestType = 'technical' | 'billing' | 'account' | 'deal' | 'general' | 'feature';
@@ -35,34 +36,21 @@ export default function SupportRequestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [ticketId, setTicketId] = useState('');
+  const { user, isAuthenticated } = useCurrentUser();
   const [userRole, setUserRole] = useState<string | null>(null);
 
-  // Try to pre-fill from localStorage session (if logged in)
+  // Pre-fill from authenticated user data
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const session = localStorage.getItem('tcredex_session');
-        if (session) {
-          const parsed = JSON.parse(session);
-          setUserRole(parsed.role || null);
-          
-          // Try to get registered user data
-          const registeredUser = localStorage.getItem('tcredex_registered_user');
-          if (registeredUser) {
-            const userData = JSON.parse(registeredUser);
-            setFormData(prev => ({
-              ...prev,
-              name: userData.name || prev.name,
-              email: userData.email || prev.email,
-              organization: userData.orgName || prev.organization,
-            }));
-          }
-        }
-      } catch (e) {
-        // Ignore errors - user just fills in manually
-      }
+    if (isAuthenticated && user) {
+      setUserRole(user.role);
+      setFormData(prev => ({
+        ...prev,
+        name: user.name || prev.name,
+        email: user.email || prev.email,
+        organization: user.organization?.name || prev.organization,
+      }));
     }
-  }, []);
+  }, [isAuthenticated, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

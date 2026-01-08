@@ -22,7 +22,7 @@ const staticPages: SearchResult[] = [
   { type: 'page', title: 'Who We Serve', href: '/who-we-serve', description: 'Sponsors, CDEs, and Investors' },
   { type: 'page', title: 'About', href: '/about', description: 'Our mission and team' },
   { type: 'page', title: 'Blog', href: '/blog', description: 'Tax credit insights and news' },
-  { type: 'page', title: 'Help', href: '/help', description: 'Support and documentation' },
+  { type: 'page', title: 'Help Center', href: '/help', description: 'Get help with tCredex platform' },
   { type: 'page', title: 'Sign In', href: '/signin', description: 'Log into your account' },
   { type: 'page', title: 'Register', href: '/signup', description: 'Create a new account' },
   { type: 'page', title: 'Dashboard', href: '/dashboard', description: 'Your dashboard' },

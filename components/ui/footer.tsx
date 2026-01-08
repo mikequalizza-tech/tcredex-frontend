@@ -38,7 +38,7 @@ export default function Footer() {
                 </li>
                 <li>
                   <Link href="/map" className="transition hover:text-gray-200">
-                    Deal Map
+                    Marketplace Map
                   </Link>
                 </li>
                 <li>

@@ -76,8 +76,7 @@ export default function Features() {
                 Project Milestones
               </h3>
               <p className="text-indigo-200/65">
-                Track progress across custom flows for your team. Find the right
-                balance for the user, privacy and security.
+                Track submissions from draft to closing with role-aware stages for sponsors, CDEs, and investors.
               </p>
             </article>
             <article>
@@ -94,8 +93,7 @@ export default function Features() {
                 Team Views
               </h3>
               <p className="text-indigo-200/65">
-                Track progress across custom flows for your team. Find the right
-                balance for the user, privacy and security.
+                Give each team the view they need: sponsor intake, CDE review queues, and investor screens.
               </p>
             </article>
             <article>
@@ -115,8 +113,7 @@ export default function Features() {
                 Advanced Search
               </h3>
               <p className="text-indigo-200/65">
-                Track progress across custom flows for your team. Find the right
-                balance for the user, privacy and security.
+                Filter by program, status, and automatch to surface the best-fit deals instantly.
               </p>
             </article>
             <article>
@@ -141,8 +138,7 @@ export default function Features() {
                 Strategic Initiatives
               </h3>
               <p className="text-indigo-200/65">
-                Track progress across custom flows for your team. Find the right
-                balance for the user, privacy and security.
+                Stack allocations, pricing, and investor terms on one card as deals progress.
               </p>
             </article>
             <article>
@@ -162,8 +158,7 @@ export default function Features() {
                 Flexible Workflows
               </h3>
               <p className="text-indigo-200/65">
-                Track progress across custom flows for your team. Find the right
-                balance for the user, privacy and security.
+                Configure workflows for intake, review, and closing without losing auditability.
               </p>
             </article>
             <article>
@@ -183,8 +178,7 @@ export default function Features() {
                 Unified Timeline
               </h3>
               <p className="text-indigo-200/65">
-                Track progress across custom flows for your team. Find the right
-                balance for the user, privacy and security.
+                Keep documents, LOIs, and allocations aligned across stages with a single timeline.
               </p>
             </article>
           </div>

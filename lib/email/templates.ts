@@ -14,6 +14,16 @@ const COLORS = {
   white: '#ffffff',
 };
 
+// Use a text-based logo as fallback for better email compatibility
+const LOGO_HTML = `
+  <div style="text-align: center; padding: 16px 0;">
+    <h1 style="margin: 0; font-family: Arial, sans-serif; font-size: 32px; font-weight: bold; color: #6538D4;">
+      t<span style="color: #3C91F5;">Credex</span><span style="color: #3C91F5; font-size: 24px;">.com</span>
+    </h1>
+    <p style="margin: 8px 0 0; color: #6B7280; font-size: 14px; font-family: Arial, sans-serif;">AI-Powered Tax Credit Marketplace</p>
+  </div>
+`;
+
 /**
  * Base email layout wrapper
  */
@@ -46,41 +56,37 @@ export function baseTemplate(content: string, preheader?: string): string {
     @media only screen and (max-width: 600px) {
       .container { width: 100% !important; }
       .content { padding: 24px !important; }
+      .logo-img { width: 180px !important; }
     }
   </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: ${COLORS.light};">
   ${preheader ? `<div style="display: none; max-height: 0; overflow: hidden;">${preheader}</div>` : ''}
-  
+
   <!-- Wrapper -->
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${COLORS.light};">
     <tr>
       <td align="center" style="padding: 40px 20px;">
-        
+
         <!-- Container -->
         <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" style="background-color: ${COLORS.white}; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
-          
-          <!-- Header -->
+
+          <!-- Header with Logo -->
           <tr>
             <td align="center" style="padding: 32px 40px 24px; border-bottom: 1px solid ${COLORS.light};">
-              <table role="presentation" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="background-color: ${COLORS.primary}; padding: 12px 20px; border-radius: 8px;">
-                    <span style="color: ${COLORS.white}; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">tCredex</span>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin: 12px 0 0; color: ${COLORS.gray}; font-size: 14px;">Tax Credit Marketplace</p>
+              <a href="https://tcredex.com" style="text-decoration: none;">
+                ${LOGO_HTML}
+              </a>
             </td>
           </tr>
-          
+
           <!-- Content -->
           <tr>
             <td class="content" style="padding: 40px;">
               ${content}
             </td>
           </tr>
-          
+
           <!-- Footer -->
           <tr>
             <td style="padding: 24px 40px; background-color: ${COLORS.dark}; border-radius: 0 0 12px 12px;">
@@ -98,25 +104,32 @@ export function baseTemplate(content: string, preheader?: string): string {
                         </td>
                       </tr>
                     </table>
-                    
+
                     <p style="margin: 0 0 8px; color: ${COLORS.gray}; font-size: 12px;">
                       tCredex | AI-Powered Tax Credit Marketplace
                     </p>
                     <p style="margin: 0 0 8px; color: ${COLORS.gray}; font-size: 12px;">
                       Connecting sponsors, CDEs, and investors for NMTC, HTC, LIHTC, and Opportunity Zone deals.
                     </p>
-                    <p style="margin: 0; color: ${COLORS.gray}; font-size: 11px;">
-                      <a href="https://tcredex.com/unsubscribe" style="color: ${COLORS.gray};">Unsubscribe</a> · 
+                    <p style="margin: 0 0 12px; color: ${COLORS.gray}; font-size: 11px;">
+                      <a href="https://tcredex.com/unsubscribe" style="color: ${COLORS.gray};">Unsubscribe</a> ·
                       <a href="https://tcredex.com/privacy" style="color: ${COLORS.gray};">Privacy Policy</a>
+                    </p>
+
+                    <!-- Legal Disclaimer -->
+                    <p style="margin: 12px 0 0; padding-top: 12px; border-top: 1px solid #374151; color: #4b5563; font-size: 10px; line-height: 1.5;">
+                      This email and any attachments are confidential and intended solely for the addressee.
+                      tCredex is a product of American Impact Ventures LLC.
+                      Tax credit investments involve risk. Past performance is not indicative of future results.
                     </p>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
-          
+
         </table>
-        
+
       </td>
     </tr>
   </table>

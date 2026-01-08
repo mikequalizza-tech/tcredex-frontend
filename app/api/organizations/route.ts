@@ -1,49 +1,76 @@
 /**
  * tCredex Organizations API
+ * CRITICAL: Requires authentication and org membership
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-
-const supabase = getSupabaseAdmin();
+import { requireAuth, requireOrgAdmin, handleAuthError, verifyOrgAccess } from '@/lib/api/auth-middleware';
 
 // =============================================================================
-// GET /api/organizations - List organizations
+// GET /api/organizations - List user's organization(s)
 // =============================================================================
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    
-    const type = searchParams.get('type');
-    const verified = searchParams.get('verified');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
 
-    let query = supabase
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    // Get specific organization
+    if (id) {
+      // CRITICAL: Verify user belongs to this org
+      verifyOrgAccess(user, id);
+
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({ organization: data });
+    }
+
+    // List user's organization only
+    const { data, error } = await supabase
       .from('organizations')
       .select('*')
-      .order('name')
-      .limit(limit);
+      .eq('id', user.organizationId)
+      .single();
 
-    if (type) query = query.eq('type', type);
-    if (verified === 'true') query = query.eq('verified', true);
+    if (error || !data) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
 
-    const { data, error } = await query;
-
-    if (error) throw error;
-
-    return NextResponse.json({ organizations: data });
+    return NextResponse.json({ organization: data });
   } catch (error) {
-    console.error('GET /api/organizations error:', error);
-    return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
 // =============================================================================
-// POST /api/organizations - Create organization
+// POST /api/organizations - Create organization (admin only)
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
+    // CRITICAL: Require system admin
+    const user = await requireAuth(request);
+    
+    if (user.organizationType !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only system admins can create organizations' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
+    const supabase = getSupabaseAdmin();
 
     if (!body.name || !body.type) {
       return NextResponse.json(
@@ -52,22 +79,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate slug
-    const slug = body.slug || body.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-
-    // Check for existing slug
-    const { data: existing } = await supabase
-      .from('organizations')
-      .select('id')
-      .eq('slug', slug)
-      .single();
-
-    if (existing) {
+    // Validate org type
+    const validTypes = ['sponsor', 'cde', 'investor', 'admin'];
+    if (!validTypes.includes(body.type)) {
       return NextResponse.json(
-        { error: 'Organization with this slug already exists' },
-        { status: 409 }
+        { error: 'Invalid organization type' },
+        { status: 400 }
       );
     }
+
+    // Generate unique slug
+    const baseSlug = body.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .substring(0, 80);
+    const slug = `${baseSlug}-${Date.now().toString(36)}`;
 
     const { data, error } = await supabase
       .from('organizations')
@@ -89,9 +116,30 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
+    // Log to ledger
+    await supabase.from('ledger_events').insert({
+      actor_type: 'human',
+      actor_id: user.id,
+      entity_type: 'organization',
+      entity_id: (data as { id: string }).id,
+      action: 'organization_created',
+      payload_json: { name: body.name, type: body.type },
+      hash: generateHash(data as Record<string, unknown>),
+    } as never);
+
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    console.error('POST /api/organizations error:', error);
-    return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 });
+    return handleAuthError(error);
   }
+}
+
+function generateHash(data: Record<string, unknown>): string {
+  const str = JSON.stringify(data) + Date.now();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16).padStart(16, '0');
 }

@@ -2,12 +2,15 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import MarketplaceFooter from '@/components/layout/MarketplaceFooter';
 import Logo from '@/components/ui/logo';
 import MapFilterRail, { FilterState, defaultFilters } from '@/components/maps/MapFilterRail';
 import { useRoleConfig, fetchMarketplaceForRole, MarketplaceResult, InvestorCard } from '@/lib/roles';
 import { Deal } from '@/lib/data/deals';
 import { CDEDealCard } from '@/lib/types/cde';
+import AppLayout from '@/components/layout/AppLayout';
+import { scoreDealFromRecord } from '@/lib/scoring/engine';
 
 // Types
 type ProgramType = 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
@@ -77,6 +80,8 @@ type SortField = 'projectName' | 'sponsorName' | 'programType' | 'allocation' | 
 type SortDirection = 'asc' | 'desc';
 
 export default function MarketplacePage() {
+  const router = useRouter();
+
   // Get role configuration
   const { orgType, orgId, marketplace, isLoading: authLoading } = useRoleConfig();
 
@@ -620,21 +625,31 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex">
-      {/* Left Sidebar - MapFilterRail */}
-      {!sidebarCollapsed ? (
-        <MapFilterRail
-          viewMode={getViewMode()}
-          filters={filters}
-          onFiltersChange={setFilters}
-          autoMatchEnabled={autoMatchEnabled}
-          onAutoMatchToggle={setAutoMatchEnabled}
-          onClose={() => setSidebarCollapsed(true)}
-        />
-      ) : (
-        <aside className="w-16 bg-gray-900 border-r border-gray-800 flex flex-col">
-          <div className="p-4 border-b border-gray-800 flex justify-center">
-            <Logo variant="icon" size="sm" />
+    <AppLayout showRoleSwitcher={false}>
+      <div className="h-full bg-gray-950 flex">
+        {/* Left Sidebar - MapFilterRail */}
+        {!sidebarCollapsed ? (
+          <MapFilterRail
+            viewMode={getViewMode()}
+            filters={filters}
+            onFiltersChange={setFilters}
+            autoMatchEnabled={autoMatchEnabled}
+            onAutoMatchToggle={setAutoMatchEnabled}
+            onClose={() => setSidebarCollapsed(true)}
+          />
+        ) : (
+          <aside className="w-16 bg-gray-900 border-r border-gray-800 flex flex-col">
+            <div className="p-3 border-b border-gray-800 flex flex-col items-center gap-2">
+              <Logo variant="icon" size="sm" />
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                title="Back to Dashboard"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
           </div>
           <nav className="flex-1 p-3 space-y-1">
             {sidebarItems.map(item => (
@@ -757,6 +772,7 @@ export default function MarketplacePage() {
       </div>
 
       <MarketplaceFooter />
-    </div>
+      </div>
+    </AppLayout>
   );
 }

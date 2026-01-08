@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/lib/auth';
+import Logo from '@/components/ui/logo';
 
 // Google Maps types
 interface PlaceResult {
@@ -353,9 +356,28 @@ export default function MapFilterRail({
 
   const showAuthUI = isMounted && !isLoading && isAuthenticated;
 
+  const router = useRouter();
+
   return (
     <div className="w-80 h-full bg-gray-950 border-r border-gray-800 flex flex-col overflow-hidden">
-      {/* Header with View Mode Badge (NOT a switcher) */}
+      {/* Logo Header */}
+      <div className="flex-none p-4 border-b border-gray-800 bg-gray-900">
+        <div className="flex items-center justify-between">
+          <Logo size="sm" />
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            title="Back to Dashboard"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back
+          </button>
+        </div>
+      </div>
+
+      {/* View Mode Header */}
       <div className="flex-none p-4 border-b border-gray-800 bg-gray-900/50">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
@@ -363,14 +385,14 @@ export default function MapFilterRail({
               {config.icon}
             </div>
             <div>
-              <h2 className="font-semibold text-white">Deal Map</h2>
-              <p className="text-xs text-gray-500">Census Tract Explorer</p>
+              <h2 className="font-semibold text-white">Marketplace</h2>
+              <p className="text-xs text-gray-500">Tax Credit Explorer</p>
             </div>
           </div>
           {onClose && (
-            <button onClick={onClose} className="p-1.5 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
+            <button onClick={onClose} className="p-1.5 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Collapse sidebar">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
               </svg>
             </button>
           )}
@@ -605,23 +627,77 @@ export default function MapFilterRail({
           </div>
         </AccordionSection>
 
-        {/* Deal Status */}
-        <AccordionSection title="Deal Status" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} defaultOpen={viewMode === 'cde'}>
-          <div className="space-y-2">
-            {[
-              { key: 'preDevelopment' as keyof FilterState, label: 'Pre-Development', color: 'text-yellow-600' },
-              { key: 'seekingCapitalStack' as keyof FilterState, label: 'Seeking Capital Stack', color: 'text-orange-600' },
-              { key: 'shovelReadyOnly' as keyof FilterState, label: 'Shovel Ready', color: 'text-green-600' },
-              { key: 'seekingAllocation' as keyof FilterState, label: 'Seeking Allocation', color: 'text-indigo-600' },
-              { key: 'inClosing' as keyof FilterState, label: 'In Closing', color: 'text-purple-600' },
-            ].map(({ key, label, color }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer group">
-                <input type="checkbox" checked={!!filters[key]} onChange={() => toggleFilter(key)} className={`w-4 h-4 rounded border-gray-600 bg-gray-800 ${color}`} />
-                <span className="text-sm text-gray-300 group-hover:text-white">{label}</span>
-              </label>
-            ))}
-          </div>
-        </AccordionSection>
+        {/* SPONSOR-SPECIFIC: CDE & Investor Criteria */}
+        {viewMode === 'sponsor' ? (
+          <>
+            {/* CDE Allocation Availability */}
+            <AccordionSection title="CDE Allocation" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} defaultOpen={true}>
+              <div className="space-y-3">
+                <div className="p-3 bg-green-900/20 border border-green-800/30 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="text-sm font-medium text-green-400">Find CDEs with Allocation</span>
+                  </div>
+                  <p className="text-xs text-gray-400">CDEs with remaining NMTC allocation for your project</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 block mb-1">Min Allocation ($M)</label>
+                    <input type="number" placeholder="5" value={filters.cdeMinAllocationRemaining ? filters.cdeMinAllocationRemaining / 1000000 : ''} 
+                      onChange={(e) => onFiltersChange({ ...filters, cdeMinAllocationRemaining: e.target.value ? parseInt(e.target.value) * 1000000 : undefined })} 
+                      className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white" />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600">Filter CDEs by minimum remaining allocation</p>
+              </div>
+            </AccordionSection>
+
+            {/* Investor Criteria */}
+            <AccordionSection title="Investor Preferences" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}>
+              <div className="space-y-2">
+                <div className="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg mb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                    <span className="text-sm font-medium text-blue-400">Find Active Investors</span>
+                  </div>
+                  <p className="text-xs text-gray-400">Investors seeking tax credit opportunities</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 block mb-1">Min Investment ($M)</label>
+                    <input type="number" placeholder="1" value={filters.allocationRequest.min ? filters.allocationRequest.min / 1000000 : ''} 
+                      onChange={(e) => onFiltersChange({ ...filters, allocationRequest: { ...filters.allocationRequest, min: e.target.value ? parseInt(e.target.value) * 1000000 : undefined } })} 
+                      className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 block mb-1">Max Investment ($M)</label>
+                    <input type="number" placeholder="50" value={filters.allocationRequest.max ? filters.allocationRequest.max / 1000000 : ''} 
+                      onChange={(e) => onFiltersChange({ ...filters, allocationRequest: { ...filters.allocationRequest, max: e.target.value ? parseInt(e.target.value) * 1000000 : undefined } })} 
+                      className="w-full px-2 py-1.5 bg-gray-800 border border-gray-700 rounded text-sm text-white" />
+                  </div>
+                </div>
+              </div>
+            </AccordionSection>
+          </>
+        ) : (
+          // CDE/INVESTOR VIEW: Deal Status filters
+          <AccordionSection title="Deal Status" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} defaultOpen={viewMode === 'cde'}>
+            <div className="space-y-2">
+              {[
+                { key: 'preDevelopment' as keyof FilterState, label: 'Pre-Development', color: 'text-yellow-600' },
+                { key: 'seekingCapitalStack' as keyof FilterState, label: 'Seeking Capital Stack', color: 'text-orange-600' },
+                { key: 'shovelReadyOnly' as keyof FilterState, label: 'Shovel Ready', color: 'text-green-600' },
+                { key: 'seekingAllocation' as keyof FilterState, label: 'Seeking Allocation', color: 'text-indigo-600' },
+                { key: 'inClosing' as keyof FilterState, label: 'In Closing', color: 'text-purple-600' },
+              ].map(({ key, label, color }) => (
+                <label key={key} className="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked={!!filters[key]} onChange={() => toggleFilter(key)} className={`w-4 h-4 rounded border-gray-600 bg-gray-800 ${color}`} />
+                  <span className="text-sm text-gray-300 group-hover:text-white">{label}</span>
+                </label>
+              ))}
+            </div>
+          </AccordionSection>
+        )}
 
         {/* Distress Level */}
         <AccordionSection title="Distress Level" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}>

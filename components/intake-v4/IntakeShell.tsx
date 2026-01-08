@@ -22,9 +22,11 @@ interface IntakeShellProps {
   onSave?: (data: IntakeData, readinessScore: number) => Promise<void>;
   onSubmit?: (data: IntakeData, readinessScore: number) => Promise<void>;
   projectId?: string;
+  isEditMode?: boolean;
+  lockedProjectName?: string;
 }
 
-export function IntakeShell({ initialData, onSave, onSubmit, projectId }: IntakeShellProps) {
+export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMode, lockedProjectName }: IntakeShellProps) {
   const [data, setData] = useState<IntakeData>(() => ({
     programs: [],
     documents: [],

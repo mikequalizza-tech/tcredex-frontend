@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { fetchDeals } from '@/lib/supabase/queries';
+import { fetchDealsByOrganization } from '@/lib/supabase/queries';
 
 interface DealSummary {
   id: string;
@@ -18,6 +18,7 @@ interface DealSummary {
 interface SponsorDashboardProps {
   userName: string;
   orgName: string;
+  organizationId?: string;
 }
 
 const STATUS_COLORS = {
@@ -35,15 +36,21 @@ const PROGRAM_COLORS = {
   OZ: 'bg-amber-600',
 };
 
-export default function SponsorDashboard({ userName, orgName }: SponsorDashboardProps) {
+export default function SponsorDashboard({ userName, orgName, organizationId }: SponsorDashboardProps) {
   const [deals, setDeals] = useState<DealSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadDeals() {
+      if (!organizationId) {
+        setDeals([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
-        const fetchedDeals = await fetchDeals();
+        const fetchedDeals = await fetchDealsByOrganization(organizationId);
         // Map to DealSummary format
         const mappedDeals: DealSummary[] = fetchedDeals.map(d => ({
           id: d.id,
@@ -53,17 +60,17 @@ export default function SponsorDashboard({ userName, orgName }: SponsorDashboard
           allocation: d.allocation,
           creditPrice: d.creditPrice,
           submittedDate: d.submittedDate,
-          // matchedDate is not in Deal interface yet, but we can add it or leave it undefined
         }));
         setDeals(mappedDeals);
       } catch (error) {
         console.error('Failed to load deals:', error);
+        setDeals([]);
       } finally {
         setLoading(false);
       }
     }
     loadDeals();
-  }, []);
+  }, [organizationId]);
   
   const stats = {
     totalDeals: deals.length,
@@ -94,75 +101,74 @@ export default function SponsorDashboard({ userName, orgName }: SponsorDashboard
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Focus on Market Opportunity */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-400">Total Projects</p>
+          <p className="text-sm text-gray-400">Your Projects</p>
           <p className="text-2xl font-bold text-gray-100 mt-1">{stats.totalDeals}</p>
         </div>
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-400">In Closing</p>
-          <p className="text-2xl font-bold text-amber-400 mt-1">{stats.inClosing}</p>
+          <p className="text-sm text-gray-400">NMTC Available</p>
+          <p className="text-2xl font-bold text-emerald-400 mt-1">$10B</p>
+          <p className="text-xs text-emerald-300">Just awarded!</p>
         </div>
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-400">Total Allocation</p>
-          <p className="text-2xl font-bold text-green-400 mt-1">{formatCurrency(stats.totalAllocation)}</p>
+          <p className="text-sm text-gray-400">Active CDEs</p>
+          <p className="text-2xl font-bold text-purple-400 mt-1">847</p>
+          <p className="text-xs text-purple-300">With allocation</p>
         </div>
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-sm text-gray-400">Avg Credit Price</p>
-          <p className="text-2xl font-bold text-indigo-400 mt-1">${stats.avgCreditPrice.toFixed(2)}</p>
+          <p className="text-sm text-gray-400">Active Investors</p>
+          <p className="text-2xl font-bold text-blue-400 mt-1">1,200+</p>
+          <p className="text-xs text-blue-300">All programs</p>
         </div>
       </div>
 
-      {/* Projects Table */}
+      {/* CDE & Investor Interest */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-100">Your Projects</h2>
-          <Link href="/dashboard/projects" className="text-sm text-indigo-400 hover:text-indigo-300">View All →</Link>
+          <h2 className="text-lg font-semibold text-gray-100">CDE & Investor Interest</h2>
+          <Link href="/map" className="text-sm text-indigo-400 hover:text-indigo-300">Find More →</Link>
         </div>
         {loading ? (
           <div className="p-12 flex justify-center">
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-800/50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Project</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Program</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Allocation</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Credit Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                  <th className="px-6 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800">
-                {deals.map((deal) => (
-                  <tr key={deal.id} className="hover:bg-gray-800/50">
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-gray-100">{deal.projectName}</p>
-                      {deal.submittedDate && <p className="text-xs text-gray-500">Submitted {deal.submittedDate}</p>}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white ${PROGRAM_COLORS[deal.program]}`}>
-                        {deal.program}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-300">{formatCurrency(deal.allocation)}</td>
-                    <td className="px-6 py-4 text-gray-300">${deal.creditPrice.toFixed(2)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[deal.status]}`}>
-                        {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Link href={`/deals/${deal.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm">View →</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* NMTC CDEs */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
+                  <h3 className="font-medium text-emerald-400">NMTC CDEs</h3>
+                  <span className="text-xs text-gray-500">($10B just awarded!)</span>
+                </div>
+                <div className="space-y-3">
+                  {/* TODO: Replace with real CDE data from Supabase */}
+                  <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <p className="text-sm text-gray-400">No CDE interest data available yet.</p>
+                    <p className="text-xs text-gray-500 mt-1">Connect with CDEs through the Map page.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tax Credit Investors */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <h3 className="font-medium text-blue-400">Active Investors</h3>
+                  <span className="text-xs text-gray-500">(All programs)</span>
+                </div>
+                <div className="space-y-3">
+                  {/* TODO: Replace with real investor data from Supabase */}
+                  <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+                    <p className="text-sm text-gray-400">No investor interest data available yet.</p>
+                    <p className="text-xs text-gray-500 mt-1">Connect with investors through the Map page.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -171,20 +177,11 @@ export default function SponsorDashboard({ userName, orgName }: SponsorDashboard
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
         <h2 className="text-lg font-semibold text-gray-100 mb-4">Recent Activity</h2>
         <div className="space-y-4">
-          {[
-            { icon: '🎉', text: 'Downtown Community Center moved to Closing', time: '2 hours ago', color: 'text-amber-400' },
-            { icon: '✅', text: 'Heritage Theater matched with First National Bank', time: '1 day ago', color: 'text-purple-400' },
-            { icon: '📄', text: 'Affordable Housing Complex submitted for review', time: '3 days ago', color: 'text-blue-400' },
-            { icon: '💬', text: 'New message from CDE partner on Downtown project', time: '5 days ago', color: 'text-gray-400' },
-          ].map((item, i) => (
-            <div key={i} className="flex items-start gap-3 p-3 bg-gray-800/50 rounded-lg">
-              <span className="text-lg">{item.icon}</span>
-              <div className="flex-1">
-                <p className={`text-sm ${item.color}`}>{item.text}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{item.time}</p>
-              </div>
-            </div>
-          ))}
+          {/* TODO: Replace with real activity data from Supabase */}
+          <div className="text-center py-8">
+            <p className="text-gray-500 text-sm">No recent activity</p>
+            <p className="text-xs text-gray-600 mt-1">Activity will appear here as you interact with CDEs and investors</p>
+          </div>
         </div>
       </div>
     </div>

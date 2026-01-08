@@ -12,7 +12,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo?: string;
-  type: 'cde' | 'sponsor' | 'investor';
+  type: 'cde' | 'sponsor' | 'investor' | 'admin';
 }
 
 export interface ProjectAssignment {

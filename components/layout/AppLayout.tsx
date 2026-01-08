@@ -14,7 +14,7 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ReactNode;
-  orgTypes?: Array<'cde' | 'sponsor' | 'investor'>;
+  orgTypes?: Array<'cde' | 'sponsor' | 'investor' | 'admin'>;
   adminOnly?: boolean;
   badge?: string | number;
 }
@@ -122,12 +122,13 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: <HomeIcon /> },
   { name: 'Submit Deal', href: '/deals/new', icon: <SubmitDealIcon />, orgTypes: ['sponsor'] },  // Only sponsors submit deals
   { name: 'Map', href: '/map', icon: <MapIcon /> },
-  { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, orgTypes: ['sponsor'] },
+  // { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, orgTypes: ['sponsor'] }, // HIDDEN per user request
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: <PipelineIcon /> },  // All roles see pipeline (scoped to their deals)
   { name: 'Allocations', href: '/dashboard/allocations', icon: <AllocationsIcon />, orgTypes: ['cde'] },
   { name: 'AutoMatch AI', href: '/dashboard/automatch', icon: <AutoMatchIcon />, orgTypes: ['cde', 'investor'] },
   { name: 'Marketplace', href: '/deals', icon: <DealsIcon /> },
   { name: 'Portfolio', href: '/dashboard/portfolio', icon: <PortfolioIcon />, orgTypes: ['investor'] },
+  { name: 'Company Profile', href: '/dashboard/organization', icon: <SettingsIcon />, orgTypes: ['sponsor', 'cde', 'investor'] },
   { name: 'Pricing Coach', href: '/pricing', icon: <PricingIcon /> },
   { name: 'Documents', href: '/dashboard/documents', icon: <DocumentsIcon /> },
   { name: 'Closing Room', href: '/closing-room', icon: <ClosingRoomIcon /> },

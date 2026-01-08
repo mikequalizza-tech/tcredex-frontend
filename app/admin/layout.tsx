@@ -19,7 +19,7 @@ const navItems = [
 
 function AdminContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isLoading, isAuthenticated } = useCurrentUser();
+  const { user, isLoading, isAuthenticated, logout } = useCurrentUser();
 
   // Loading state
   if (isLoading) {
@@ -33,11 +33,8 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Not authenticated - redirect to signin
+  // Not authenticated - ProtectedRoute will handle redirect
   if (!isAuthenticated || !user) {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/signin';
-    }
     return null;
   }
 
@@ -85,15 +82,21 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
         {/* User */}
         <div className="p-4 border-t border-gray-800">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">
-              A
+              {user.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-200 truncate">Platform Admin</p>
-              <p className="text-xs text-gray-500 truncate">admin@tcredex.com</p>
+              <p className="text-sm font-medium text-gray-200 truncate">{user.name}</p>
+              <p className="text-xs text-gray-500 truncate">{user.email}</p>
             </div>
           </div>
+          <button
+            onClick={logout}
+            className="w-full px-3 py-2 text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-colors text-left"
+          >
+            Sign Out
+          </button>
         </div>
       </aside>
 
@@ -112,7 +115,9 @@ export default function AdminLayout({
 }) {
   return (
     <AuthProvider>
-      <AdminContent>{children}</AdminContent>
+      <ProtectedRoute requiredRole={Role.ORG_ADMIN}>
+        <AdminContent>{children}</AdminContent>
+      </ProtectedRoute>
     </AuthProvider>
   );
 }

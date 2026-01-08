@@ -36,19 +36,37 @@ class Logger {
 
     const formattedMessage = this.formatMessage(level, message);
     
-    switch (level) {
-      case 'debug':
-        console.debug(formattedMessage, data);
-        break;
-      case 'info':
-        console.info(formattedMessage, data);
-        break;
-      case 'warn':
-        console.warn(formattedMessage, data);
-        break;
-      case 'error':
-        console.error(formattedMessage, data);
-        break;
+    // Use console methods directly to avoid TypeScript issues
+    if (data !== undefined) {
+      switch (level) {
+        case 'debug':
+          console.debug(formattedMessage, data);
+          break;
+        case 'info':
+          console.info(formattedMessage, data);
+          break;
+        case 'warn':
+          console.warn(formattedMessage, data);
+          break;
+        case 'error':
+          console.error(formattedMessage, data);
+          break;
+      }
+    } else {
+      switch (level) {
+        case 'debug':
+          console.debug(formattedMessage);
+          break;
+        case 'info':
+          console.info(formattedMessage);
+          break;
+        case 'warn':
+          console.warn(formattedMessage);
+          break;
+        case 'error':
+          console.error(formattedMessage);
+          break;
+      }
     }
   }
 

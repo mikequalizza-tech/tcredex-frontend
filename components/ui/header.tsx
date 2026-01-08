@@ -5,26 +5,16 @@ import Link from "next/link";
 import Logo from "./logo";
 import MobileMenu from "./mobile-menu";
 import HeaderSearch from "./header-search";
+import { useCurrentUser } from "@/lib/auth";
 
 export default function Header() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("User");
+  const { isAuthenticated, userName, logout, isLoading } = useCurrentUser();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [platformOpen, setPlatformOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const platformRef = useRef<HTMLDivElement>(null);
   const resourcesRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const session = localStorage.getItem('tcredex_session');
-    const demoRole = localStorage.getItem('tcredex_demo_role');
-    if (session || demoRole) {
-      setIsLoggedIn(true);
-      const storedName = localStorage.getItem('tcredex_user_name');
-      if (storedName) setUserName(storedName);
-    }
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -42,12 +32,9 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('tcredex_session');
-    localStorage.removeItem('tcredex_demo_role');
-    setIsLoggedIn(false);
+  const handleLogout = async () => {
     setUserMenuOpen(false);
-    window.location.href = '/';
+    await logout();
   };
 
   return (
@@ -63,6 +50,9 @@ export default function Header() {
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/" className="text-sm text-gray-300 hover:text-white">
               Home
+            </Link>
+            <Link href="/blog" className="text-sm text-gray-300 hover:text-white">
+              Blog
             </Link>
 
             {/* Platform Dropdown */}
@@ -135,7 +125,7 @@ export default function Header() {
           {/* Search + Auth buttons */}
           <div className="flex items-center gap-3">
             <HeaderSearch />
-            {isLoggedIn ? (
+            {!isLoading && isAuthenticated ? (
               <>
                 <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">
                   Dashboard
@@ -146,13 +136,13 @@ export default function Header() {
                     className="flex items-center gap-2 p-1.5 hover:bg-gray-800 rounded-lg"
                   >
                     <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                      {userName.charAt(0)}
+                      {(userName || 'User').charAt(0)}
                     </div>
                   </button>
                   {userMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-xl z-50">
                       <div className="px-4 py-3 border-b border-gray-800">
-                        <p className="text-sm font-medium text-gray-200">{userName}</p>
+                        <p className="text-sm font-medium text-gray-200">{userName || 'User'}</p>
                       </div>
                       <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800" onClick={() => setUserMenuOpen(false)}>
                         Dashboard

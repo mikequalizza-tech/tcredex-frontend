@@ -691,11 +691,11 @@ export default function DealDetailPage({ params }: DealPageProps) {
       {/* New Role-Based Action Modals */}
       <DealActionModals
         deal={deal}
-        orgType={orgType}
-        orgName={orgName}
-        userName={userName}
-        organizationId={organizationId}
-        isOwner={isOwner}
+        orgType={orgType || 'investor'}
+        orgName={orgName || 'Guest'}
+        userName={userName || 'User'}
+        organizationId={organizationId || ''}
+        isOwner={isOwner || false}
         showModal={showActionModal}
         modalType={activeModal}
         onClose={() => {

@@ -132,7 +132,11 @@ export default function DocumentsPage() {
   // Load pipeline projects for upload dropdown
   const loadPipelineProjects = async () => {
     try {
+<<<<<<< HEAD
       const response = await fetch('/api/deals', { credentials: 'include' }); // Get user's deals
+=======
+      const response = await fetch('/api/deals'); // Get user's deals
+>>>>>>> origin/main
       const deals = await response.json();
       const projects = deals.map((deal: any) => ({
         id: deal.id,

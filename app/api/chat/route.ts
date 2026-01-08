@@ -135,13 +135,23 @@ function getFallbackResponse(userMessage: string): string {
   if (lower.includes('not working') || lower.includes('bug') || lower.includes('error') ||
       lower.includes('cant login') || lower.includes("can't login") || lower.includes('account') ||
       lower.includes('password') || lower.includes('subscription') || lower.includes('billing') ||
-      lower.includes('how do i use') || lower.includes('how does the platform')) {
-    return `For tCredex platform support, please reach out to our support team:
+      lower.includes('how do i use') || lower.includes('how does the platform') ||
+      lower.includes('intake form') || lower.includes('submit a deal') || lower.includes('marketplace')) {
+    return `**tCredex Platform Support**
+
+For account issues, technical problems, and platform questions:
 
 📧 **Email**: support@tcredex.com
 🌐 **Support Portal**: tcredex.com/support
+💬 **Live Chat**: Available on tcredex.com
 
-They can help with account issues, technical problems, and platform questions.`;
+**Common Issues:**
+• Can't login? Check your email and password
+• Intake form not working? Try clearing browser cache
+• Marketplace not loading? Refresh the page
+• Need to invite team members? Go to Organization Settings
+
+Our support team responds within 2 hours during business hours.`;
   }
 
   // === PATH 2: Tax Credit Advisory Detection (AIV Referral) ===
@@ -151,84 +161,202 @@ They can help with account issues, technical problems, and platform questions.`;
       lower.includes('need help closing') || lower.includes('cde matching') || lower.includes('find a cde') ||
       lower.includes('investor') || lower.includes('complex deal') || lower.includes('transaction support') ||
       lower.includes('accountant') || lower.includes('lawyer') || lower.includes('cpa') ||
-      lower.includes('attorney') || lower.includes('professional help')) {
-    return `For tax credit advisory and deal support, I recommend connecting with **American Impact Ventures (AIV)**.
+      lower.includes('attorney') || lower.includes('professional help') || lower.includes('deal support')) {
+    return `**Tax Credit Advisory & Deal Support**
 
-**AIV Track Record:**
+For deal structuring, CDE matching, investor introductions, and transaction support, I recommend **American Impact Ventures (AIV)**.
+
+**Why AIV?**
 • $650M+ in NMTC Allocations Closed
 • $3B in LIHTC Syndication
 • $450M in Historic Tax Credit Investments
-• 85 NMTC Projects Closed
+• 85+ NMTC Projects Successfully Closed
+• Expert team with 20+ years experience
 
 **Services:**
-• Deal structuring & optimization
-• CDE introductions & matching
-• Investor relationships
-• Full closing coordination
+✓ Deal structuring & optimization
+✓ CDE introductions & matching
+✓ Investor relationship management
+✓ Full closing coordination
+✓ Compliance & regulatory guidance
+✓ Multi-credit stacking strategies
 
 📧 **Contact**: deals@americanimpactventures.com
-🌐 **Consultation Request**: tcredex.com/contact-aiv`;
+🌐 **Request Consultation**: tcredex.com/contact-aiv
+📞 **Phone**: Available for urgent matters
+
+They typically respond within 24 hours and can often move quickly on time-sensitive deals.`;
   }
 
   // === Educational Responses ===
   if (lower.includes('nmtc') || lower.includes('new markets')) {
-    return `**New Markets Tax Credit (NMTC)** provides a 39% federal tax credit over 7 years for investments in low-income communities.
+    return `**New Markets Tax Credit (NMTC)** - The 39% Federal Tax Credit
 
-**Key Points:**
-• Credit: 39% of Qualified Equity Investment (QEI)
-• Schedule: 5% years 1-3, 6% years 4-7
-• Must invest through a Community Development Entity (CDE)
-• Project must be a Qualified Active Low-Income Community Business (QALICB)
+**The Basics:**
+• **Credit Amount**: 39% of Qualified Equity Investment (QEI)
+• **Schedule**: 5% years 1-3, 6% years 4-7
+• **Total**: 39% over 7 years
+• **Investment Vehicle**: Must invest through a Community Development Entity (CDE)
 
-Use tCredex's Map to check if your location qualifies!
+**Who Qualifies?**
+• Business must be in a Qualified Low-Income Community (QLIC)
+• Must pass QALICB (Qualified Active Low-Income Community Business) tests
+• Project must create jobs or provide essential services
 
-**Need deal support?** Contact AIV: deals@americanimpactventures.com
-**Platform questions?** Contact: support@tcredex.com`;
+**Key Benefits:**
+✓ Significant tax credit reduces investor cost of capital
+✓ Enables affordable financing for community projects
+✓ Supports job creation in underserved areas
+✓ Can be combined with other credits (HTC, LIHTC, State credits)
+
+**Use tCredex to:**
+• Check if your location qualifies (use the Map)
+• Find CDEs with available allocations
+• Connect with investors interested in NMTC deals
+• Get pricing guidance for your deal
+
+**Need Deal Support?**
+Contact American Impact Ventures: deals@americanimpactventures.com
+
+**Platform Questions?**
+Contact tCredex Support: support@tcredex.com`;
   }
 
-  if (lower.includes('lihtc') || lower.includes('housing')) {
-    return `**Low-Income Housing Tax Credit (LIHTC)** is the primary federal program for affordable rental housing.
+  if (lower.includes('lihtc') || lower.includes('housing') || lower.includes('affordable housing')) {
+    return `**Low-Income Housing Tax Credit (LIHTC)** - America's Primary Affordable Housing Program
 
-**Key Points:**
-• 9% Credit: Competitive, ~9% annually for 10 years
-• 4% Credit: As-of-right with tax-exempt bonds
-• Target: Households at 60% AMI or below
-• 15-year compliance period
+**The Basics:**
+• **9% Credit**: Competitive allocation, ~9% annually for 10 years
+• **4% Credit**: As-of-right with tax-exempt bonds
+• **Total**: 90% credit over 10 years (9%) or 40% (4%)
+• **Compliance**: 15-year minimum affordability period
 
-Great for affordable housing developers!
+**Who Qualifies?**
+• Rental housing projects (not for-sale)
+• Households at 60% Area Median Income (AMI) or below
+• Must meet rent restrictions
+• Can be new construction or rehabilitation
 
-**Need syndication support?** Contact AIV: deals@americanimpactventures.com
-**Platform questions?** Contact: support@tcredex.com`;
+**Key Benefits:**
+✓ Largest federal affordable housing program
+✓ Produces ~100,000 units annually
+✓ Combines with other financing sources
+✓ Can stack with HTC, NMTC, or State credits
+
+**The Process:**
+1. Developer applies to State Housing Finance Agency (HFA)
+2. HFA awards credits based on Qualified Allocation Plan (QAP)
+3. Developer syndicates credits to investors
+4. Investor equity fills financing gap
+5. Project operates with restricted rents for 15+ years
+
+**Use tCredex to:**
+• Find LIHTC deals in your target markets
+• Connect with syndicators and investors
+• Understand pricing and deal structures
+• Get guidance on your project
+
+**Need Syndication Help?**
+Contact American Impact Ventures: deals@americanimpactventures.com
+
+**Platform Questions?**
+Contact tCredex Support: support@tcredex.com`;
   }
 
   if (lower.includes('htc') || lower.includes('historic')) {
-    return `**Historic Tax Credit (HTC)** provides a 20% credit for rehabilitating certified historic buildings.
+    return `**Historic Tax Credit (HTC)** - Preserving America's Historic Buildings
 
-**Key Points:**
-• 20% of Qualified Rehabilitation Expenditures (QREs)
-• Building must be on National Register or in historic district
-• Must meet Secretary of Interior's Standards
-• Requires NPS Part 1/2/3 application process
+**The Basics:**
+• **Credit Amount**: 20% of Qualified Rehabilitation Expenditures (QREs)
+• **Eligibility**: Building on National Register or in certified historic district
+• **Standards**: Must meet Secretary of Interior's Standards
+• **Timeline**: Multi-year process with NPS review
 
-Often combined with NMTC or LIHTC!
+**Who Qualifies?**
+• Historic buildings (typically 50+ years old)
+• Substantial rehabilitation (>$5,000 or 5% of basis)
+• Commercial, residential, or mixed-use projects
+• Can be combined with NMTC or LIHTC
 
-**Have a historic project?** Contact AIV: deals@americanimpactventures.com
-**Platform questions?** Contact: support@tcredex.com`;
+**Key Benefits:**
+✓ 20% credit on qualified rehabilitation costs
+✓ Preserves historic character and architecture
+✓ Often combined with LIHTC for affordable housing
+✓ Supports community revitalization
+✓ Can stack with NMTC for maximum benefit
+
+**The Process:**
+1. Determine if building qualifies (National Register or historic district)
+2. Submit Part 1 (project description) to National Park Service
+3. Submit Part 2 (detailed plans) for NPS approval
+4. Complete rehabilitation per approved plans
+5. Submit Part 3 (completion documentation)
+6. Claim credits on tax return
+
+**Common Combinations:**
+• HTC + LIHTC: Historic affordable housing
+• HTC + NMTC: Community facilities in historic buildings
+• HTC + State Credits: Maximum layering
+
+**Use tCredex to:**
+• Find HTC deals and opportunities
+• Connect with experienced HTC syndicators
+• Understand deal structures and pricing
+• Get guidance on your historic project
+
+**Need HTC Expertise?**
+Contact American Impact Ventures: deals@americanimpactventures.com
+
+**Platform Questions?**
+Contact tCredex Support: support@tcredex.com`;
   }
 
   if (lower.includes('oz') || lower.includes('opportunity zone')) {
-    return `**Opportunity Zones** offer capital gains tax benefits for investments in designated census tracts.
+    return `**Opportunity Zones (OZ)** - Capital Gains Tax Benefits for Community Investment
+
+**The Basics:**
+• **Deferral**: Defer original capital gains until December 31, 2026
+• **Exclusion**: 100% exclusion of NEW gains if held 10+ years
+• **Timing**: Must invest within 180 days of gain recognition
+• **Vehicle**: Invest through a Qualified Opportunity Fund (QOF)
+
+**Who Qualifies?**
+• Any investor with capital gains to defer
+• Businesses investing in OZ-designated census tracts
+• Real estate developers in opportunity zones
+• Can be combined with other credits (NMTC, LIHTC, HTC)
 
 **Key Benefits:**
-• Defer original capital gains until 2026
-• 10-year hold: 100% exclusion of NEW gains
-• Must invest within 180 days of gain recognition
-• Invest through a Qualified Opportunity Fund (QOF)
+✓ Defer capital gains tax for 5+ years
+✓ Reduce taxable gains by 15% (if held 5+ years)
+✓ 100% exclusion of new gains (if held 10+ years)
+✓ Supports community development
+✓ Can layer with other tax credits
 
-Check tCredex's Map for OZ-designated tracts!
+**The Timeline:**
+1. Recognize capital gain (stock sale, real estate sale, etc.)
+2. Within 180 days, invest in Qualified Opportunity Fund
+3. Fund invests in OZ-designated census tract
+4. Hold investment for 10 years
+5. Exclude all new gains from taxation
 
-**Need OZ structuring help?** Contact AIV: deals@americanimpactventures.com
-**Platform questions?** Contact: support@tcredex.com`;
+**Common Uses:**
+• Real estate development in underserved areas
+• Business expansion in opportunity zones
+• Mixed-use projects combining OZ + NMTC + LIHTC
+• Revitalization projects
+
+**Use tCredex to:**
+• Check if your location is in an Opportunity Zone (use the Map)
+• Find OZ deals and investment opportunities
+• Connect with QOF managers
+• Understand deal structures
+
+**Need OZ Structuring Help?**
+Contact American Impact Ventures: deals@americanimpactventures.com
+
+**Platform Questions?**
+Contact tCredex Support: support@tcredex.com`;
   }
 
   if (lower.includes('stack') || lower.includes('combine')) {
@@ -289,16 +417,36 @@ For deal structuring, CDE matching, and transaction support:
 How can I help you today?`;
   }
 
-  return `I'm ChatTC, your tax credit assistant! I can help with:
+  return `**Welcome to ChatTC** - Your Tax Credit AI Assistant
 
-• **NMTC** - New Markets Tax Credit (39% over 7 years)
-• **LIHTC** - Low-Income Housing Tax Credit
-• **HTC** - Historic Tax Credit (20%)
-• **Opportunity Zones** - Capital gains benefits
-• **tCredex Platform** - How to use the marketplace
+I can help you understand:
 
-What would you like to know?
+**Tax Credit Programs:**
+• **NMTC** - 39% credit for low-income community investments
+• **LIHTC** - 9% or 4% credits for affordable housing
+• **HTC** - 20% credit for historic building rehabilitation
+• **Opportunity Zones** - Capital gains deferral and exclusion
+• **State Credits** - Additional state-level incentives
+• **Credit Stacking** - Combining multiple programs
 
-**Platform support**: support@tcredex.com
-**Tax credit advisory**: deals@americanimpactventures.com`;
+**tCredex Platform:**
+• How to submit a deal
+• Using the marketplace
+• Finding CDEs and investors
+• Understanding pricing
+• Managing your team
+
+**What Would You Like to Know?**
+
+Try asking:
+• "What is NMTC?"
+• "How do I check if my project qualifies?"
+• "Can I combine LIHTC with HTC?"
+• "How do I submit a deal on tCredex?"
+• "Who can help me structure my deal?"
+
+**Quick Links:**
+📧 Platform Support: support@tcredex.com
+🤝 Deal Advisory: deals@americanimpactventures.com
+🌐 tCredex: tcredex.com`;
 }

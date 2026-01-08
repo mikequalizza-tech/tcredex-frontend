@@ -1,0 +1,25 @@
+
+> tcredex-frontend@1.0.0 build
+> next build
+
+   Γû▓ Next.js 15.1.11
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ Γ£ô Compiled successfully
+   Linting and checking validity of types ...
+
+ ΓÜá The Next.js plugin was not detected in your ESLint configuration. See https://nextjs.org/docs/app/api-reference/config/eslint#migrating-existing-config
+Failed to compile.
+
+./app/api/closing-room/route.ts:123:14
+Type error: Cannot find name 'data'.
+
+  121 |     // Calculate stats
+  122 |     const stats = {
+> 123 |       total: data?.length || 0,
+      |              ^
+  124 |       active: data?.filter(r => r.status === 'active').length || 0,
+  125 |       pending: data?.filter(r => r.status === 'pending').length || 0,
+  126 |       closing: data?.filter(r => r.status === 'closing').length || 0,
+Next.js build worker exited with code: 1 and signal: null

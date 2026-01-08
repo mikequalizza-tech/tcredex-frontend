@@ -28,6 +28,7 @@ export default function ContactAIV() {
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, type: 'aiv_advisory' }),
       });

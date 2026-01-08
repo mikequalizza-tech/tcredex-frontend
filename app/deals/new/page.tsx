@@ -92,6 +92,7 @@ export default function NewDealPage() {
       // Use /api/intake which properly maps IntakeData to deal record
       const response = await fetch('/api/intake', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           intakeData: enrichedData,
@@ -138,6 +139,7 @@ export default function NewDealPage() {
       // Use /api/intake which properly maps IntakeData to deal record
       const response = await fetch('/api/intake', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           intakeData: enrichedData,

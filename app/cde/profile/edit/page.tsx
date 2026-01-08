@@ -122,6 +122,7 @@ export default function CDEProfileEditPage() {
     try {
       const response = await fetch('/api/cde/profile', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, allocations }),
       });

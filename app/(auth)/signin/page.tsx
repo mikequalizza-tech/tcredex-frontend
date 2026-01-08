@@ -34,7 +34,7 @@ function SignInForm() {
   useEffect(() => {
     const fetchDemoUsers = async () => {
       try {
-        const response = await fetch('/api/auth/demo-users');
+        const response = await fetch('/api/auth/demo-users', { credentials: 'include' });
         const data = await response.json();
         if (data.users) {
           setDemoUsers(data.users);

@@ -49,6 +49,7 @@ export default function FoundersContent() {
     try {
       const response = await fetch('/api/founders/register', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,

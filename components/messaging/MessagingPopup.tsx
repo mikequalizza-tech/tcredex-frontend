@@ -211,6 +211,7 @@ export default function MessagingPopup({ isOpen, onClose, initialCategory }: Mes
       setSending(true);
       const response = await fetch('/api/conversations', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: activeCategory,
@@ -239,6 +240,7 @@ export default function MessagingPopup({ isOpen, onClose, initialCategory }: Mes
     try {
       const response = await fetch('/api/messages', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversationId: activeConversation,

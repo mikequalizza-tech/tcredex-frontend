@@ -293,6 +293,7 @@ function IntakePageContent() {
     try {
       const response = await fetch('/api/drafts', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ organizationId, data, readinessScore, dealId: existingDraft?.id })
       });
@@ -367,6 +368,7 @@ function IntakePageContent() {
     try {
       const response = await fetch('/api/intake', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           intakeData: currentData,

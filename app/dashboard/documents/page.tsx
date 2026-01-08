@@ -132,7 +132,7 @@ export default function DocumentsPage() {
   // Load pipeline projects for upload dropdown
   const loadPipelineProjects = async () => {
     try {
-      const response = await fetch('/api/deals'); // Get user's deals
+      const response = await fetch('/api/deals', { credentials: 'include' }); // Get user's deals
       const deals = await response.json();
       const projects = deals.map((deal: any) => ({
         id: deal.id,
@@ -275,6 +275,7 @@ export default function DocumentsPage() {
 
       const uploadResponse = await fetch('/api/documents', {
         method: 'PUT',
+        credentials: 'include',
         body: formData,
       });
 
@@ -288,6 +289,7 @@ export default function DocumentsPage() {
       // Step 2: Create document record in database
       const docResponse = await fetch('/api/documents', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: uploadFile.name,

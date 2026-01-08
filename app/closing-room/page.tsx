@@ -63,7 +63,7 @@ export default function ClosingRoomIndexPage() {
   useEffect(() => {
     async function fetchClosingRooms() {
       try {
-        const response = await fetch('/api/closing-room');
+        const response = await fetch('/api/closing-room', { credentials: 'include' });
         if (response.ok) {
           const data = await response.json();
           setClosingRooms(data.closingRooms || []);

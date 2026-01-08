@@ -97,23 +97,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ closingRoom: data });
     }
 
-    // List closing rooms
+    // List closing rooms - query actual table instead of non-existent view
     let query = supabase
-      .from('closing_rooms_summary')
-      .select('*')
-      .order('target_close_date', { ascending: true, nullsFirst: false });
-
-    if (status && status !== 'all') {
-      query = query.eq('status', status);
-    }
-
-    const { data: rawData, error } = await query;
-    const data = rawData as ClosingRoomSummaryRow[] | null;
-
-    if (error) {
-      console.error('Closing rooms list error:', error);
-      return NextResponse.json({ error: 'Failed to fetch closing rooms' }, { status: 500 });
-    }
+      .from('closing_rooms')
+      .select(`
+        id,
+        deal_id,
+        status,
+        target_close_date,
+        opened_at,
+        created_at,
+        deals (
+          id,
+          project_name,
+          sponsor_name,
+          program_type,
+          nmtc_financing_requested,
+          total_project_cost
+        )
+      `)
+   
 
     // Calculate stats
     const stats = {

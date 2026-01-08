@@ -136,7 +136,8 @@ export default function DealDetailPage({ params }: DealPageProps) {
     try {
       const type = contactCDEs && contactInvestors ? 'both' : contactCDEs ? 'cde' : 'investor';
       const response = await fetch(
-        `/api/deals/${id}/outreach?type=${type}&senderOrgId=${organizationId}`
+        `/api/deals/${id}/outreach?type=${type}&senderOrgId=${organizationId}`,
+        { credentials: 'include' }
       );
 
       if (!response.ok) {
@@ -209,6 +210,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
           requests.push(
             fetch(`/api/deals/${id}/outreach`, {
               method: 'POST',
+              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 recipientIds: selectedCDEIds,
@@ -228,6 +230,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
           requests.push(
             fetch(`/api/deals/${id}/outreach`, {
               method: 'POST',
+              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 recipientIds: selectedInvestorIds,
@@ -265,6 +268,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
       try {
         const response = await fetch(`/api/messages`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             dealId: id,

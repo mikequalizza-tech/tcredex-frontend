@@ -60,10 +60,7 @@ export default function OrganizationPage() {
 
         // Fetch organization
         const orgResponse = await fetch('/api/organizations', {
-<<<<<<< HEAD
           credentials: 'include',
-=======
->>>>>>> origin/main
           headers: {
             Authorization: `Bearer ${user.id}`,
           },
@@ -78,10 +75,7 @@ export default function OrganizationPage() {
 
         // Fetch team members
         const teamResponse = await fetch('/api/team', {
-<<<<<<< HEAD
           credentials: 'include',
-=======
->>>>>>> origin/main
           headers: {
             Authorization: `Bearer ${user.id}`,
           },
@@ -112,10 +106,7 @@ export default function OrganizationPage() {
       setIsInviting(true);
       const response = await fetch('/api/team', {
         method: 'POST',
-<<<<<<< HEAD
         credentials: 'include',
-=======
->>>>>>> origin/main
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.id}`,
@@ -134,10 +125,7 @@ export default function OrganizationPage() {
 
       // Refresh team members
       const teamResponse = await fetch('/api/team', {
-<<<<<<< HEAD
         credentials: 'include',
-=======
->>>>>>> origin/main
         headers: {
           Authorization: `Bearer ${user.id}`,
         },

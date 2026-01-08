@@ -7,6 +7,7 @@ import { fetchDealById } from '@/lib/supabase/queries';
 import { Deal } from '@/lib/data/deals';
 import { scoreDealFromRecord } from '@/lib/scoring/engine';
 import ScoreCard from '@/components/scoring/ScoreCard';
+import DealActionModals from '@/components/deals/DealActionModals';
 
 // Types for outreach recipients
 interface OutreachRecipient {
@@ -118,6 +119,10 @@ export default function DealDetailPage({ params }: DealPageProps) {
   const [interestSubmitting, setInterestSubmitting] = useState(false);
   const [interestSubmitted, setInterestSubmitted] = useState(false);
 
+  // New modal state for role-based actions
+  const [activeModal, setActiveModal] = useState<'interest' | 'loi' | 'commitment' | 'request-info' | null>(null);
+  const [showActionModal, setShowActionModal] = useState(false);
+
   // Sponsor outreach state (for when owner contacts CDEs/Investors)
   const [contactCDEs, setContactCDEs] = useState(true);
   const [contactInvestors, setContactInvestors] = useState(false);
@@ -136,12 +141,8 @@ export default function DealDetailPage({ params }: DealPageProps) {
     try {
       const type = contactCDEs && contactInvestors ? 'both' : contactCDEs ? 'cde' : 'investor';
       const response = await fetch(
-<<<<<<< HEAD
         `/api/deals/${id}/outreach?type=${type}&senderOrgId=${organizationId}`,
         { credentials: 'include' }
-=======
-        `/api/deals/${id}/outreach?type=${type}&senderOrgId=${organizationId}`
->>>>>>> origin/main
       );
 
       if (!response.ok) {
@@ -158,12 +159,42 @@ export default function DealDetailPage({ params }: DealPageProps) {
     }
   }, [id, isOwner, organizationId, contactCDEs, contactInvestors]);
 
-  // Fetch when modal opens or contact type changes
-  useEffect(() => {
-    if (showInterestModal && isOwner && (contactCDEs || contactInvestors)) {
-      fetchOutreachOptions();
+  // Handle role-based actions (LOI, Commitment, Request Info)
+  const handleActionSubmit = async (data: any) => {
+    try {
+      const endpoint = `/api/deals/${id}/${data.type}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dealId: id,
+          message: data.message,
+          senderOrgId: data.senderOrgId,
+          senderName: data.senderName,
+          senderOrg: data.senderOrg,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to submit action');
+      }
+
+      // Show success and close modal
+      setShowActionModal(false);
+      setActiveModal(null);
+    } catch (error) {
+      console.error('Error submitting action:', error);
+      throw error;
     }
-  }, [showInterestModal, isOwner, contactCDEs, contactInvestors, fetchOutreachOptions]);
+  };
+
+  // Open action modal
+  const openActionModal = (type: 'interest' | 'loi' | 'commitment' | 'request-info') => {
+    setActiveModal(type);
+    setShowActionModal(true);
+  };
 
   // Toggle recipient selection
   const toggleRecipient = (recipientId: string) => {
@@ -214,10 +245,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
           requests.push(
             fetch(`/api/deals/${id}/outreach`, {
               method: 'POST',
-<<<<<<< HEAD
               credentials: 'include',
-=======
->>>>>>> origin/main
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 recipientIds: selectedCDEIds,
@@ -237,10 +265,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
           requests.push(
             fetch(`/api/deals/${id}/outreach`, {
               method: 'POST',
-<<<<<<< HEAD
               credentials: 'include',
-=======
->>>>>>> origin/main
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 recipientIds: selectedInvestorIds,
@@ -278,10 +303,7 @@ export default function DealDetailPage({ params }: DealPageProps) {
       try {
         const response = await fetch(`/api/messages`, {
           method: 'POST',
-<<<<<<< HEAD
           credentials: 'include',
-=======
->>>>>>> origin/main
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             dealId: id,
@@ -568,60 +590,90 @@ export default function DealDetailPage({ params }: DealPageProps) {
 
               <div className="mt-6 space-y-3">
                 {isAuthenticated ? (
-                  <button
-                    onClick={() => setShowInterestModal(true)}
-                    disabled={interestSubmitted}
-                    className={`block w-full py-3 text-center font-semibold rounded-lg transition-colors ${
-                      interestSubmitted
-                        ? 'bg-green-600 text-white cursor-default'
-                        : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                    }`}
-                  >
-                    {interestSubmitted
-                      ? '✓ Interest Submitted'
-                      : isOwner
-                        ? 'Contact CDEs / Investors'
-                        : 'Express Interest'}
-                  </button>
+                  <>
+                    {/* SPONSOR ACTIONS */}
+                    {isOwner && (
+                      <>
+                        <button
+                          onClick={() => setShowInterestModal(true)}
+                          className="block w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-center font-semibold rounded-lg transition-colors"
+                        >
+                          Contact CDEs / Investors
+                        </button>
+                        <Link
+                          href={`/intake?dealId=${id}`}
+                          className="block w-full py-3 bg-amber-600 hover:bg-amber-500 text-white text-center font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit Deal
+                        </Link>
+                      </>
+                    )}
+                    
+                    {/* CDE/INVESTOR ACTIONS */}
+                    {!isOwner && (
+                      <>
+                        <button
+                          onClick={() => openActionModal('interest')}
+                          disabled={interestSubmitted}
+                          className={`block w-full py-3 text-center font-semibold rounded-lg transition-colors ${
+                            interestSubmitted
+                              ? 'bg-green-600 text-white cursor-default'
+                              : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                          }`}
+                        >
+                          {interestSubmitted ? '✓ Interest Submitted' : 'Express Interest'}
+                        </button>
+                        <button 
+                          onClick={() => openActionModal('request-info')}
+                          className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-center font-medium rounded-lg transition-colors"
+                        >
+                          Request More Info
+                        </button>
+                        {orgType === 'cde' && (
+                          <button 
+                            onClick={() => openActionModal('loi')}
+                            className="block w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-center font-medium rounded-lg transition-colors"
+                          >
+                            Create LOI
+                          </button>
+                        )}
+                        {orgType === 'investor' && (
+                          <button 
+                            onClick={() => openActionModal('commitment')}
+                            className="block w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-center font-medium rounded-lg transition-colors"
+                          >
+                            Create Commitment
+                          </button>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* COMMON ACTIONS */}
+                    <Link
+                      href={`/deals/${id}/profile`}
+                      className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center font-medium rounded-lg transition-colors"
+                    >
+                      View Full Profile
+                    </Link>
+                    <Link
+                      href={`/deals/${id}/card`}
+                      className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download Intake Form
+                    </Link>
+                  </>
                 ) : (
                   <Link
                     href="/signin"
                     className="block w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-center font-semibold rounded-lg transition-colors"
                   >
                     Sign In to Connect
-                  </Link>
-                )}
-                <Link
-                  href={`/deals/${id}/profile`}
-                  className="block w-full py-3 bg-purple-600 hover:bg-purple-500 text-white text-center font-medium rounded-lg transition-colors"
-                >
-                  View Project Profile
-                </Link>
-                <Link
-                  href={`/deals/${id}/card`}
-                  className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download Deal Card
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="block w-full py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 text-center font-medium rounded-lg transition-colors"
-                >
-                  Run Pricing Estimate
-                </Link>
-                {/* Edit Deal button - only visible to sponsor who owns this deal */}
-                {isOwner && (
-                  <Link
-                    href={`/intake?dealId=${id}`}
-                    className="block w-full py-3 bg-amber-600 hover:bg-amber-500 text-white text-center font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit Deal
                   </Link>
                 )}
               </div>
@@ -635,6 +687,23 @@ export default function DealDetailPage({ params }: DealPageProps) {
           </div>
         </div>
       </div>
+
+      {/* New Role-Based Action Modals */}
+      <DealActionModals
+        deal={deal}
+        orgType={orgType}
+        orgName={orgName}
+        userName={userName}
+        organizationId={organizationId}
+        isOwner={isOwner}
+        showModal={showActionModal}
+        modalType={activeModal}
+        onClose={() => {
+          setShowActionModal(false);
+          setActiveModal(null);
+        }}
+        onSubmit={handleActionSubmit}
+      />
 
       {/* Express Interest Modal - Role-Aware */}
       {showInterestModal && (

@@ -16,15 +16,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
-// Connection pool - reused across requests for efficiency
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  statement_timeout: 5000, // 5 second timeout for tile queries
-});
+// Create Supabase client for server-side queries
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export const dynamic = 'force-dynamic';
 
@@ -43,82 +41,58 @@ export async function GET(
   }
 
   try {
-    const client = await pool.connect();
-
+    // Try optimized RPC function first (uses pre-simplified geometries)
+    let result;
     try {
-      // Try optimized RPC function first (uses pre-simplified geometries)
-      let result;
-      try {
-        result = await client.query(
-          'SELECT get_vector_tile($1, $2, $3) as mvt',
-          [z, x, y]
-        );
-      } catch (rpcError) {
-        // Fallback to inline query if RPC doesn't exist
-        console.log('[Tiles] RPC not available, using inline query');
-        const simplifyFactor = z < 6 ? 0.01 : (z < 10 ? 0.001 : 0.0001);
+      const { data, error } = await supabase.rpc('get_vector_tile', {
+        z_param: z,
+        x_param: x,
+        y_param: y,
+      });
 
-        // Eligibility = Federal programs only (State programs are bonuses)
-        // NMTC (LIC or High Migration), LIHTC QCT, OZ
-        // NOTE: DDA is NOT a standalone qualifier - only a 30% boost if LIHTC QCT eligible
-        result = await client.query(`
-          WITH bounds AS (
-            SELECT ST_Transform(ST_TileEnvelope($1, $2, $3), 4326) as geom_bounds,
-                   ST_TileEnvelope($1, $2, $3) as mvt_bounds
-          )
-          SELECT ST_AsMVT(tile, 'tracts', 4096, 'geom') as mvt
-          FROM (
-            SELECT
-              g.geoid,
-              CASE WHEN (
-                COALESCE(s.is_nmtc_eligible, false) OR
-                COALESCE(s.is_nmtc_high_migration, false) OR
-                COALESCE(s.is_lihtc_qct_2025, false) OR
-                COALESCE(s.is_lihtc_qct_2026, false) OR
-                COALESCE(s.is_oz_designated, false)
-              ) THEN 1 ELSE 0 END as e,
-              COALESCE(s.stack_score, 0) as s,
-              ST_AsMVTGeom(
-                ST_Transform(
-                  COALESCE(g.geometry_simplified, ST_Simplify(g.geometry, $4)),
-                  3857
-                ),
-                (SELECT mvt_bounds FROM bounds),
-                4096, 64, true
-              ) as geom
-            FROM tract_geometries g
-            LEFT JOIN master_tax_credit_sot s ON g.geoid = s.geoid
-            WHERE g.geometry && (SELECT geom_bounds FROM bounds)
-          ) as tile
-          WHERE geom IS NOT NULL
-        `, [z, x, y, simplifyFactor]);
-      }
+      if (error) throw error;
+      result = data;
+    } catch (rpcError) {
+      // Fallback to inline query if RPC doesn't exist
+      console.log('[Tiles] RPC not available, using inline query');
+      const simplifyFactor = z < 6 ? 0.01 : (z < 10 ? 0.001 : 0.0001);
 
-      const mvt = result.rows[0]?.mvt;
+      // Eligibility = Federal programs only (State programs are bonuses)
+      // NMTC (LIC or High Migration), LIHTC QCT, OZ
+      // NOTE: DDA is NOT a standalone qualifier - only a 30% boost if LIHTC QCT eligible
+      const { data, error } = await supabase.rpc('get_vector_tile_inline', {
+        z_param: z,
+        x_param: x,
+        y_param: y,
+        simplify_factor: simplifyFactor,
+      });
 
-      if (!mvt || mvt.length === 0) {
-        // Return empty tile (HTTP 204)
-        return new NextResponse(null, {
-          status: 204,
-          headers: {
-            'Content-Type': 'application/x-protobuf',
-            'Cache-Control': 'public, max-age=86400', // Cache 24 hours
-          },
-        });
-      }
+      if (error) throw error;
+      result = data;
+    }
 
-      return new NextResponse(mvt, {
-        status: 200,
+    const mvt = result;
+
+    if (!mvt || mvt.length === 0) {
+      // Return empty tile (HTTP 204)
+      return new NextResponse(null, {
+        status: 204,
         headers: {
           'Content-Type': 'application/x-protobuf',
-          'Content-Encoding': 'identity',
-          'Cache-Control': 'public, max-age=86400',
-          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=86400', // Cache 24 hours
         },
       });
-    } finally {
-      client.release();
     }
+
+    return new NextResponse(mvt, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/x-protobuf',
+        'Content-Encoding': 'identity',
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
   } catch (error: unknown) {
     // Return empty tile on timeout or error (graceful degradation)
     const pgError = error as { code?: string };

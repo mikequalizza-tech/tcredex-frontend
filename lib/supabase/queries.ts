@@ -98,11 +98,7 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
  */
 export async function fetchDealById(id: string): Promise<Deal | null> {
   try {
-<<<<<<< HEAD
     const res = await fetch(`/api/deals?id=${encodeURIComponent(id)}`, { credentials: 'include' });
-=======
-    const res = await fetch(`/api/deals?id=${encodeURIComponent(id)}`);
->>>>>>> origin/main
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       logger.error('Error fetching deal by ID', data.error || res.statusText);

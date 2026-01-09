@@ -1,0 +1,305 @@
+---
+title: "tCredex System Overview"
+updatedAt: "2025-01-19"
+summary: "A complete site map and explanation of how all parts of tCredex work together."
+---
+
+## Platform Architecture
+
+tCredex is built around three core systems that work together:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         tCredex                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │
+│   │    MAP      │    │   INTAKE    │    │  MATCHING   │    │
+│   │  (Data)     │───▶│   (Input)   │───▶│  (Engine)   │    │
+│   └─────────────┘    └─────────────┘    └─────────────┘    │
+│          │                  │                  │            │
+│          ▼                  ▼                  ▼            │
+│   ┌─────────────────────────────────────────────────────┐  │
+│   │              MARKETPLACE (Discovery)                 │  │
+│   └─────────────────────────────────────────────────────┘  │
+│                            │                                │
+│                            ▼                                │
+│   ┌─────────────────────────────────────────────────────┐  │
+│   │              CLOSING ROOM (Execution)                │  │
+│   └─────────────────────────────────────────────────────┘  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Site Map
+
+### Public Pages (No Login Required)
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Home | `/` | Landing page, platform overview |
+| About | `/about` | Company and mission |
+| Blog | `/blog` | Tax credit industry articles |
+| Help Center | `/help` | Documentation and guides |
+| Contact | `/contact` | Support and inquiries |
+| Sign Up | `/signup` | Create new account |
+| Sign In | `/signin` | Login for existing users |
+
+### Map & Research (Browse Without Login)
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Map | `/map` | Interactive eligibility map |
+| Marketplace | `/marketplace` | Browse public DealCards |
+| CDE Directory | `/cdes` | Browse CDEs with allocation |
+| Investor Directory | `/investors` | Browse active investors |
+
+### Sponsor Pages (Requires Sponsor Login)
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Dashboard | `/dashboard` | Sponsor home base |
+| Intake Form | `/intake` | Submit new project |
+| My Projects | `/projects` | Manage all projects |
+| Project Detail | `/projects/[id]` | Single project view |
+| DealCard Preview | `/deals/[id]/card` | Preview DealCard |
+| Matches | `/matches` | View CDE/Investor matches |
+| Closing Room | `/closing/[id]` | Deal workspace |
+| Settings | `/settings` | Account and team |
+
+### CDE Pages (Requires CDE Login)
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Dashboard | `/dashboard` | CDE home base |
+| Pipeline | `/pipeline` | Projects in evaluation |
+| Allocation | `/allocation` | Track allocation balance |
+| Browse Projects | `/marketplace` | Find new projects |
+| Project Detail | `/deals/[id]` | Evaluate DealCard |
+| Issue LOI | `/loi/[id]` | Create LOI for project |
+| Closing Room | `/closing/[id]` | Deal workspace |
+| Settings | `/settings` | Profile and preferences |
+
+### Investor Pages (Requires Investor Login)
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Dashboard | `/dashboard` | Investor home base |
+| Pipeline | `/pipeline` | Deals in evaluation |
+| Portfolio | `/portfolio` | Closed investments |
+| Browse Deals | `/marketplace` | Find opportunities |
+| Deal Detail | `/deals/[id]` | Evaluate opportunity |
+| Issue Commitment | `/commitment/[id]` | Create commitment |
+| Closing Room | `/closing/[id]` | Deal workspace |
+| Settings | `/settings` | Criteria and preferences |
+
+### Admin Pages (Platform Admins Only)
+
+| Page | URL | Purpose |
+|------|-----|---------|
+| Admin Dashboard | `/admin` | Platform overview |
+| Organizations | `/admin/organizations` | Manage orgs |
+| Users | `/admin/users` | Manage users |
+| Deals | `/admin/deals` | All deals |
+| CDEs | `/admin/cdes` | CDE management |
+| Analytics | `/admin/analytics` | Platform metrics |
+
+---
+
+## Core Systems Explained
+
+### 1. The Map System
+
+**What it is:** Interactive map showing census tract eligibility across all programs.
+
+**What it does:**
+- Displays NMTC eligibility for every tract
+- Shows Opportunity Zones
+- Highlights QCTs and DDAs for LIHTC
+- Identifies state program eligibility
+- Provides distress metrics (poverty, MFI, unemployment)
+
+**How it connects:**
+- Intake Form geocodes addresses → Map provides tract data
+- AutoMatch uses tract data → Geographic matching
+- DealCards display tract info → Eligibility verification
+
+### 2. The Intake System
+
+**What it is:** Dynamic form that collects project information and generates DealCards.
+
+**What it does:**
+- Guides Sponsors through project details
+- Auto-detects eligibility from address
+- Adapts fields based on selected programs
+- Calculates completion tier
+- Generates standardized DealCard
+
+**How it connects:**
+- Address entry → Map lookup → Eligibility auto-fill
+- Program selection → Dynamic field display
+- Completion → DealCard generation → Marketplace listing
+
+### 3. The Matching System (AutoMatch)
+
+**What it is:** AI-driven engine that connects projects with CDEs and Investors.
+
+**What it does:**
+- Analyzes project characteristics
+- Compares against CDE/Investor preferences
+- Scores compatibility
+- Notifies parties of strong matches
+
+**How it connects:**
+- DealCard data → Match analysis
+- CDE/Investor profiles → Criteria comparison
+- Match scores → Notifications → Discovery
+
+### 4. The Marketplace
+
+**What it is:** Discovery platform where all parties find each other.
+
+**What it does:**
+- Lists all published DealCards
+- Shows CDE profiles with allocation
+- Displays Investor profiles with criteria
+- Enables filtering and search
+- Facilitates initial interest expression
+
+**How it connects:**
+- Published DealCards appear automatically
+- AutoMatch surfaces relevant listings
+- Interest expressions trigger communication
+
+### 5. The Closing Room
+
+**What it is:** Secure workspace for due diligence and deal execution.
+
+**What it does:**
+- Central document repository
+- Checklist tracking
+- Threaded messaging
+- LOI and commitment management
+- Status tracking to close
+
+**How it connects:**
+- Mutual interest → Closing Room opens
+- Documents uploaded → Checklist progress
+- LOI/Commitment issued → Deal advances
+- All conditions met → Deal closes
+
+---
+
+## Data Flow Through the System
+
+### Project Submission Flow
+
+```
+Sponsor enters address
+        │
+        ▼
+Map geocodes → returns tract data
+        │
+        ▼
+Intake Form auto-populates eligibility
+        │
+        ▼
+Sponsor completes required fields
+        │
+        ▼
+Tier 1 reached → DealCard generated
+        │
+        ▼
+DealCard published to Marketplace
+        │
+        ▼
+AutoMatch analyzes → notifies CDEs/Investors
+```
+
+### Match to Close Flow
+
+```
+AutoMatch identifies compatible parties
+        │
+        ▼
+Notifications sent to both sides
+        │
+        ▼
+Mutual interest expressed
+        │
+        ▼
+Closing Room opens
+        │
+        ▼
+Documents exchanged, checklists tracked
+        │
+        ▼
+LOI issued (NMTC) or Commitment issued (direct)
+        │
+        ▼
+Terms negotiated and accepted
+        │
+        ▼
+Final conditions satisfied
+        │
+        ▼
+Deal funded → marked closed
+```
+
+---
+
+## User Journeys by Role
+
+### Sponsor Journey
+
+1. Create account → Select Sponsor type
+2. Submit project → Complete Intake Form
+3. Reach Tier 1 → DealCard goes live
+4. Receive matches → Review CDE/Investor interest
+5. Express interest → Communication unlocks
+6. Enter Closing Room → Upload documents
+7. Receive LOI/Commitment → Negotiate terms
+8. Close deal → Receive financing
+
+### CDE Journey
+
+1. Create account → Select CDE type
+2. Complete profile → Set allocation and preferences
+3. Receive matches → Review project DealCards
+4. Express interest → Communication unlocks
+5. Enter Closing Room → Evaluate documents
+6. Issue LOI → Set terms
+7. Bring Investor → Coordinate commitment
+8. Close deal → Deploy allocation
+
+### Investor Journey
+
+1. Create account → Select Investor type
+2. Complete profile → Set investment criteria
+3. Receive matches → Review opportunities
+4. Express interest → Communication unlocks
+5. Enter Closing Room → Conduct due diligence
+6. Issue commitment → Set terms
+7. Close deal → Fund investment
+8. Track portfolio → Monitor compliance
+
+---
+
+## System Integration Points
+
+| Integration | Purpose |
+|-------------|---------|
+| Map ↔ Intake | Address geocoding, eligibility lookup |
+| Intake ↔ Marketplace | DealCard publication |
+| Profiles ↔ AutoMatch | Matching criteria |
+| AutoMatch ↔ Notifications | Match alerts |
+| Marketplace ↔ Closing Room | Interest → Due diligence |
+| Closing Room ↔ Portfolio | Deal completion tracking |
+
+---
+
+## Need Help?
+
+Contact **support@tcredex.com** for system questions.

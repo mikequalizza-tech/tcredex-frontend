@@ -1,6 +1,6 @@
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 import AOSProvider from "@/components/aosprovider";
-import { AuthProvider } from "@/lib/auth/useCurrentUser";
 import { Metadata, Viewport } from "next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@/components/analytics";
@@ -83,11 +83,11 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
       </head>
       <body className="bg-gray-950 font-inter text-base text-gray-200 antialiased">
-        <AuthProvider>
+        <ClerkProvider>
           <div className="flex min-h-screen flex-col overflow-hidden supports-[overflow:clip]:overflow-clip">
             <AOSProvider>{children}</AOSProvider>
           </div>
-        </AuthProvider>
+        </ClerkProvider>
         <SpeedInsights />
         <Analytics />
       </body>

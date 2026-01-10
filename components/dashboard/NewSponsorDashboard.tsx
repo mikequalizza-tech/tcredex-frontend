@@ -109,8 +109,12 @@ export default function NewSponsorDashboard({ userName, orgName, organizationId 
   const [loading, setLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<'ALL' | 'NMTC' | 'HTC' | 'LIHTC' | 'OZ'>('ALL');
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
+    // Prevent duplicate fetches
+    if (hasFetched) return;
+
     async function loadData() {
       if (!organizationId) {
         setDeals([]);
@@ -119,6 +123,7 @@ export default function NewSponsorDashboard({ userName, orgName, organizationId 
       }
 
       setLoading(true);
+      setHasFetched(true); // Mark as fetched immediately
       try {
         const fetchedDeals = await fetchDealsByOrganization(organizationId);
         
@@ -189,7 +194,7 @@ export default function NewSponsorDashboard({ userName, orgName, organizationId 
       }
     }
     loadData();
-  }, [organizationId]);
+  }, [organizationId, hasFetched]);
 
   const filteredDeals = selectedProgram === 'ALL' 
     ? deals 

@@ -10,7 +10,7 @@ import { Document, DocumentVersion, DOCUMENT_CATEGORIES, formatFileSize, Documen
 
 export default function DocumentDetailPage() {
   const params = useParams();
-  const documentId = params.id as string;
+  const documentId = params?.id as string;
 
   const [document, setDocument] = useState<Document | null>(null);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);

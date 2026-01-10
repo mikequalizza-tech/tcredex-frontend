@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCurrentUser } from '@/lib/auth';
 import { usePathname } from 'next/navigation';
 import MessagingPopup from './MessagingPopup';
@@ -15,85 +15,61 @@ export default function MessagingButton({ dealId, className = '' }: MessagingBut
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const hasFetchedRef = useRef(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Don't load messaging on intake page - it's not needed there
-  const shouldLoadMessaging = pathname !== '/intake' && organizationId;
+  const shouldLoadMessaging = pathname !== '/intake' && !!organizationId;
 
-  // Load unread count
-  useEffect(() => {
-    if (shouldLoadMessaging) {
-      loadUnreadCount();
-      // Poll for updates every 30 seconds
-      const interval = setInterval(loadUnreadCount, 30000);
-      return () => clearInterval(interval);
-    } else {
-      // Reset count if not loading messaging
-      setUnreadCount(0);
-    }
-  }, [shouldLoadMessaging]);
-
-  const loadUnreadCount = async () => {
-    // Don't load if we shouldn't be loading messaging
-    if (!shouldLoadMessaging) {
+  // Memoized unread count loader - NO /api/deals call, just check conversations API directly
+  const loadUnreadCount = useCallback(async () => {
+    if (!organizationId) {
       setUnreadCount(0);
       return;
     }
 
     try {
-      // Get deals for organization
-      const dealsResponse = await fetch(`/api/deals?organizationId=${organizationId}`);
-      
-      if (!dealsResponse.ok) {
-        // Silently handle API errors - messaging is not critical
+      // Use the conversations API directly - don't fetch deals
+      const response = await fetch(`/api/messages/conversations?organizationId=${organizationId}&category=team`);
+
+      if (!response.ok) {
         setUnreadCount(0);
         return;
       }
-      
-      const deals = await dealsResponse.json();
-      
-      // Ensure deals is an array
-      if (!Array.isArray(deals)) {
-        setUnreadCount(0);
-        return;
-      }
-      
-      let totalUnread = 0;
-      
-      // Check messages for each deal
-      for (const deal of deals) {
-        try {
-          const messagesResponse = await fetch(`/api/messages?dealId=${deal.id}`);
-          
-          if (!messagesResponse.ok) {
-            continue; // Skip this deal if messages fail to load
-          }
-          
-          const messages = await messagesResponse.json();
-          
-          // Ensure messages is an array
-          if (!Array.isArray(messages)) {
-            continue;
-          }
-          
-          // Count unread messages (simple logic - messages from last hour that aren't from current user)
-          const oneHourAgo = Date.now() - (60 * 60 * 1000);
-          const unreadInDeal = messages.filter((m: any) => 
-            !m.isOwn && new Date(m.createdAt).getTime() > oneHourAgo
-          ).length;
-          
-          totalUnread += unreadInDeal;
-        } catch (dealError) {
-          // Skip individual deal errors
-          continue;
-        }
-      }
-      
+
+      const data = await response.json();
+      const conversations = data.conversations || [];
+
+      // Sum up unread counts from all conversations
+      const totalUnread = conversations.reduce((sum: number, conv: any) => sum + (conv.unread_count || 0), 0);
       setUnreadCount(totalUnread);
-    } catch (error) {
-      // Silently handle errors - messaging is not critical for most pages
+    } catch {
       setUnreadCount(0);
     }
-  };
+  }, [organizationId]);
+
+  // Load unread count once on mount, then poll
+  useEffect(() => {
+    if (!shouldLoadMessaging) {
+      setUnreadCount(0);
+      return;
+    }
+
+    // Only fetch once on initial mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      loadUnreadCount();
+    }
+
+    // Poll for updates every 60 seconds (not 30 - reduce load)
+    intervalRef.current = setInterval(loadUnreadCount, 60000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [shouldLoadMessaging, loadUnreadCount]);
 
   return (
     <>

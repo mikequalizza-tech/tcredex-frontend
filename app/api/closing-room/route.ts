@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
     // Get deal info to populate defaults
     const { data: deal, error: dealError } = await supabase
       .from('deals')
-      .select('id, project_name, program_type, allocation_request, user_id')
+      .select('id, project_name, programs, nmtc_financing_requested, sponsor_id')
       .eq('id', dealId)
       .single();
 
@@ -206,20 +206,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
     }
 
+    type DealData = { id: string; programs: string[]; nmtc_financing_requested: number | null; sponsor_id: string | null };
+    const typedDeal = deal as DealData;
+
     // Create closing room
     const insertData = {
       deal_id: dealId,
       commitment_id: commitmentId,
       loi_id: loiId,
-      sponsor_id: sponsorId || (deal as { user_id: string }).user_id,
+      sponsor_id: sponsorId || typedDeal.sponsor_id,
       cde_id: cdeId,
       investor_id: investorId,
       status: 'pending',
       opened_at: new Date().toISOString(),
       target_close_date: targetCloseDate,
-      allocation_amount: allocationAmount || (deal as { allocation_request: number }).allocation_request,
+      allocation_amount: allocationAmount || typedDeal.nmtc_financing_requested,
       investment_amount: investmentAmount,
-      credit_type: creditType || (deal as { program_type: string }).program_type,
+      credit_type: creditType || (typedDeal.programs?.[0] || 'NMTC'),
       created_by: createdBy,
     };
 
@@ -247,12 +250,11 @@ export async function POST(request: NextRequest) {
     const checklistResult = await checklistResponse.json();
 
     // Add sponsor as first participant
-    const dealData = deal as { user_id: string };
     const roomData = closingRoom as { id: string };
-    if (sponsorId || dealData.user_id) {
+    if (sponsorId || typedDeal.sponsor_id) {
       await supabase.from('closing_room_participants').insert({
         closing_room_id: roomData.id,
-        user_id: sponsorId || dealData.user_id,
+        user_id: sponsorId || typedDeal.sponsor_id,
         role: 'sponsor',
         permissions: { view: true, upload: true, approve: false },
         accepted_at: new Date().toISOString(),

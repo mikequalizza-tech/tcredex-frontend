@@ -1,20 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { requireAuth, handleAuthError } from '@/lib/api/auth-middleware';
 
 /**
  * GET /api/auth/me
  * Returns current authenticated user with organization and role
- * CRITICAL: Uses requireAuth() to validate token and fetch user data
+ * Uses Clerk for authentication, Supabase for user/organization data
  */
 export async function GET(request: NextRequest) {
   try {
-    // CRITICAL: Use requireAuth to validate token and get user context
-    const user = await requireAuth(request);
+    // Get Clerk session
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
+    }
+
+    // Get Clerk user details
+    const clerkUser = await currentUser();
+    if (!clerkUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 401 }
+      );
+    }
+
     const supabase = getSupabaseAdmin();
 
-    // Fetch full user record with organization
-    const { data: userRecord, error } = await supabase
+    // Try to find user by clerk_id
+    let userRecord;
+    const { data: clerkMatch } = await supabase
       .from('users')
       .select(`
         id,
@@ -39,14 +57,68 @@ export async function GET(request: NextRequest) {
           verified
         )
       `)
-      .eq('id', user.id)
+      .eq('clerk_id', userId)
       .single();
 
-    if (error || !userRecord) {
-      return NextResponse.json(
-        { error: 'User record not found' },
-        { status: 404 }
-      );
+    if (clerkMatch) {
+      userRecord = clerkMatch;
+    } else {
+      // Try to find by email for migration
+      const primaryEmail = clerkUser.emailAddresses[0]?.emailAddress;
+      if (primaryEmail) {
+        const { data: emailMatch } = await supabase
+          .from('users')
+          .select(`
+            id,
+            email,
+            name,
+            role,
+            organization_id,
+            avatar_url,
+            title,
+            phone,
+            is_active,
+            email_verified,
+            last_login_at,
+            created_at,
+            organization:organizations(
+              id,
+              name,
+              slug,
+              type,
+              logo_url,
+              website,
+              verified
+            )
+          `)
+          .eq('email', primaryEmail.toLowerCase())
+          .single();
+
+        if (emailMatch) {
+          // Update user with clerk_id for future lookups
+          await supabase
+            .from('users')
+            .update({ clerk_id: userId })
+            .eq('id', (emailMatch as { id: string }).id);
+
+          userRecord = emailMatch;
+        }
+      }
+    }
+
+    if (!userRecord) {
+      // User authenticated with Clerk but not in our database
+      // Return partial info so frontend can redirect to registration
+      return NextResponse.json({
+        user: null,
+        clerkUser: {
+          id: userId,
+          email: clerkUser.emailAddresses[0]?.emailAddress,
+          name: clerkUser.fullName || clerkUser.firstName,
+          avatar: clerkUser.imageUrl,
+        },
+        needsRegistration: true,
+      });
     }
 
     const typedRecord = userRecord as {
@@ -73,6 +145,12 @@ export async function GET(request: NextRequest) {
       };
     };
 
+    // Update last login
+    await supabase
+      .from('users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', typedRecord.id);
+
     return NextResponse.json({
       user: {
         id: typedRecord.id,
@@ -89,7 +167,7 @@ export async function GET(request: NextRequest) {
           website: typedRecord.organization.website,
           verified: typedRecord.organization.verified,
         },
-        avatar: typedRecord.avatar_url,
+        avatar: typedRecord.avatar_url || clerkUser.imageUrl,
         title: typedRecord.title,
         phone: typedRecord.phone,
         isActive: typedRecord.is_active,
@@ -99,6 +177,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    return handleAuthError(error);
+    console.error('[API] /api/auth/me error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

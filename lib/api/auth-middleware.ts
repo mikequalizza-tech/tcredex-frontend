@@ -1,12 +1,15 @@
 /**
  * Authentication Middleware
  * Provides utilities for validating authentication and authorization on API routes
- * 
+ *
  * CRITICAL: This is the single source of truth for auth validation
  * All API endpoints MUST use requireAuth() before accessing data
+ *
+ * Uses Clerk for authentication, Supabase for user/organization data
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export class AuthError extends Error {
@@ -30,23 +33,7 @@ export interface AuthUser {
   organizationId: string;
   organizationType: 'sponsor' | 'cde' | 'investor' | 'admin';
   userRole: 'ORG_ADMIN' | 'PROJECT_ADMIN' | 'MEMBER' | 'VIEWER';
-}
-
-/**
- * Extract auth token from request (Authorization header or cookies)
- */
-export function getTokenFromRequest(request: NextRequest): string | null {
-  // Try Authorization header first
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-
-  // Try cookies
-  const cookieToken = request.cookies.get('auth-token')?.value ||
-                      request.cookies.get('tcredex_session')?.value;
-  
-  return cookieToken || null;
+  clerkUserId: string;
 }
 
 /**
@@ -55,40 +42,47 @@ export function getTokenFromRequest(request: NextRequest): string | null {
  * Throws AuthError if not authenticated or user not found
  */
 export async function requireAuth(request: NextRequest): Promise<AuthUser> {
-  const token = getTokenFromRequest(request);
-  
-  if (!token) {
-    throw new AuthError('UNAUTHENTICATED', 'No authentication token provided', 401);
-  }
-
   try {
-    const supabase = getSupabaseAdmin();
-    
-    // Step 1: Verify token with Supabase Auth
-    const { data: authUser, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authUser?.user) {
-      throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 401);
+    // Get Clerk auth session
+    const { userId } = await auth();
+
+    if (!userId) {
+      throw new AuthError('UNAUTHENTICATED', 'Not authenticated', 401);
     }
 
-    // Step 2: Get user record from database (source of truth)
-    const { data: userRecord, error: userError } = await supabase
+    const supabase = getSupabaseAdmin();
+
+    // Get user record from database using Clerk ID
+    // First try clerk_id, then fall back to id (for transition period)
+    let userRecord;
+    let userError;
+
+    // Try finding by clerk_id first
+    const clerkResult = await supabase
       .from('users')
       .select('id, email, role, organization_id')
-      .eq('id', authUser.user.id)
+      .eq('clerk_id', userId)
       .single();
 
-    if (userError || !userRecord) {
-      throw new AuthError('USER_NOT_FOUND', 'User record not found in database', 401);
+    if (clerkResult.data) {
+      userRecord = clerkResult.data;
+    } else {
+      // User not found by clerk_id - they need to complete registration
+      throw new AuthError(
+        'USER_NOT_FOUND',
+        'User not found in database. Please complete registration.',
+        401
+      );
     }
 
-    const typedUserRecord = userRecord as { 
+    const typedUserRecord = userRecord as {
       id: string
       email: string
       role: string
-      organization_id: string 
+      organization_id: string
     };
 
-    // Step 3: Verify organization exists and is active
+    // Verify organization exists and is active
     const { data: org, error: orgError } = await supabase
       .from('organizations')
       .select('id, type')
@@ -101,24 +95,25 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
 
     const typedOrg = org as { id: string; type: string };
 
-    // Step 4: Validate organization type is valid
+    // Validate organization type is valid
     const validOrgTypes = ['sponsor', 'cde', 'investor', 'admin'];
     if (!validOrgTypes.includes(typedOrg.type)) {
       throw new AuthError('INVALID_ORG_TYPE', 'Organization has invalid type', 403);
     }
 
-    // Step 5: Validate user role is valid
+    // Validate user role is valid
     const validUserRoles = ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'];
     if (!validUserRoles.includes(typedUserRecord.role)) {
       throw new AuthError('INVALID_USER_ROLE', 'User has invalid role', 403);
     }
 
     return {
-      id: authUser.user.id,
-      email: authUser.user.email || '',
+      id: typedUserRecord.id,
+      email: typedUserRecord.email,
       organizationId: typedUserRecord.organization_id,
       organizationType: typedOrg.type as 'sponsor' | 'cde' | 'investor' | 'admin',
       userRole: typedUserRecord.role as 'ORG_ADMIN' | 'PROJECT_ADMIN' | 'MEMBER' | 'VIEWER',
+      clerkUserId: userId,
     };
   } catch (error) {
     if (error instanceof AuthError) {
@@ -126,6 +121,18 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
     }
     console.error('[Auth] Unexpected error:', error);
     throw new AuthError('AUTH_ERROR', 'Authentication failed', 500);
+  }
+}
+
+/**
+ * Optional auth - returns user if authenticated, null otherwise
+ * Use for endpoints that work for both authenticated and anonymous users
+ */
+export async function optionalAuth(request: NextRequest): Promise<AuthUser | null> {
+  try {
+    return await requireAuth(request);
+  } catch {
+    return null;
   }
 }
 
@@ -189,7 +196,7 @@ export async function verifyDealAccess(
     throw new AuthError('NOT_FOUND', 'Deal not found', 404);
   }
 
-  const typedDeal = deal as { 
+  const typedDeal = deal as {
     sponsor_organization_id: string
     assigned_cde_id: string | null
     status: string
@@ -212,7 +219,7 @@ export async function verifyDealAccess(
       .select('organization_id')
       .eq('id', typedDeal.assigned_cde_id)
       .single();
-    
+
     if (cde && (cde as { organization_id: string }).organization_id === user.organizationId) {
       return;
     }
@@ -257,4 +264,11 @@ export function withAuthErrorHandling(
       return handleAuthError(error);
     }
   };
+}
+
+// Legacy function for backwards compatibility
+export function getTokenFromRequest(request: NextRequest): string | null {
+  // With Clerk, we don't need to extract tokens manually
+  // Clerk middleware handles this automatically
+  return null;
 }

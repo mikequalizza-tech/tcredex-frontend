@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
-import { User, Role, AuthContext, hasMinimumRole } from './types';
+import { useUser, useAuth, useOrganization } from '@clerk/nextjs';
+import { useState, useEffect, useCallback } from 'react';
+import { User, Role, AuthContext, hasMinimumRole, Organization, ProjectAssignment } from './types';
 
 export interface ExtendedAuthContext extends AuthContext {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -13,13 +14,12 @@ export interface ExtendedAuthContext extends AuthContext {
   orgName: string;
   orgLogo?: string;
   organizationId: string | undefined;
+  userId: string | undefined;
   userName: string;
   userEmail: string;
 }
 
-const AuthContextValue = createContext<ExtendedAuthContext | undefined>(undefined);
-
-const normalizeOrgType = (type?: string): 'sponsor' | 'cde' | 'investor' | 'admin' | undefined => {
+const normalizeOrgType = (type?: string | null): 'sponsor' | 'cde' | 'investor' | 'admin' | undefined => {
   if (!type) return undefined;
   const lower = type.toLowerCase();
   if (['sponsor', 'cde', 'investor', 'admin'].includes(lower)) {
@@ -29,209 +29,192 @@ const normalizeOrgType = (type?: string): 'sponsor' | 'cde' | 'investor' | 'admi
 };
 
 // Map user role to permission level
-const mapUserRoleToRole = (userRole?: string): Role => {
+const mapUserRoleToRole = (userRole?: string | null): Role => {
   if (!userRole) return Role.VIEWER;
-  
+
   const upper = userRole.toUpperCase();
-  if (upper === 'ORG_ADMIN') return Role.ORG_ADMIN;
+  if (upper === 'ORG_ADMIN' || upper === 'ORG:ADMIN' || upper === 'ADMIN') return Role.ORG_ADMIN;
   if (upper === 'PROJECT_ADMIN') return Role.PROJECT_ADMIN;
   if (upper === 'MEMBER') return Role.MEMBER;
   if (upper === 'VIEWER') return Role.VIEWER;
-  
-  // Default to VIEWER for unknown roles
-  return Role.VIEWER;
+
+  // Default to MEMBER for unknown roles (authenticated users get base access)
+  return Role.MEMBER;
 };
 
-async function fetchMe(): Promise<User | null> {
-  const res = await fetch('/api/auth/me', { credentials: 'include' });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const apiUser = data.user;
-  if (!apiUser) return null;
+/**
+ * Clerk-based useCurrentUser hook
+ *
+ * This hook provides a compatibility layer between Clerk and the app's existing auth interface.
+ * It uses Clerk's hooks (useUser, useAuth, useOrganization) and maps the data to match
+ * the ExtendedAuthContext interface that the rest of the app expects.
+ */
+export function useCurrentUser(): ExtendedAuthContext {
+  const { user: clerkUser, isLoaded: userLoaded } = useUser();
+  const { signOut, isLoaded: authLoaded } = useAuth();
+  const { organization: clerkOrg, isLoaded: orgLoaded } = useOrganization();
 
-  // CRITICAL: Validate org type is valid
-  const orgType = normalizeOrgType(apiUser.organization?.type || apiUser.orgType);
-  if (!orgType) {
-    console.error('[Auth] Invalid organization type:', apiUser.organization?.type);
-    return null;
-  }
+  const [dbUserData, setDbUserData] = useState<{
+    organizationId?: string;
+    orgType?: string;
+    orgName?: string;
+    orgLogo?: string;
+    role?: string;
+    projectAssignments?: ProjectAssignment[];
+  } | null>(null);
+  const [isLoadingDbData, setIsLoadingDbData] = useState(true);
 
-  // CRITICAL: Validate user role is valid
-  const userRole = mapUserRoleToRole(apiUser.role);
-
-  // CRITICAL: Validate organization exists
-  if (!apiUser.organization?.id && !apiUser.organizationId) {
-    console.error('[Auth] User has no organization');
-    return null;
-  }
-
-  return {
-    id: apiUser.id,
-    email: apiUser.email,
-    name: apiUser.name || 'User',
-    role: userRole,
-    organizationId: apiUser.organizationId || apiUser.organization?.id || '',
-    organization: apiUser.organization ? {
-      ...apiUser.organization,
-      type: orgType,
-    } : {
-      id: apiUser.organizationId || 'org-unknown',
-      name: 'Organization',
-      slug: 'org',
-      type: orgType,
-    },
-    projectAssignments: [],
-    createdAt: new Date().toISOString(),
-    lastLoginAt: new Date().toISOString(),
-  };
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    try {
-      const u = await fetchMe();
-      setUser(u);
-    } catch (err) {
-      console.error('[Auth] refresh error', err);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+  // Fetch additional user data from our database (organization info, role, etc.)
+  const fetchDbUserData = useCallback(async () => {
+    if (!clerkUser?.id) {
+      setDbUserData(null);
+      setIsLoadingDbData(false);
+      return;
     }
-  }, []);
+
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setDbUserData({
+            organizationId: data.user.organizationId || data.user.organization?.id,
+            orgType: data.user.organization?.type || data.user.orgType,
+            orgName: data.user.organization?.name || 'Organization',
+            orgLogo: data.user.organization?.logo,
+            role: data.user.role,
+            projectAssignments: data.user.projectAssignments || [],
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[Auth] Error fetching DB user data:', err);
+    } finally {
+      setIsLoadingDbData(false);
+    }
+  }, [clerkUser?.id]);
 
   useEffect(() => {
-    // Clean up any conflicting localStorage data on app startup
-    if (typeof window !== 'undefined') {
-      try {
-        // Only clear if we detect mixed auth systems
-        const hasOldSession = localStorage.getItem('tcredex_session');
-        if (hasOldSession) {
-          console.log('[Auth] Cleaning up old localStorage auth data');
-          localStorage.removeItem('tcredex_session');
-          localStorage.removeItem('tcredex_demo_role');
-          localStorage.removeItem('tcredex_registered_user');
-        }
-      } catch (err) {
-        console.error('[Auth] startup cleanup error', err);
-      }
+    if (userLoaded && clerkUser) {
+      fetchDbUserData();
+    } else if (userLoaded && !clerkUser) {
+      setDbUserData(null);
+      setIsLoadingDbData(false);
     }
-    
-    refresh();
-  }, [refresh]);
+  }, [userLoaded, clerkUser, fetchDbUserData]);
 
-  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase().trim(), password }),
-      });
+  const isLoading = !userLoaded || !authLoaded || isLoadingDbData;
+  const isAuthenticated = !!clerkUser;
 
-      const data = await res.json();
-      if (!res.ok || !data.user) {
-        return { success: false, error: data.error || 'Invalid email or password' };
-      }
+  // Build the user object from Clerk + DB data
+  const orgType = normalizeOrgType(dbUserData?.orgType);
+  const userRole = mapUserRoleToRole(dbUserData?.role);
 
-      // Cookie is set server-side; just refresh state
-      await refresh();
-      return { success: true };
-    } catch (error) {
-      console.error('[Login] error', error);
-      return { success: false, error: 'Login failed. Please try again.' };
-    }
-  }, [refresh]);
+  const organization: Organization | undefined = orgType ? {
+    id: dbUserData?.organizationId || clerkOrg?.id || 'org-unknown',
+    name: dbUserData?.orgName || clerkOrg?.name || 'Organization',
+    slug: clerkOrg?.slug || 'org',
+    logo: dbUserData?.orgLogo || clerkOrg?.imageUrl,
+    type: orgType,
+  } : undefined;
 
-  const logout = useCallback(async () => {
-    try {
-      // Call logout API to clear server-side session
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch (err) {
-      console.error('[Auth] logout API error', err);
-      // Continue with client-side cleanup even if API fails
-    }
-    
-    // Clear client-side state
-    setUser(null);
-    
-    // Clear any localStorage data that might cause conflicts
-    if (typeof window !== 'undefined') {
-      try {
-        const keysToRemove = [
-          'tcredex_session',
-          'tcredex_demo_role', 
-          'tcredex_registered_user',
-        ];
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-      } catch (err) {
-        console.error('[Auth] localStorage cleanup error', err);
-      }
-      
-      // Redirect to signin page
-      window.location.href = '/signin';
-    }
-  }, []);
+  const user: User | null = clerkUser && organization ? {
+    id: clerkUser.id,
+    email: clerkUser.emailAddresses[0]?.emailAddress || '',
+    name: clerkUser.fullName || clerkUser.firstName || 'User',
+    avatar: clerkUser.imageUrl,
+    role: userRole,
+    organizationId: organization.id,
+    organization,
+    projectAssignments: dbUserData?.projectAssignments || [],
+    createdAt: clerkUser.createdAt?.toISOString() || new Date().toISOString(),
+    lastLoginAt: clerkUser.lastSignInAt?.toISOString(),
+  } : null;
 
-  const switchRole = useCallback((_role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
-    // Role switching disabled; real role comes from server
-    console.warn('switchRole is disabled; log in with the correct account.');
-  }, []);
-
-  const canViewDocument = (documentOwnerId: string, projectId?: string): boolean => {
+  // Permission methods
+  const canViewDocument = useCallback((documentOwnerId: string, projectId?: string): boolean => {
     if (!user) return false;
     if (user.role === Role.ORG_ADMIN) return true;
     if (documentOwnerId === user.id) return true;
     if (projectId) return hasProjectAccess(projectId, 'viewer');
     return hasMinimumRole(user.role, Role.VIEWER);
-  };
+  }, [user]);
 
-  const canEditDocument = (documentOwnerId: string, projectId?: string): boolean => {
+  const canEditDocument = useCallback((documentOwnerId: string, projectId?: string): boolean => {
     if (!user) return false;
     if (user.role === Role.ORG_ADMIN) return true;
     if (documentOwnerId === user.id) return true;
     if (projectId && user.role === Role.PROJECT_ADMIN) return hasProjectAccess(projectId, 'admin');
     if (projectId && user.role === Role.MEMBER) return hasProjectAccess(projectId, 'member');
     return false;
-  };
+  }, [user]);
 
-  const canDeleteDocument = (documentOwnerId: string): boolean => {
+  const canDeleteDocument = useCallback((documentOwnerId: string): boolean => {
     if (!user) return false;
     if (user.role === Role.ORG_ADMIN) return true;
     return documentOwnerId === user.id && hasMinimumRole(user.role, Role.PROJECT_ADMIN);
-  };
+  }, [user]);
 
-  const canShareDocument = (documentOwnerId: string): boolean => {
+  const canShareDocument = useCallback((documentOwnerId: string): boolean => {
     if (!user) return false;
     if (hasMinimumRole(user.role, Role.PROJECT_ADMIN)) return true;
     return documentOwnerId === user.id;
-  };
+  }, [user]);
 
-  const canUploadDocument = (projectId?: string): boolean => {
+  const canUploadDocument = useCallback((projectId?: string): boolean => {
     if (!user) return false;
     if (user.role === Role.VIEWER) return false;
     if (hasMinimumRole(user.role, Role.PROJECT_ADMIN)) return true;
     if (projectId) return hasProjectAccess(projectId, 'member');
     return user.role === Role.MEMBER;
-  };
+  }, [user]);
 
-  const canManageTeam = (): boolean => user?.role === Role.ORG_ADMIN;
-  const canManageSettings = (): boolean => !!user && hasMinimumRole(user.role, Role.PROJECT_ADMIN);
+  const canManageTeam = useCallback((): boolean => user?.role === Role.ORG_ADMIN, [user]);
+  const canManageSettings = useCallback((): boolean => !!user && hasMinimumRole(user.role, Role.PROJECT_ADMIN), [user]);
 
-  const hasProjectAccess = (projectId: string, requiredRole: 'admin' | 'member' | 'viewer' = 'viewer'): boolean => {
+  const hasProjectAccess = useCallback((projectId: string, requiredRole: 'admin' | 'member' | 'viewer' = 'viewer'): boolean => {
     if (!user) return false;
     if (user.role === Role.ORG_ADMIN) return true;
     const assignment = user.projectAssignments.find(p => p.projectId === projectId);
     if (!assignment) return false;
     const roleHierarchy = { admin: 3, member: 2, viewer: 1 };
     return roleHierarchy[assignment.role] >= roleHierarchy[requiredRole];
-  };
+  }, [user]);
 
-  const contextValue: ExtendedAuthContext = {
+  // Auth actions
+  const login = useCallback(async (_email: string, _password: string): Promise<{ success: boolean; error?: string }> => {
+    // With Clerk, login is handled by Clerk's SignIn component
+    // This is kept for interface compatibility but shouldn't be called directly
+    console.warn('[Auth] login() called but Clerk handles authentication via SignIn component');
+    return { success: false, error: 'Use Clerk SignIn component for authentication' };
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await signOut();
+      // Clerk handles the redirect
+    } catch (err) {
+      console.error('[Auth] logout error', err);
+      // Fallback redirect
+      if (typeof window !== 'undefined') {
+        window.location.href = '/signin';
+      }
+    }
+  }, [signOut]);
+
+  const refresh = useCallback(async () => {
+    await fetchDbUserData();
+  }, [fetchDbUserData]);
+
+  const switchRole = useCallback((_role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
+    // Role switching disabled; real role comes from database
+    console.warn('[Auth] switchRole is disabled; use Clerk Organizations for role management.');
+  }, []);
+
+  return {
     user,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated,
     canViewDocument,
     canEditDocument,
     canDeleteDocument,
@@ -245,25 +228,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh,
     switchRole,
     currentDemoRole: null,
-    orgType: user?.organization?.type,
-    orgName: user?.organization.name || '',
-    orgLogo: user?.organization.logo,
-    organizationId: user?.organizationId,
+    orgType: organization?.type,
+    orgName: organization?.name || '',
+    orgLogo: organization?.logo,
+    organizationId: organization?.id,
+    userId: user?.id,
     userName: user?.name || '',
     userEmail: user?.email || '',
   };
-
-  return <AuthContextValue.Provider value={contextValue}>{children}</AuthContextValue.Provider>;
 }
 
-export function useCurrentUser(): ExtendedAuthContext {
-  const context = useContext(AuthContextValue);
-  if (context === undefined) {
-    throw new Error('useCurrentUser must be used within an AuthProvider');
-  }
-  return context;
-}
-
+// Higher-order component for protected routes
 export function withAuth<P extends object>(Component: React.ComponentType<P>, requiredRole?: Role) {
   return function AuthenticatedComponent(props: P) {
     const { user, isLoading, isAuthenticated } = useCurrentUser();
@@ -296,4 +271,12 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>, re
 
     return <Component {...props} />;
   };
+}
+
+// Re-export for backward compatibility - AuthProvider is no longer needed
+// as ClerkProvider handles everything, but we export a no-op for any imports
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // With Clerk, ClerkProvider in layout.tsx handles auth context
+  // This is a pass-through for backward compatibility
+  return <>{children}</>;
 }

@@ -266,8 +266,13 @@ function PipelineContent() {
 
   const handleDealClick = (deal: PipelineDeal) => {
     if (deal.isDraft) {
+      // Draft deal - go to intake to continue
       router.push('/intake');
+    } else if (effectiveRole === 'sponsor') {
+      // Sponsor clicking their own deal - go directly to intake to edit
+      router.push(`/intake?dealId=${deal.id}`);
     } else {
+      // CDE/Investor - show detail modal
       setSelectedDeal(deal);
     }
   };
@@ -347,7 +352,7 @@ function PipelineContent() {
                 <tr
                   key={`draft-${draft.id}`}
                   className="hover:bg-gray-800/50 cursor-pointer bg-gray-800/20"
-                  onClick={() => router.push('/intake')}
+                  onClick={() => router.push(`/intake?draftId=${draft.id}`)}
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -385,7 +390,7 @@ function PipelineContent() {
                 .map(deal => {
                 const config = stageConfig[deal.stage];
                 return (
-                  <tr key={`deal-${deal.id}`} className="hover:bg-gray-800/50 cursor-pointer" onClick={() => setSelectedDeal(deal)}>
+                  <tr key={`deal-${deal.id}`} className="hover:bg-gray-800/50 cursor-pointer" onClick={() => handleDealClick(deal)}>
                     <td className="px-4 py-3">
                       <div>
                         <p className="font-medium text-gray-100">{deal.projectName}</p>

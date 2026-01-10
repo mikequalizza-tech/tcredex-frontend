@@ -57,7 +57,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string }>
 
 export default function ProjectMatchesPage() {
   const params = useParams();
-  const projectId = params.id as string;
+  const projectId = (params?.id ?? '') as string;
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;

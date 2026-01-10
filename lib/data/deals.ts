@@ -35,6 +35,7 @@ export interface Deal {
   creditPrice: number;
   state: string;
   city: string;
+  address?: string;
   tractType: TractType[];
   status: DealStatus;
   description?: string;

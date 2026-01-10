@@ -6,8 +6,8 @@ import Link from "next/link";
 
 export default function FoundersContent() {
   const searchParams = useSearchParams();
-  const referralCode = searchParams.get('ref');
-  const utmSource = searchParams.get('utm_source');
+  const referralCode = searchParams?.get('ref') ?? null;
+  const utmSource = searchParams?.get('utm_source') ?? null;
   
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');

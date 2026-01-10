@@ -1,4 +1,4 @@
-import { getSupabase } from '../supabase';
+import { getSupabase, getSupabaseAdmin } from '../supabase';
 import { CDEDealCard } from '@/lib/types/cde';
 import { Deal, ProgramType, ProgramLevel, DealStatus, TractType } from '@/lib/data/deals';
 import { logger } from '@/lib/utils/logger';
@@ -26,7 +26,7 @@ function mapAllocationByProgram(deal: any, programType: ProgramType): number {
  * Fetch all deals from Supabase and map them to the Deal interface from lib/data/deals
  */
 export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
   
   let query = supabase
     .from('deals')
@@ -163,11 +163,9 @@ export async function fetchMarketplaceDeals(): Promise<Deal[]> {
 
 /**
  * Fetch deals for a specific organization or user
- * Also includes deals where the intake_data contains matching organization or user info
+ * Uses API route to avoid RLS issues on client side
  */
 export async function fetchDealsByOrganization(orgId: string, userEmail?: string): Promise<Deal[]> {
-  const supabase = getSupabase();
-
   // If orgId is empty/undefined, return empty array (user has no deals yet)
   if (!orgId || orgId === 'undefined' || orgId === 'null') {
     logger.info('fetchDealsByOrganization: No valid orgId, returning empty');
@@ -175,78 +173,20 @@ export async function fetchDealsByOrganization(orgId: string, userEmail?: string
   }
 
   try {
-    // First, determine what type of organization this is and get the relevant record IDs
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .select('type')
-      .eq('id', orgId)
-      .single();
+    // Use API route which runs on server with admin privileges
+    const url = `/api/deals/by-organization?orgId=${encodeURIComponent(orgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+    const response = await fetch(url);
 
-    if (orgError || !orgData) {
-      logger.error('Error fetching organization type', orgError);
+    if (!response.ok) {
+      logger.error('Error fetching deals by organization', { status: response.status });
       return [];
     }
 
-    let orConditions = '';
+    const result = await response.json();
+    const data = result.deals || [];
 
-    // Build conditions based on organization type
-    if ((orgData as any).type === 'sponsor') {
-      // For sponsors, use the organization_id directly
-      orConditions = `sponsor_organization_id.eq.${orgId}`;
-    } else if ((orgData as any).type === 'cde') {
-      // For CDEs, find the CDE record and use its ID
-      const { data: cdeData } = await supabase
-        .from('cdes')
-        .select('id')
-        .eq('organization_id', orgId)
-        .single();
-      
-      if (cdeData) {
-        orConditions = `assigned_cde_id.eq.${(cdeData as any).id}`;
-      } else {
-        // No CDE record found, return empty
-        logger.info('No CDE record found for organization', orgId);
-        return [];
-      }
-    } else if ((orgData as any).type === 'investor') {
-      // For investors, find the investor record and use its ID
-      const { data: investorData } = await supabase
-        .from('investors')
-        .select('id')
-        .eq('organization_id', orgId)
-        .single();
-      
-      if (investorData) {
-        orConditions = `investor_id.eq.${(investorData as any).id}`;
-      } else {
-        // No investor record found, return empty
-        logger.info('No investor record found for organization', orgId);
-        return [];
-      }
-    } else {
-      // Unknown organization type, return empty
-      logger.info('Unknown organization type', (orgData as any).type);
-      return [];
-    }
-
-    const { data, error } = await supabase
-      .from('deals')
-      .select('*')
-      .or(orConditions)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
-      const isRecursion = error.message?.toLowerCase().includes('recursion');
-      
-      if (!isBuild || !isRecursion) {
-        logger.error('Error fetching deals by organization', error);
-      }
-      return [];
-    }
-
-    logger.info(`Found ${data?.length || 0} deals for ${(orgData as any).type} organization ${orgId}`);
-    return (data || []).map((deal: any) => ({
+    logger.info(`Found ${data.length} deals for organization ${orgId}`);
+    return data.map((deal: any) => ({
       id: deal.id,
       projectName: deal.project_name,
       sponsorName: deal.sponsor_name || 'Unknown Sponsor',
@@ -299,7 +239,7 @@ export async function fetchDealsByOrganization(orgId: string, userEmail?: string
  * Fetch all CDEs from Supabase and map them to the CDEDealCard interface
  */
 export async function fetchCDEs(): Promise<CDEDealCard[]> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
   
   const { data, error } = await supabase
     .from('cdes')
@@ -378,7 +318,7 @@ export interface CDEDetail {
  * Fetch a single CDE by slug
  */
 export async function fetchCDEBySlug(slug: string): Promise<CDEDetail | null> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
     .from('cdes')
@@ -482,7 +422,7 @@ export interface InvestorDetail {
  * Fetch a single investor by slug
  */
 export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail | null> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
 
   const { data, error } = await supabase
     .from('investors')
@@ -579,7 +519,7 @@ export interface CDEAllocation {
  * Fetch all allocations for a specific CDE organization
  */
 export async function fetchCDEAllocations(cdeOrgId: string): Promise<CDEAllocation[]> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
 
   try {
     // First get the CDE record for this organization
@@ -650,7 +590,7 @@ export interface CDEInvestmentCriteria {
 }
 
 export async function fetchCDECriteria(cdeOrgId: string): Promise<CDEInvestmentCriteria | null> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
 
   try {
     const { data: rawData, error } = await supabase
@@ -689,7 +629,7 @@ export async function fetchCDECriteria(cdeOrgId: string): Promise<CDEInvestmentC
  * Fetch deals in CDE's pipeline (matched/interested deals)
  */
 export async function fetchCDEPipelineDeals(cdeOrgId: string): Promise<Deal[]> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
 
   // Get CDE record
   const { data: cdeRaw } = await supabase

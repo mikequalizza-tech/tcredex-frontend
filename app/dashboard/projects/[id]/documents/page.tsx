@@ -209,7 +209,7 @@ const closingChecklist = [
 
 export default function ProjectDocumentsPage() {
   const params = useParams();
-  const projectId = params.id as string;
+  const projectId = (params?.id ?? '') as string;
   
   const project = demoProjects[projectId];
   const [documents, setDocuments] = useState<Document[]>(getProjectDocuments(projectId));

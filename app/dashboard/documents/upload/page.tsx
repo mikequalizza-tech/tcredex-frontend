@@ -27,9 +27,9 @@ export default function DocumentUploadPage() {
   const searchParams = useSearchParams();
   
   // Pre-fill from URL params
-  const prefilledEntityType = searchParams.get('entityType') as EntityType | null;
-  const prefilledEntityId = searchParams.get('entityId');
-  const prefilledProjectId = searchParams.get('projectId');
+  const prefilledEntityType = searchParams?.get('entityType') as EntityType | null;
+  const prefilledEntityId = searchParams?.get('entityId');
+  const prefilledProjectId = searchParams?.get('projectId');
   
   const [step, setStep] = useState<'select' | 'upload'>(prefilledEntityType ? 'upload' : 'select');
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>(prefilledEntityType || 'organization');

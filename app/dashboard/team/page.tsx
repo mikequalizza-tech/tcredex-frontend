@@ -104,6 +104,85 @@ export default function TeamPage() {
   const [organizationName, setOrganizationName] = useState(orgName || 'My Organization');
   const [orgSettingsSaving, setOrgSettingsSaving] = useState(false);
 
+  // About Organization state
+  const [orgDescription, setOrgDescription] = useState('');
+  const [orgWebsite, setOrgWebsite] = useState('');
+  const [orgPhone, setOrgPhone] = useState('');
+  const [orgAddress, setOrgAddress] = useState('');
+  const [orgCity, setOrgCity] = useState('');
+  const [orgState, setOrgState] = useState('');
+  const [orgZip, setOrgZip] = useState('');
+  const [orgYearFounded, setOrgYearFounded] = useState('');
+  const [orgPrimaryContact, setOrgPrimaryContact] = useState('');
+  const [orgPrimaryEmail, setOrgPrimaryEmail] = useState('');
+  const [showAboutSection, setShowAboutSection] = useState(true);
+  const [aboutSaving, setAboutSaving] = useState(false);
+
+  // Load organization details
+  useEffect(() => {
+    const loadOrgDetails = async () => {
+      if (!organizationId) return;
+      try {
+        const response = await fetch(`/api/organization?id=${organizationId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.organization) {
+            setOrganizationName(data.organization.name || orgName || '');
+            setOrgDescription(data.organization.description || '');
+            setOrgWebsite(data.organization.website || '');
+            setOrgPhone(data.organization.phone || '');
+            setOrgAddress(data.organization.address_line1 || '');
+            setOrgCity(data.organization.city || '');
+            setOrgState(data.organization.state || '');
+            setOrgZip(data.organization.zip_code || '');
+            setOrgYearFounded(data.organization.year_founded || '');
+            setOrgPrimaryContact(data.organization.primary_contact_name || '');
+            setOrgPrimaryEmail(data.organization.primary_contact_email || '');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load organization details:', error);
+      }
+    };
+    loadOrgDetails();
+  }, [organizationId, orgName]);
+
+  // Save organization about info
+  const handleSaveAbout = async () => {
+    if (!organizationId) return;
+    setAboutSaving(true);
+    try {
+      const response = await fetch('/api/organization', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: organizationId,
+          name: organizationName,
+          description: orgDescription,
+          website: orgWebsite,
+          phone: orgPhone,
+          address_line1: orgAddress,
+          city: orgCity,
+          state: orgState,
+          zip_code: orgZip,
+          year_founded: orgYearFounded,
+          primary_contact_name: orgPrimaryContact,
+          primary_contact_email: orgPrimaryEmail,
+        }),
+      });
+      if (response.ok) {
+        alert('Organization profile saved!');
+      } else {
+        throw new Error('Failed to save');
+      }
+    } catch (error) {
+      console.error('Failed to save organization:', error);
+      alert('Failed to save organization profile');
+    } finally {
+      setAboutSaving(false);
+    }
+  };
+
   // Current user's role (demo - in reality would come from auth)
   const currentUserRole: MemberRole = 'owner'; // TODO: Get from auth context
   const canEditOrg = currentUserRole === 'owner' || currentUserRole === 'admin';
@@ -270,6 +349,177 @@ export default function TeamPage() {
             </svg>
             Only Owners and Admins can edit organization settings
           </p>
+        )}
+      </div>
+
+      {/* About Organization Section */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 mb-8 overflow-hidden">
+        <button
+          onClick={() => setShowAboutSection(!showAboutSection)}
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-800/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-purple-600/20 border border-purple-600/30 flex items-center justify-center">
+              <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-100">About Your Organization</h3>
+              <p className="text-sm text-gray-500">Profile info used in deal exports and Project Profiles</p>
+            </div>
+          </div>
+          <svg className={`w-5 h-5 text-gray-400 transition-transform ${showAboutSection ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showAboutSection && (
+          <div className="p-6 pt-2 border-t border-gray-800">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Left Column */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Organization Name *</label>
+                  <input
+                    type="text"
+                    value={organizationName}
+                    onChange={(e) => setOrganizationName(e.target.value)}
+                    placeholder="Your organization name"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">About / Description</label>
+                  <textarea
+                    value={orgDescription}
+                    onChange={(e) => setOrgDescription(e.target.value)}
+                    placeholder="Brief description of your organization, mission, and experience..."
+                    rows={4}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">This will appear on your Project Profile exports</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Website</label>
+                  <input
+                    type="url"
+                    value={orgWebsite}
+                    onChange={(e) => setOrgWebsite(e.target.value)}
+                    placeholder="https://www.example.com"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Year Founded</label>
+                  <input
+                    type="text"
+                    value={orgYearFounded}
+                    onChange={(e) => setOrgYearFounded(e.target.value)}
+                    placeholder="2010"
+                    maxLength={4}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Primary Contact Name</label>
+                  <input
+                    type="text"
+                    value={orgPrimaryContact}
+                    onChange={(e) => setOrgPrimaryContact(e.target.value)}
+                    placeholder="John Smith"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Primary Contact Email</label>
+                  <input
+                    type="email"
+                    value={orgPrimaryEmail}
+                    onChange={(e) => setOrgPrimaryEmail(e.target.value)}
+                    placeholder="contact@example.com"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={orgPhone}
+                    onChange={(e) => setOrgPhone(e.target.value)}
+                    placeholder="(555) 123-4567"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={orgAddress}
+                    onChange={(e) => setOrgAddress(e.target.value)}
+                    placeholder="123 Main Street"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={orgCity}
+                      onChange={(e) => setOrgCity(e.target.value)}
+                      placeholder="City"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={orgState}
+                      onChange={(e) => setOrgState(e.target.value)}
+                      placeholder="ST"
+                      maxLength={2}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">ZIP</label>
+                    <input
+                      type="text"
+                      value={orgZip}
+                      onChange={(e) => setOrgZip(e.target.value)}
+                      placeholder="12345"
+                      maxLength={10}
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleSaveAbout}
+                disabled={aboutSaving || !organizationName.trim()}
+                className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-not-allowed font-medium transition-colors"
+              >
+                {aboutSaving ? 'Saving...' : 'Save Organization Profile'}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

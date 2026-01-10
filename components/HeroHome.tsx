@@ -35,7 +35,7 @@ export default function HeroHome() {
                 <ul className="space-y-3 text-lg text-indigo-200/65">
                   <li className="flex items-start">
                     <span className="mr-3 text-indigo-500">•</span>
-                    <span><strong>Universal Coverage:</strong> NMTC, HTC, Federal LIHTC, State LIHTC, Brownfields, Opportunity Zones, and more—all programs in one place</span>
+                    <span><strong>Universal Coverage:</strong> NMTC, HTC, LIHTC, Brownfields, Opportunity Zones, both Federal and State Tax Credits—all programs in one platform</span>
                   </li>
                   <li className="flex items-start">
                     <span className="mr-3 text-indigo-500">•</span>

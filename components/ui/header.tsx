@@ -5,22 +5,22 @@ import Link from "next/link";
 import Logo from "./logo";
 import MobileMenu from "./mobile-menu";
 import HeaderSearch from "./header-search";
-import { useCurrentUser } from "@/lib/auth";
+import {
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from "@clerk/nextjs";
 
 export default function Header() {
-  const { isAuthenticated, userName, logout, isLoading } = useCurrentUser();
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [platformOpen, setPlatformOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const platformRef = useRef<HTMLDivElement>(null);
   const resourcesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setUserMenuOpen(false);
-      }
       if (platformRef.current && !platformRef.current.contains(event.target as Node)) {
         setPlatformOpen(false);
       }
@@ -31,11 +31,6 @@ export default function Header() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleLogout = async () => {
-    setUserMenuOpen(false);
-    await logout();
-  };
 
   return (
     <header className="z-30 mt-2 w-full md:mt-5">
@@ -125,48 +120,39 @@ export default function Header() {
           {/* Search + Auth buttons */}
           <div className="flex items-center gap-3">
             <HeaderSearch />
-            {!isLoading && isAuthenticated ? (
-              <>
-                <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">
-                  Dashboard
-                </Link>
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center gap-2 p-1.5 hover:bg-gray-800 rounded-lg"
-                  >
-                    <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                      {(userName || 'User').charAt(0)}
-                    </div>
-                  </button>
-                  {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-xl z-50">
-                      <div className="px-4 py-3 border-b border-gray-800">
-                        <p className="text-sm font-medium text-gray-200">{userName || 'User'}</p>
-                      </div>
-                      <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800" onClick={() => setUserMenuOpen(false)}>
-                        Dashboard
-                      </Link>
-                      <Link href="/dashboard/settings" className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800" onClick={() => setUserMenuOpen(false)}>
-                        Settings
-                      </Link>
-                      <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-800 border-t border-gray-800">
-                        Sign out
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <Link href="/signin" className="text-sm text-gray-300 hover:text-white">
+
+            {/* Clerk Auth Components */}
+            <SignedIn>
+              <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">
+                Dashboard
+              </Link>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8",
+                    userButtonPopoverCard: "bg-gray-900 border border-gray-800",
+                    userButtonPopoverActionButton: "text-gray-300 hover:text-white hover:bg-gray-800",
+                    userButtonPopoverActionButtonText: "text-gray-300",
+                    userButtonPopoverFooter: "hidden",
+                  },
+                }}
+                afterSignOutUrl="/"
+              />
+            </SignedIn>
+
+            <SignedOut>
+              <SignInButton mode="redirect">
+                <button className="text-sm text-gray-300 hover:text-white">
                   Login
-                </Link>
-                <Link href="/signup" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg">
+                </button>
+              </SignInButton>
+              <SignUpButton mode="redirect">
+                <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg">
                   Register
-                </Link>
-              </>
-            )}
+                </button>
+              </SignUpButton>
+            </SignedOut>
+
             <MobileMenu />
           </div>
         </div>

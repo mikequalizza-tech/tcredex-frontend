@@ -73,7 +73,7 @@ const eventTypeConfig: Record<string, { icon: string; color: string }> = {
 
 export default function ProjectTimelinePage() {
   const params = useParams();
-  const projectId = params.id as string;
+  const projectId = (params?.id ?? '') as string;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     // Admin sees all deals (no filter)
 
     // Apply additional filters
-    if (status) query = query.eq('status', status);
+    if (status) query = query.eq('status', status as any);
     if (state) query = query.eq('state', state);
     if (program) query = query.contains('programs', [program]);
 

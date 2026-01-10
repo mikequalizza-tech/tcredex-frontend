@@ -74,7 +74,7 @@ export default function DocumentsPage() {
 
   // Check for upload query param to auto-open modal
   useEffect(() => {
-    if (searchParams.get('upload') === 'true') {
+    if (searchParams?.get('upload') === 'true') {
       setShowUploadModal(true);
       // Clear the query param from URL
       router.replace('/dashboard/documents', { scroll: false });

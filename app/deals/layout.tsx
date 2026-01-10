@@ -9,9 +9,9 @@ import Header from '@/components/ui/header';
 import Footer from '@/components/ui/footer';
 
 function DealsLayoutContent({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const { isAuthenticated, isLoading } = useCurrentUser();
-  
+
   // Routes that always require authentication
   const protectedPaths = ['/deals/new'];
   const requiresAuth = protectedPaths.some(path => pathname.startsWith(path));

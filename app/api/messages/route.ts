@@ -1,190 +1,118 @@
-/**
- * tCredex API - Messages
- * GET /api/messages?dealId=X - Get messages for a deal
- * POST /api/messages - Send a message
- * 
- * CRITICAL: All endpoints require authentication and org filtering
- */
-
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { requireAuth, handleAuthError, verifyDealAccess } from '@/lib/api/auth-middleware';
-import { notify } from '@/lib/notifications';
 
+// GET - Fetch messages for a conversation
 export async function GET(request: NextRequest) {
-  try {
-    // CRITICAL: Use requireAuth instead of supabase.auth.getUser()
-    const user = await requireAuth(request);
-    const supabase = getSupabaseAdmin();
-    const { searchParams } = new URL(request.url);
-    const dealId = searchParams.get('dealId');
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-    if (!dealId) {
-      return NextResponse.json(
-        { error: 'dealId is required' },
-        { status: 400 }
-      );
+  const { searchParams } = new URL(request.url);
+  const conversationId = searchParams.get('conversationId');
+
+  if (!conversationId) {
+    return NextResponse.json({ error: 'conversationId required' }, { status: 400 });
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+
+    // Verify user is a participant in this conversation
+    const { data: participant } = await supabase
+      .from('conversation_participants')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('clerk_id', userId)
+      .single();
+
+    // Also check by user_id for existing participants
+    if (!participant) {
+      const { data: user } = await supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_id', userId)
+        .single();
+
+      if (user) {
+        const { data: participantByUser } = await supabase
+          .from('conversation_participants')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .eq('user_id', (user as { id: string }).id)
+          .single();
+
+        if (!participantByUser) {
+          return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
+        }
+      } else {
+        return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
+      }
     }
 
-    // CRITICAL: Verify user can access this deal
-    await verifyDealAccess(request, user, dealId, 'view');
-
-    const { data: messagesData, error } = await supabase
+    const { data: messages, error } = await supabase
       .from('messages')
-      .select(`
-        id,
-        deal_id,
-        sender_id,
-        sender_name,
-        sender_org,
-        content,
-        attachments,
-        created_at
-      `)
-      .eq('deal_id', dealId)
+      .select('*')
+      .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
 
-    type MessageRow = {
-      id: string;
-      deal_id: string;
-      sender_id: string;
-      sender_name: string;
-      sender_org: string | null;
-      content: string;
-      attachments: unknown[] | null;
-      created_at: string;
-    };
-    const messages = messagesData as MessageRow[] | null;
+    if (error) throw error;
 
-    if (error) {
-      console.error('Messages query error:', error);
-      return NextResponse.json({
-        messages: [],
-        organizationId: user.organizationId,
-      });
-    }
-
-    const formatted = (messages || []).map(m => ({
-      id: m.id,
-      dealId: m.deal_id,
-      senderId: m.sender_id,
-      senderName: m.sender_name,
-      senderOrg: m.sender_org,
-      content: m.content,
-      attachments: m.attachments,
-      createdAt: m.created_at,
-      isOwn: m.sender_id === user.id,
-    }));
-
-    return NextResponse.json({
-      messages: formatted,
-      organizationId: user.organizationId,
-    });
+    return NextResponse.json({ messages: messages || [] });
   } catch (error) {
-    return handleAuthError(error);
+    console.error('[Messages] Error fetching messages:', error);
+    return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
   }
 }
 
+// POST - Send a new message
 export async function POST(request: NextRequest) {
-  try {
-    // CRITICAL: Use requireAuth instead of supabase.auth.getUser()
-    const user = await requireAuth(request);
-    const supabase = getSupabaseAdmin();
-    
-    const { dealId, content, attachments } = await request.json();
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-    if (!dealId || !content) {
-      return NextResponse.json(
-        { error: 'dealId and content are required' },
-        { status: 400 }
-      );
+  try {
+    const body = await request.json();
+    const { conversationId, content, senderId, senderName, senderOrg } = body;
+
+    if (!conversationId || !content) {
+      return NextResponse.json({ error: 'conversationId and content required' }, { status: 400 });
     }
 
-    // CRITICAL: Verify user can access this deal
-    await verifyDealAccess(request, user, dealId, 'edit');
+    const supabase = getSupabaseAdmin();
 
-    // Get sender profile
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('full_name, organizations(name)')
-      .eq('id', user.id)
-      .single();
-
-    type ProfileRow = { full_name: string | null; organizations: { name?: string } | null };
-    const profile = profileData as ProfileRow | null;
-
-    const senderName = profile?.full_name || user.email?.split('@')[0] || 'User';
-    const senderOrg = profile?.organizations?.name || '';
-
-    // Get deal info for notification
-    const { data: dealData } = await supabase
-      .from('deals')
-      .select('project_name')
-      .eq('id', dealId)
-      .single();
-
-    type DealRow = { project_name: string };
-    const deal = dealData as DealRow | null;
-
-    const { data: message, error } = await supabase
+    // Insert message
+    const { data: message, error: insertError } = await supabase
       .from('messages')
       .insert({
-        deal_id: dealId,
-        sender_id: user.id,
-        sender_name: senderName,
-        sender_org: senderOrg,
+        conversation_id: conversationId,
+        sender_id: senderId,
+        sender_clerk_id: userId,
+        sender_name: senderName || 'User',
+        sender_org: senderOrg || 'Organization',
+        sender_org_id: body.senderOrgId || null,
         content,
-        attachments: attachments || [],
-        created_at: new Date().toISOString(),
-      } as never)
+        message_type: 'text',
+      })
       .select()
       .single();
 
-    if (error) {
-      console.error('Message creation error:', error);
-      return NextResponse.json(
-        { error: 'Failed to send message' },
-        { status: 500 }
-      );
-    }
+    if (insertError) throw insertError;
 
-    // 🔔 Emit notification to other deal participants
-    try {
-      await notify.newMessage(
-        dealId,
-        deal?.project_name || 'Deal',
-        senderName
-      );
-    } catch (notifyError) {
-      console.error('Notification error:', notifyError);
-    }
+    // Update conversation's last_message
+    await supabase
+      .from('conversations')
+      .update({
+        last_message: content.substring(0, 100),
+        last_message_at: new Date().toISOString(),
+      })
+      .eq('id', conversationId);
 
-    type MsgRow = {
-      id: string;
-      deal_id: string;
-      sender_id: string;
-      sender_name: string;
-      sender_org: string | null;
-      content: string;
-      attachments: unknown[] | null;
-      created_at: string;
-    };
-    const typedMessage = message as unknown as MsgRow;
-    const formatted = {
-      id: typedMessage.id,
-      dealId: typedMessage.deal_id,
-      senderId: typedMessage.sender_id,
-      senderName: typedMessage.sender_name,
-      senderOrg: typedMessage.sender_org,
-      content: typedMessage.content,
-      attachments: typedMessage.attachments,
-      createdAt: typedMessage.created_at,
-      isOwn: true,
-      organizationId: user.organizationId,
-    };
-
-    return NextResponse.json(formatted, { status: 201 });
+    return NextResponse.json({ message });
   } catch (error) {
-    return handleAuthError(error);
+    console.error('[Messages] Error sending message:', error);
+    return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
   }
 }

@@ -31,9 +31,9 @@ export default function NewDocumentPage() {
   const searchParams = useSearchParams();
   
   // Pre-fill from URL params
-  const prefilledEntityType = searchParams.get('entityType') as EntityType | null;
-  const prefilledEntityId = searchParams.get('entityId');
-  const prefilledProjectId = searchParams.get('projectId');
+  const prefilledEntityType = searchParams?.get('entityType') as EntityType | null;
+  const prefilledEntityId = searchParams?.get('entityId');
+  const prefilledProjectId = searchParams?.get('projectId');
 
   // Form state
   const [name, setName] = useState('');

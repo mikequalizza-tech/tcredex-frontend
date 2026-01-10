@@ -43,15 +43,14 @@ export async function GET(request: NextRequest) {
         id,
         project_name,
         sponsor_name,
-        program_type,
+        programs,
         status,
-        allocation_amount,
+        nmtc_financing_requested,
         city,
         state,
         census_tract,
         created_at,
-        updated_at,
-        profiles!deals_user_id_fkey(email, full_name)
+        updated_at
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -61,7 +60,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status);
     }
     if (program) {
-      query = query.eq('program_type', program);
+      query = query.contains('programs', [program]);
     }
     if (search) {
       query = query.or(`project_name.ilike.%${search}%,sponsor_name.ilike.%${search}%`);
@@ -77,16 +76,15 @@ export async function GET(request: NextRequest) {
     type DealRow = {
       id: string;
       project_name: string;
-      sponsor_name: string;
-      program_type: string;
+      sponsor_name: string | null;
+      programs: string[];
       status: string;
-      allocation_amount: number | null;
+      nmtc_financing_requested: number | null;
       city: string | null;
       state: string | null;
       census_tract: string | null;
       created_at: string;
       updated_at: string;
-      profiles: { email?: string; full_name?: string } | null;
     };
 
     const deals = dealsData as DealRow[] | null;
@@ -96,10 +94,9 @@ export async function GET(request: NextRequest) {
       id: deal.id,
       projectName: deal.project_name,
       sponsorName: deal.sponsor_name,
-      sponsorEmail: deal.profiles?.email,
-      programType: deal.program_type,
+      programs: deal.programs,
       status: deal.status,
-      allocation: deal.allocation_amount || 0,
+      allocation: deal.nmtc_financing_requested || 0,
       location: deal.city && deal.state ? `${deal.city}, ${deal.state}` : null,
       censusTract: deal.census_tract,
       createdAt: deal.created_at,

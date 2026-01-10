@@ -24,7 +24,7 @@ const TRACT_LABELS: Record<string, string> = {
 
 export default function DealCardPage() {
   const params = useParams();
-  const dealId = params.id as string;
+  const dealId = (params?.id ?? '') as string;
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(true);
   const cardRef = useRef<HTMLDivElement>(null);

@@ -44,6 +44,19 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMo
   const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [agreementChecked, setAgreementChecked] = useState(false);
 
+  // Sync initialData when it arrives (for draft loading)
+  useEffect(() => {
+    if (initialData && Object.keys(initialData).length > 0) {
+      setData(prev => ({
+        ...prev,
+        ...initialData,
+      }));
+      if (initialData.programs) {
+        setPrograms(initialData.programs);
+      }
+    }
+  }, [initialData]);
+
   // Handle data changes
   const handleDataChange = useCallback((updates: Partial<IntakeData>) => {
     setData(prev => ({ ...prev, ...updates, updatedAt: new Date().toISOString() }));

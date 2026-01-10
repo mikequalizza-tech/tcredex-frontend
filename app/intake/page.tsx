@@ -151,7 +151,8 @@ function IntakeLoadingFallback() {
 function IntakePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const dealId = searchParams.get('dealId'); // Edit mode if dealId is present
+  const dealId = searchParams?.get('dealId') ?? null; // Edit mode for submitted deals
+  const draftId = searchParams?.get('draftId') ?? null; // Continue specific draft directly (skip prompt)
 
   const { orgType, isLoading: authLoading, isAuthenticated, organizationId, userEmail: authEmail } = useCurrentUser();
   const [step, setStep] = useState<'loading' | 'draft-prompt' | 'form'>('loading');
@@ -219,10 +220,10 @@ function IntakePageContent() {
 
   // Hydrate email from authenticated user (preferred) or local fallback and fetch draft
   useEffect(() => {
-    if (dealId) return; // Skip draft check in edit mode
+    if (dealId) return; // Skip draft check in edit mode for submitted deals
     if (authLoading) return;
 
-    const skipDraftCheck = searchParams.get('new') === 'true'; // Skip if user explicitly wants new deal
+    const skipDraftCheck = searchParams?.get('new') === 'true'; // Skip if user explicitly wants new deal
 
     const hydrateAndLoadDraft = async () => {
       if (!organizationId) {
@@ -239,13 +240,20 @@ function IntakePageContent() {
       }
 
       try {
-        const response = await fetch(`/api/drafts?orgId=${encodeURIComponent(organizationId)}`);
+        // If a specific draftId is provided, load that draft directly without showing prompt
+        const draftQuery = draftId
+          ? `/api/drafts?id=${encodeURIComponent(draftId)}`
+          : `/api/drafts?orgId=${encodeURIComponent(organizationId)}`;
+
+        const response = await fetch(draftQuery);
         const result = await response.json();
 
         if (result.draft) {
           setExistingDraft(result.draft);
           setInitialData(result.draft.draft_data || result.draft.intake_data);
-          setStep('draft-prompt');
+          // If draftId was specified, go directly to form (user already chose to continue from pipeline)
+          // Otherwise show the prompt so user can choose
+          setStep(draftId ? 'form' : 'draft-prompt');
         } else {
           setStep('form');
         }
@@ -256,7 +264,7 @@ function IntakePageContent() {
     };
 
     hydrateAndLoadDraft();
-  }, [authEmail, authLoading, dealId, organizationId, searchParams]);
+  }, [authEmail, authLoading, dealId, draftId, organizationId, searchParams]);
 
   // Continue with existing draft
   const handleContinueDraft = () => {

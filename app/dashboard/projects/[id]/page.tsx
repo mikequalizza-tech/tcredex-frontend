@@ -61,7 +61,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 
 export default function ProjectDetailPage() {
   const params = useParams();
-  const projectId = params.id as string;
+  const projectId = (params?.id ?? '') as string;
   const project = demoProjects[projectId];
 
   if (!project) {

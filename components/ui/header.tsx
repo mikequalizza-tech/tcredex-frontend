@@ -12,6 +12,7 @@ import {
   SignedOut,
   UserButton,
 } from "@clerk/nextjs";
+import { OrganizationBadge } from "./organization-badge";
 
 export default function Header() {
   const [platformOpen, setPlatformOpen] = useState(false);
@@ -123,6 +124,8 @@ export default function Header() {
 
             {/* Clerk Auth Components */}
             <SignedIn>
+              {/* Organization Badge */}
+              <OrganizationBadge />
               <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">
                 Dashboard
               </Link>

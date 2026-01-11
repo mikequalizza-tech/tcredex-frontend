@@ -271,16 +271,18 @@ function formatEligibilityResponse(
     programs.push('State NMTC');
   }
 
-  // LIHTC: Federal QCT is the qualifier, State LIHTC and DDA are bonuses
-  const isLihtcQct = data.is_lihtc_qct_2025 || data.is_lihtc_qct_2026;
-  if (isLihtcQct) {
+  // LIHTC: HOA OR QCT OR DDA = Eligible, QCT/DDA = 30% Basis Boost
+  const isLihtcEligible = data.is_high_opportunity_area || data.is_lihtc_qct_2025 || data.is_lihtc_qct_2026 || data.is_dda_2025 || data.is_dda_2026;
+  const hasLihtcBoost = data.is_lihtc_qct_2025 || data.is_lihtc_qct_2026 || data.is_dda_2025 || data.is_dda_2026;
+
+  if (isLihtcEligible) {
+    programs.push('LIHTC Eligible');
+    if (data.is_high_opportunity_area) programs.push('High Opportunity Area');
     if (data.is_lihtc_qct_2025) programs.push('LIHTC QCT 2025');
     if (data.is_lihtc_qct_2026) programs.push('LIHTC QCT 2026');
-    // DDA is 30% boost - only relevant if QCT eligible
-    if (data.is_dda_2025 || data.is_dda_2026) {
-      programs.push('DDA (30% Boost)');
+    if (hasLihtcBoost) {
+      programs.push('30% Basis Boost');
     }
-    // State LIHTC is bonus only if QCT eligible
     if (data.has_state_lihtc) {
       programs.push('State LIHTC');
     }
@@ -310,15 +312,23 @@ function formatEligibilityResponse(
     // Federal programs (normalized names for API consumers)
     federal: {
       nmtc_eligible: data.is_nmtc_eligible || false,
+      // LIHTC: HOA OR QCT OR DDA = Eligible
+      lihtc_eligible: isLihtcEligible,
+      lihtc_high_opportunity_area: data.is_high_opportunity_area || false,
       lihtc_qct: data.is_lihtc_qct_2025 || data.is_lihtc_qct_2026 || false,
       lihtc_qct_2025: data.is_lihtc_qct_2025 || false,
       lihtc_qct_2026: data.is_lihtc_qct_2026 || false,
       lihtc_dda: data.is_dda_2025 || data.is_dda_2026 || false,
       lihtc_dda_2025: data.is_dda_2025 || false,
       lihtc_dda_2026: data.is_dda_2026 || false,
+      lihtc_basis_boost: hasLihtcBoost,
       opportunity_zone: data.is_oz_designated || false,
       htc_eligible: isHtcEligible,
       htc_is_nhl: isNHL,
+      // Tribal and poverty data
+      is_tribal_area: data.is_tribal_area || false,
+      is_rcap: data.is_rcap || false,
+      is_acp: data.is_acp || false,
       // Use nmtc_* prefixed columns from database
       poverty_rate: data.nmtc_poverty_rate ?? 0,
       poverty_qualifies: data.nmtc_poverty_rate ? Number(data.nmtc_poverty_rate) >= 20 : false,

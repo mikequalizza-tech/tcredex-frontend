@@ -2,15 +2,20 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import Logo from '@/components/ui/logo';
+import { MessageCircle } from 'lucide-react';
+import { useUser } from '@clerk/nextjs';
 
 interface MarketplaceFooterProps {
   onChatSubmit?: (message: string) => void;
+  onOpenMessages?: () => void;
+  unreadCount?: number;
 }
 
-export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterProps) {
+export default function MarketplaceFooter({ onChatSubmit, onOpenMessages, unreadCount = 0 }: MarketplaceFooterProps) {
+  const { user } = useUser();
   const [chatMessage, setChatMessage] = useState('');
+  const [isMessagesOpen, setIsMessagesOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
     {
       role: 'assistant',
@@ -139,9 +144,26 @@ export default function MarketplaceFooter({ onChatSubmit }: MarketplaceFooterPro
           </div>
         </form>
 
-        {/* Right - Copyright */}
-        <div className="hidden lg:flex items-center gap-4 text-sm text-gray-400">
-          <span>© 2025 tCredex</span>
+        {/* Right - Messages Button & Copyright */}
+        <div className="flex items-center gap-4">
+          {user && (
+            <button
+              onClick={() => {
+                setIsMessagesOpen(true);
+                onOpenMessages?.();
+              }}
+              className="relative flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full text-sm text-gray-300 hover:text-white transition-colors"
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Messages</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
+          <span className="hidden lg:inline text-sm text-gray-400">© 2025 tCredex</span>
         </div>
       </div>
     </footer>

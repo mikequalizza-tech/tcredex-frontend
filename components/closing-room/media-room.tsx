@@ -43,17 +43,27 @@ export function MediaRoom({
 
     if (!name) return;
 
+    const abortController = new AbortController();
+
     (async () => {
       try {
-        const resp = await fetch(`/api/livekit?room=${roomId}`);
+        const resp = await fetch(`/api/livekit?room=${roomId}`, {
+          signal: abortController.signal,
+        });
         const data = await resp.json();
         if (data.token) {
           setToken(data.token);
         }
       } catch (e) {
+        // Ignore abort errors - these are expected when component unmounts
+        if (e instanceof Error && e.name === 'AbortError') return;
         console.error("[MediaRoom] Error getting token:", e);
       }
     })();
+
+    return () => {
+      abortController.abort();
+    };
   }, [roomId, user]);
 
   if (token === "" || !isLoaded) {

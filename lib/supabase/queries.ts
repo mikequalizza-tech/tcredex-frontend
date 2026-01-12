@@ -155,10 +155,21 @@ export async function fetchDealById(id: string): Promise<Deal | null> {
 }
 
 /**
- * Fetch deals for the marketplace view
+ * Fetch deals for the marketplace view (public, uses API route)
  */
 export async function fetchMarketplaceDeals(): Promise<Deal[]> {
-  return fetchDeals(true);
+  try {
+    const response = await fetch('/api/deals/marketplace');
+    if (!response.ok) {
+      logger.error('Error fetching marketplace deals', { status: response.status });
+      return [];
+    }
+    const { deals } = await response.json();
+    return deals || [];
+  } catch (error) {
+    logger.error('Error fetching deals', error);
+    return [];
+  }
 }
 
 /**

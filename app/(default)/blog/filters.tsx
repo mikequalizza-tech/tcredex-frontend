@@ -5,14 +5,20 @@ import { useCategoryProvider } from "./category-provider";
 export default function BlogFilters() {
   const { category, setCategory } = useCategoryProvider();
 
+  // Categories sorted by type: Tax Credits first, then Industry topics
   const categories = [
     { name: "All", label: "View All" },
+    // Tax Credit Programs
     { name: "NMTC", label: "NMTC" },
     { name: "HTC", label: "HTC" },
     { name: "OZ", label: "Opportunity Zones" },
-    { name: "Strategies", label: "Strategies" },
-    { name: "Compliance", label: "Compliance" },
+    { name: "Housing Finance", label: "Housing Finance" },
     { name: "State Credits", label: "State Credits" },
+    // Industry Topics
+    { name: "Strategies", label: "Strategies" },
+    { name: "Construction", label: "Construction" },
+    { name: "Development", label: "Development" },
+    { name: "Compliance", label: "Compliance" },
   ];
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/client';
@@ -80,7 +80,12 @@ const getCategoryConfig = (orgType: string | null) => {
 export default function MessagesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, orgType, userName, orgName, organizationId, userId } = useCurrentUser();
-  const supabase = createClient();
+
+  // Defer Supabase client creation to avoid SSR issues
+  const supabase = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return createClient();
+  }, []);
 
   // State
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -249,7 +254,7 @@ export default function MessagesPage() {
 
   // Real-time subscription
   useEffect(() => {
-    if (!activeConversation) return;
+    if (!activeConversation || !supabase) return;
 
     const channel = supabase
       .channel(`messages:${activeConversation.id}`)

@@ -59,6 +59,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/pricing',
   '/api/founders/(.*)',
   '/api/deals',
+  '/api/deals/marketplace',
   '/api/cdes',
   '/api/investors',
   '/api/webhook/(.*)',
@@ -128,27 +129,10 @@ export default clerkMiddleware(async (auth, request) => {
     const onboardingComplete = request.cookies.get('tcredex_onboarded')?.value;
 
     if (!onboardingComplete) {
-      // Check with API if user is onboarded
-      try {
-        const baseUrl = request.nextUrl.origin;
-        const checkResponse = await fetch(`${baseUrl}/api/onboarding`, {
-          headers: {
-            Cookie: request.headers.get('cookie') || '',
-          },
-        });
-
-        if (checkResponse.ok) {
-          const { needsOnboarding } = await checkResponse.json();
-
-          if (needsOnboarding) {
-            const onboardingUrl = new URL('/onboarding', request.url);
-            return NextResponse.redirect(onboardingUrl);
-          }
-        }
-      } catch (error) {
-        // If check fails, allow through (will be caught by page-level checks)
-        console.error('[Middleware] Onboarding check failed:', error);
-      }
+      // Redirect to onboarding - page-level will handle the check
+      // Avoid middleware fetch to prevent edge runtime issues
+      const onboardingUrl = new URL('/onboarding', request.url);
+      return NextResponse.redirect(onboardingUrl);
     }
   }
 });

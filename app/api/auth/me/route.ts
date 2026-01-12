@@ -20,7 +20,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Get Clerk user details
-    const clerkUser = await currentUser();
+    let clerkUser;
+    try {
+      clerkUser = await currentUser();
+    } catch (clerkError: any) {
+      // User was deleted from Clerk - return 401 to force re-auth
+      if (clerkError?.status === 404) {
+        return NextResponse.json(
+          { error: 'User not found', needsSignOut: true },
+          { status: 401 }
+        );
+      }
+      throw clerkError;
+    }
+
     if (!clerkUser) {
       return NextResponse.json(
         { error: 'User not found' },

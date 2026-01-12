@@ -143,13 +143,14 @@ const navItems: NavItem[] = [
   { name: 'Admin', href: '/admin', icon: <AdminIcon />, adminOnly: true },
 ];
 
-export default function AppLayout({ 
+export default function AppLayout({
   children,
   showRoleSwitcher = true,
 }: AppLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  // Pre-collapse sidebar on /map for maximum map view
+  const [sidebarOpen, setSidebarOpen] = useState(!pathname?.startsWith('/map'));
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Get user info from auth context
   const { user, isLoading, orgType, orgName, orgLogo, userName, userEmail, currentDemoRole } = useCurrentUser();
@@ -212,31 +213,31 @@ export default function AppLayout({
       )}
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          ${sidebarOpen ? 'w-64' : 'w-20'} 
+          ${sidebarOpen ? 'w-56' : 'w-16'}
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           bg-gray-900 border-r border-gray-800 flex flex-col transition-all duration-300 flex-shrink-0
         `}
       >
         {/* Logo & Toggle */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-800">
+        <div className={`h-14 flex items-center justify-between ${sidebarOpen ? 'px-3' : 'px-2'} border-b border-gray-800`}>
           {sidebarOpen ? (
             <Logo size="sm" />
           ) : (
             <Logo variant="icon" size="sm" />
           )}
-          <button 
+          <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="text-gray-400 hover:text-white p-1 hidden lg:block"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? "M11 19l-7-7 7-7m8 14l-7-7 7-7" : "M13 5l7 7-7 7M5 5l7 7-7 7"} />
             </svg>
           </button>
           {/* Mobile close button */}
-          <button 
+          <button
             onClick={() => setMobileMenuOpen(false)}
             className="text-gray-400 hover:text-white p-1 lg:hidden"
           >
@@ -248,23 +249,23 @@ export default function AppLayout({
 
         {/* Org Info */}
         {sidebarOpen && (
-          <div className="p-4 border-b border-gray-800">
-            <div className="flex items-center gap-3">
+          <div className="px-3 py-2.5 border-b border-gray-800">
+            <div className="flex items-center gap-2">
               {orgLogo ? (
-                <Image src={orgLogo} alt={orgName} width={40} height={40} className="rounded-lg" />
+                <Image src={orgLogo} alt={orgName} width={32} height={32} className="rounded-lg" />
               ) : (
-                <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-gray-400 font-bold">
+                <div className="w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center text-gray-400 font-bold text-sm">
                   {orgName.charAt(0)}
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-200 truncate">{orgName}</p>
                 {currentDemoRole === 'admin' ? (
-                  <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-red-600 text-white">
-                    Platform Admin
+                  <span className="inline-block px-1.5 py-0.5 text-[10px] rounded-full bg-red-600 text-white">
+                    Admin
                   </span>
                 ) : orgType && (
-                  <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${orgTypeColors[orgType]} text-white`}>
+                  <span className={`inline-block px-1.5 py-0.5 text-[10px] rounded-full ${orgTypeColors[orgType]} text-white`}>
                     {orgTypeLabels[orgType]}
                   </span>
                 )}
@@ -274,7 +275,7 @@ export default function AppLayout({
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className={`flex-1 ${sidebarOpen ? 'p-3' : 'p-2'} space-y-1 overflow-y-auto`}>
           {filteredNavItems.map((item) => {
             const isActive = isActiveRoute(item.href);
             return (
@@ -282,7 +283,7 @@ export default function AppLayout({
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                className={`flex items-center ${sidebarOpen ? 'gap-3 px-3' : 'justify-center px-2'} py-2 rounded-lg transition-colors ${
                   isActive
                     ? 'bg-indigo-600 text-white'
                     : 'text-gray-400 hover:bg-gray-800 hover:text-white'
@@ -305,18 +306,18 @@ export default function AppLayout({
 
         {/* Quick Links */}
         {sidebarOpen && (
-          <div className="p-4 border-t border-gray-800">
-            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Quick Links</p>
-            <div className="space-y-1">
+          <div className="px-3 py-2 border-t border-gray-800">
+            <p className="text-[10px] text-gray-500 mb-1.5 uppercase tracking-wider">Quick Links</p>
+            <div className="space-y-0.5">
               <Link
                 href="/programs"
-                className="block text-sm text-gray-400 hover:text-white transition-colors"
+                className="block text-xs text-gray-400 hover:text-white transition-colors py-0.5"
               >
                 Tax Credit Programs
               </Link>
               <Link
                 href="/"
-                className="block text-sm text-gray-400 hover:text-white transition-colors"
+                className="block text-xs text-gray-400 hover:text-white transition-colors py-0.5"
               >
                 tCredex Home
               </Link>
@@ -325,15 +326,15 @@ export default function AppLayout({
         )}
 
         {/* User Info */}
-        <div className="p-4 border-t border-gray-800">
-          <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center'}`}>
-            <div className="w-9 h-9 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium">
+        <div className={`${sidebarOpen ? 'px-3 py-2' : 'p-2'} border-t border-gray-800`}>
+          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'justify-center'}`}>
+            <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center text-white font-medium text-xs">
               {userName.charAt(0)}
             </div>
             {sidebarOpen && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-200 truncate">{userName}</p>
-                <Link href="/signout" className="text-xs text-gray-500 hover:text-gray-400">
+                <p className="text-xs font-medium text-gray-200 truncate">{userName}</p>
+                <Link href="/signout" className="text-[10px] text-gray-500 hover:text-gray-400">
                   Sign out
                 </Link>
               </div>

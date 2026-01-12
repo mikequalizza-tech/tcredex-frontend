@@ -267,10 +267,10 @@ function PipelineContent() {
   const handleDealClick = (deal: PipelineDeal) => {
     if (deal.isDraft) {
       // Draft deal - go to intake to continue
-      router.push('/intake');
+      router.push(`/intake?draftId=${deal.id}`);
     } else if (effectiveRole === 'sponsor') {
-      // Sponsor clicking their own deal - go directly to intake to edit
-      router.push(`/intake?dealId=${deal.id}`);
+      // Sponsor clicking their own deal - go to deal detail page (they can edit from there)
+      router.push(`/deals/${deal.id}`);
     } else {
       // CDE/Investor - show detail modal
       setSelectedDeal(deal);
@@ -309,7 +309,7 @@ function PipelineContent() {
           <div className="px-3 py-1.5 rounded text-sm font-medium text-gray-300 border border-gray-700">List View</div>
           {effectiveRole === 'sponsor' && (
             <Link
-              href="/intake"
+              href="/deals/new"
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

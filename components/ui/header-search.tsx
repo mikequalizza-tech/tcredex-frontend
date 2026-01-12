@@ -1,51 +1,171 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useCurrentUser } from "@/lib/auth";
 
 interface SearchResult {
   type: 'page' | 'blog' | 'deal' | 'help';
   title: string;
   href: string;
   description?: string;
+  roles?: Array<'sponsor' | 'cde' | 'investor' | 'all'>;
 }
 
-// Static pages for instant search
-const staticPages: SearchResult[] = [
-  { type: 'page', title: 'Home', href: '/', description: 'tCredex homepage' },
-  { type: 'page', title: 'Map', href: '/map', description: 'Interactive deal map with census tract data' },
-  { type: 'page', title: 'Marketplace', href: '/deals', description: 'Browse tax credit opportunities' },
-  { type: 'page', title: 'Pricing Coach', href: '/pricing', description: 'Get pricing guidance for deals' },
-  { type: 'page', title: 'Submit Deal', href: '/intake', description: 'Submit a new deal to the marketplace' },
-  { type: 'page', title: 'Features', href: '/features', description: 'Platform capabilities' },
-  { type: 'page', title: 'How It Works', href: '/how-it-works', description: 'Step-by-step process' },
-  { type: 'page', title: 'Who We Serve', href: '/who-we-serve', description: 'Sponsors, CDEs, and Investors' },
-  { type: 'page', title: 'About', href: '/about', description: 'Our mission and team' },
-  { type: 'page', title: 'Blog', href: '/blog', description: 'Tax credit insights and news' },
-  { type: 'page', title: 'Help Center', href: '/help', description: 'Get help with tCredex platform' },
-  { type: 'page', title: 'Sign In', href: '/signin', description: 'Log into your account' },
-  { type: 'page', title: 'Register', href: '/signup', description: 'Create a new account' },
-  { type: 'page', title: 'Dashboard', href: '/dashboard', description: 'Your dashboard' },
-  { type: 'page', title: 'Settings', href: '/dashboard/settings', description: 'Account settings' },
-  // Blog posts
-  { type: 'blog', title: 'NMTC Overview', href: '/blog/tcredex-five-tax-credit-platform', description: 'The first platform for all five tax-credit programs' },
-  { type: 'blog', title: 'Blended Capital Stacks', href: '/blog/blended-capital-stacks-how-to-combine-tax-credits', description: 'How to combine NMTC, LIHTC, HTC, and OZ' },
-  { type: 'blog', title: 'QALICB Qualification', href: '/blog/qalicb-qualification-technical-rules-nmtc-practitioners', description: 'Technical rules every NMTC practitioner must master' },
-  { type: 'blog', title: 'HTC/NMTC Master Lease', href: '/blog/htc-nmtc-master-lease-structures-how-they-work', description: 'How master lease structures work' },
-  { type: 'blog', title: 'Opportunity Zones', href: '/blog/opportunity-zones-what-developers-investors-need-to-know', description: 'What developers and investors need to know' },
-  { type: 'blog', title: 'State Tax Credits', href: '/blog/state-tax-credits-missing-layer-modern-capital-stacks', description: 'The missing layer in modern capital stacks' },
-  { type: 'blog', title: 'Compliance Pitfalls', href: '/blog/compliance-pitfalls-in-tax-credit-deals', description: 'Common pitfalls and how to avoid them' },
+// Base pages available to all users
+const basePages: SearchResult[] = [
+  { type: 'page', title: 'Home', href: '/', description: 'tCredex homepage', roles: ['all'] },
+  { type: 'page', title: 'Map', href: '/map', description: 'Interactive deal map with census tract data', roles: ['all'] },
+  { type: 'page', title: 'Marketplace', href: '/deals', description: 'Browse tax credit opportunities', roles: ['all'] },
+  { type: 'page', title: 'Pricing Coach', href: '/pricing', description: 'Get pricing guidance for deals', roles: ['all'] },
+  { type: 'page', title: 'Dashboard', href: '/dashboard', description: 'Your dashboard', roles: ['all'] },
+  { type: 'page', title: 'Messages', href: '/messages', description: 'View and send messages', roles: ['all'] },
+  { type: 'page', title: 'Documents', href: '/dashboard/documents', description: 'Your documents and files', roles: ['all'] },
+  { type: 'page', title: 'Team', href: '/dashboard/team', description: 'Manage team members', roles: ['all'] },
+  { type: 'page', title: 'Settings', href: '/dashboard/settings', description: 'Account settings', roles: ['all'] },
+  { type: 'page', title: 'Closing Room', href: '/closing-room', description: 'Deal closing management', roles: ['all'] },
+  { type: 'page', title: 'Blog', href: '/blog', description: 'Tax credit insights and news', roles: ['all'] },
+  { type: 'page', title: 'Help Center', href: '/help', description: 'Get help with tCredex platform', roles: ['all'] },
+];
+
+// Role-specific pages
+const rolePages: SearchResult[] = [
+  // Sponsor-specific
+  { type: 'page', title: 'Submit New Deal', href: '/deals/new', description: 'Submit a new project to the marketplace', roles: ['sponsor'] },
+  { type: 'page', title: 'My Projects', href: '/dashboard/projects', description: 'View and manage your submitted projects', roles: ['sponsor'] },
+  { type: 'page', title: 'Pipeline', href: '/dashboard/pipeline', description: 'Track your deal progress', roles: ['sponsor'] },
+
+  // CDE-specific
+  { type: 'page', title: 'Pipeline', href: '/dashboard/pipeline', description: 'Review incoming deals', roles: ['cde'] },
+  { type: 'page', title: 'Allocations', href: '/dashboard/allocations', description: 'Manage your NMTC allocations', roles: ['cde'] },
+  { type: 'page', title: 'AutoMatch AI', href: '/dashboard/automatch', description: 'AI-powered deal matching', roles: ['cde'] },
+
+  // Investor-specific
+  { type: 'page', title: 'Portfolio', href: '/dashboard/portfolio', description: 'View your investment portfolio', roles: ['investor'] },
+  { type: 'page', title: 'AutoMatch AI', href: '/dashboard/automatch', description: 'AI-powered investment matching', roles: ['investor'] },
+  { type: 'page', title: 'Pipeline', href: '/dashboard/pipeline', description: 'Track investment opportunities', roles: ['investor'] },
+];
+
+// Blog posts
+const blogPosts: SearchResult[] = [
+  { type: 'blog', title: 'NMTC Overview', href: '/blog/tcredex-five-tax-credit-platform', description: 'The first platform for all five tax-credit programs', roles: ['all'] },
+  { type: 'blog', title: 'Blended Capital Stacks', href: '/blog/blended-capital-stacks-how-to-combine-tax-credits', description: 'How to combine NMTC, LIHTC, HTC, and OZ', roles: ['all'] },
+  { type: 'blog', title: 'QALICB Qualification', href: '/blog/qalicb-qualification-technical-rules-nmtc-practitioners', description: 'Technical rules every NMTC practitioner must master', roles: ['cde', 'sponsor'] },
+  { type: 'blog', title: 'HTC/NMTC Master Lease', href: '/blog/htc-nmtc-master-lease-structures-how-they-work', description: 'How master lease structures work', roles: ['all'] },
+  { type: 'blog', title: 'Opportunity Zones', href: '/blog/opportunity-zones-what-developers-investors-need-to-know', description: 'What developers and investors need to know', roles: ['sponsor', 'investor'] },
+  { type: 'blog', title: 'State Tax Credits', href: '/blog/state-tax-credits-missing-layer-modern-capital-stacks', description: 'The missing layer in modern capital stacks', roles: ['all'] },
+  { type: 'blog', title: 'Compliance Pitfalls', href: '/blog/compliance-pitfalls-in-tax-credit-deals', description: 'Common pitfalls and how to avoid them', roles: ['cde', 'sponsor'] },
+];
+
+// Help articles
+const helpArticles: SearchResult[] = [
+  { type: 'help', title: 'Getting Started', href: '/help/getting-started', description: 'New to tCredex? Start here', roles: ['all'] },
+  { type: 'help', title: 'Account Setup', href: '/help/account-setup', description: 'Set up your organization profile', roles: ['all'] },
+  { type: 'help', title: 'Submitting Deals', href: '/help/submitting-deals', description: 'How to submit projects to the marketplace', roles: ['sponsor'] },
+  { type: 'help', title: 'Reviewing Deals', href: '/help/reviewing-deals', description: 'How to review and score deals', roles: ['cde'] },
+  { type: 'help', title: 'Investing', href: '/help/investing', description: 'How to invest in tax credit deals', roles: ['investor'] },
 ];
 
 export default function HeaderSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [dealResults, setDealResults] = useState<SearchResult[]>([]);
+  const [isSearchingDeals, setIsSearchingDeals] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { orgType, isAuthenticated } = useCurrentUser();
 
-  // Handle search
+  // Build role-filtered static pages
+  const staticPages = useMemo(() => {
+    const userRole = orgType || 'sponsor';
+
+    const filterByRole = (items: SearchResult[]) =>
+      items.filter(item => {
+        if (!item.roles || item.roles.includes('all')) return true;
+        return item.roles.includes(userRole as any);
+      });
+
+    return [
+      ...filterByRole(basePages),
+      ...filterByRole(rolePages),
+      ...filterByRole(blogPosts),
+      ...filterByRole(helpArticles),
+    ];
+  }, [orgType]);
+
+  // Role-specific quick links
+  const quickLinks = useMemo(() => {
+    const userRole = orgType || 'sponsor';
+
+    switch (userRole) {
+      case 'sponsor':
+        return [
+          { name: 'Submit Deal', href: '/deals/new' },
+          { name: 'My Projects', href: '/dashboard/pipeline' },
+          { name: 'Map', href: '/map' },
+          { name: 'Help', href: '/help' },
+        ];
+      case 'cde':
+        return [
+          { name: 'Pipeline', href: '/dashboard/pipeline' },
+          { name: 'Allocations', href: '/dashboard/allocations' },
+          { name: 'Map', href: '/map' },
+          { name: 'AutoMatch', href: '/dashboard/automatch' },
+        ];
+      case 'investor':
+        return [
+          { name: 'Portfolio', href: '/dashboard/portfolio' },
+          { name: 'Marketplace', href: '/deals' },
+          { name: 'Map', href: '/map' },
+          { name: 'AutoMatch', href: '/dashboard/automatch' },
+        ];
+      default:
+        return [
+          { name: 'Map', href: '/map' },
+          { name: 'Marketplace', href: '/deals' },
+          { name: 'Blog', href: '/blog' },
+          { name: 'Help', href: '/help' },
+        ];
+    }
+  }, [orgType]);
+
+  // Search deals from API when query is long enough
+  useEffect(() => {
+    if (!query.trim() || query.length < 2 || !isAuthenticated) {
+      setDealResults([]);
+      return;
+    }
+
+    const searchDeals = async () => {
+      setIsSearchingDeals(true);
+      try {
+        const response = await fetch(`/api/deals/search?q=${encodeURIComponent(query)}&limit=5`, {
+          credentials: 'include',
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const deals: SearchResult[] = (data.deals || []).map((d: any) => ({
+            type: 'deal' as const,
+            title: d.project_name || d.name,
+            href: `/deals/${d.id}`,
+            description: `${d.city}, ${d.state} • ${d.program_type || 'NMTC'}`,
+          }));
+          setDealResults(deals);
+        }
+      } catch (error) {
+        console.error('Deal search error:', error);
+      } finally {
+        setIsSearchingDeals(false);
+      }
+    };
+
+    const debounce = setTimeout(searchDeals, 300);
+    return () => clearTimeout(debounce);
+  }, [query, isAuthenticated]);
+
+  // Handle static search
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
@@ -54,13 +174,13 @@ export default function HeaderSearch() {
 
     const q = query.toLowerCase();
     const filtered = staticPages.filter(
-      page => 
-        page.title.toLowerCase().includes(q) || 
+      page =>
+        page.title.toLowerCase().includes(q) ||
         page.description?.toLowerCase().includes(q)
-    ).slice(0, 8);
+    ).slice(0, 6);
 
     setResults(filtered);
-  }, [query]);
+  }, [query, staticPages]);
 
   // Handle keyboard shortcut (Cmd/Ctrl + K)
   useEffect(() => {
@@ -162,40 +282,86 @@ export default function HeaderSearch() {
 
             {/* Results */}
             <div className="max-h-80 overflow-y-auto">
-              {results.length > 0 ? (
-                <ul className="py-2">
-                  {results.map((result, index) => (
-                    <li key={index}>
-                      <button
-                        onClick={() => handleSelect(result.href)}
-                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-800 transition-colors text-left"
-                      >
-                        <span className="text-lg">{getTypeIcon(result.type)}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-200 truncate">{result.title}</p>
-                          {result.description && (
-                            <p className="text-xs text-gray-500 truncate">{result.description}</p>
-                          )}
-                        </div>
-                        <span className="text-xs text-gray-600 uppercase">{result.type}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+              {(results.length > 0 || dealResults.length > 0) ? (
+                <div className="py-2">
+                  {/* Deal Results */}
+                  {dealResults.length > 0 && (
+                    <div>
+                      <p className="px-4 py-1 text-xs text-gray-500 uppercase tracking-wider">Deals</p>
+                      <ul>
+                        {dealResults.map((result, index) => (
+                          <li key={`deal-${index}`}>
+                            <button
+                              onClick={() => handleSelect(result.href)}
+                              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-800 transition-colors text-left"
+                            >
+                              <span className="text-lg">{getTypeIcon(result.type)}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-200 truncate">{result.title}</p>
+                                {result.description && (
+                                  <p className="text-xs text-gray-500 truncate">{result.description}</p>
+                                )}
+                              </div>
+                              <span className="text-xs text-indigo-400 uppercase">Deal</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Static Results */}
+                  {results.length > 0 && (
+                    <div>
+                      {dealResults.length > 0 && (
+                        <p className="px-4 py-1 text-xs text-gray-500 uppercase tracking-wider mt-2">Pages & Articles</p>
+                      )}
+                      <ul>
+                        {results.map((result, index) => (
+                          <li key={`page-${index}`}>
+                            <button
+                              onClick={() => handleSelect(result.href)}
+                              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-800 transition-colors text-left"
+                            >
+                              <span className="text-lg">{getTypeIcon(result.type)}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-200 truncate">{result.title}</p>
+                                {result.description && (
+                                  <p className="text-xs text-gray-500 truncate">{result.description}</p>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-600 uppercase">{result.type}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Searching indicator */}
+                  {isSearchingDeals && (
+                    <div className="px-4 py-2 flex items-center gap-2 text-gray-500 text-sm">
+                      <div className="w-3 h-3 border border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      Searching deals...
+                    </div>
+                  )}
+                </div>
               ) : query ? (
                 <div className="px-4 py-8 text-center text-gray-500">
-                  <p>No results found for "{query}"</p>
+                  {isSearchingDeals ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      Searching...
+                    </div>
+                  ) : (
+                    <p>No results found for "{query}"</p>
+                  )}
                 </div>
               ) : (
                 <div className="px-4 py-4">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Quick Links</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { name: 'Map', href: '/map' },
-                      { name: 'Submit Deal', href: '/intake' },
-                      { name: 'Blog', href: '/blog' },
-                      { name: 'Help', href: '/help' },
-                    ].map((link) => (
+                    {quickLinks.map((link) => (
                       <button
                         key={link.href}
                         onClick={() => handleSelect(link.href)}

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { fetchDealById } from '@/lib/supabase/queries';
 import { Deal } from '@/lib/data/deals';
+import { scoreDealFromRecord } from '@/lib/scoring/engine';
+import { downloadDealProfilePDF } from '@/components/pdf';
 
 // Program colors for display
 const PROGRAM_COLORS: Record<string, { gradient: string; bg: string; text: string; border: string }> = {
@@ -27,6 +29,7 @@ export default function DealCardPage() {
   const dealId = (params?.id ?? '') as string;
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,6 +77,41 @@ export default function DealCardPage() {
     window.print();
   };
 
+  const handleDownloadPDF = async () => {
+    if (!deal) return;
+    setDownloading(true);
+    try {
+      // Calculate score for the PDF
+      let score = null;
+      try {
+        score = scoreDealFromRecord({
+          census_tract: deal.censusTract,
+          tract_poverty_rate: deal.povertyRate,
+          tract_median_income: deal.medianIncome,
+          tract_unemployment: deal.unemployment,
+          total_project_cost: deal.projectCost,
+          nmtc_financing_requested: deal.allocation,
+          jobs_created: deal.jobsCreated,
+          site_control: 'under_contract',
+          pro_forma_complete: true,
+          third_party_reports: true,
+          committed_capital_pct: 70,
+          projected_completion_date: new Date().toISOString(),
+          project_type: deal.programType,
+          target_sectors: [deal.programType],
+        });
+      } catch (e) {
+        console.error('Error calculating score:', e);
+      }
+      await downloadDealProfilePDF(deal, score);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to generate PDF. Please try printing instead.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   // Calculate mock data
   const totalProjectCost = deal.allocation * 2.5;
   const jobsCreated = deal.jobsCreated || Math.floor(deal.allocation / 250000);
@@ -96,13 +134,32 @@ export default function DealCardPage() {
           </Link>
           <div className="flex gap-3">
             <button
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:bg-indigo-800 disabled:cursor-wait flex items-center gap-2"
+            >
+              {downloading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download PDF
+                </>
+              )}
+            </button>
+            <button
               onClick={handlePrint}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 flex items-center gap-2"
+              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
-              Print / Save PDF
+              Print
             </button>
           </div>
         </div>

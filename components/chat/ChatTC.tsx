@@ -157,6 +157,13 @@ export default function ChatTC() {
     scrollToBottom();
   }, [messages, showContactForm]);
 
+  // Listen for custom event to open chat from footer button
+  useEffect(() => {
+    const handleOpenChat = () => setIsOpen(true);
+    window.addEventListener('openChatTC', handleOpenChat);
+    return () => window.removeEventListener('openChatTC', handleOpenChat);
+  }, []);
+
   // Detect if a question is technical/deal-related that ChatTC CANNOT answer
   const isUnansweredTechnicalQuestion = (userText: string, assistantResponse: string): boolean => {
     // These are questions ChatTC CANNOT answer and should refer to AIV

@@ -15,7 +15,7 @@
  * - Narrative/political scoring
  */
 
-import {
+import type {
   ScoringInput,
   DealScore,
   ScoreTier,
@@ -25,19 +25,25 @@ import {
   MissionFitScore,
   CDECriteria,
   ProjectSector,
+  SiteControlStatus,
+  CommitmentLevel,
+} from '@/types/scoring';
+
+import {
   TIER_THRESHOLDS,
   ESSENTIAL_SERVICE_SCORES,
   SITE_CONTROL_SCORES,
   COMMITMENT_SCORES,
-  SiteControlStatus,
-  CommitmentLevel,
 } from '@/types/scoring';
+
+// Re-export DealScore for consumers
+export type { DealScore } from '@/types/scoring';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-export const MODEL_VERSION = '1.0.0';
+export const MODEL_VERSION = '1.1.0';  // v1.1.0: Added FHFA Duty to Serve data (tribal, RCAP, ACP, HOA)
 
 // Pillar maximums
 const MAX_DISTRESS = 40;
@@ -60,6 +66,8 @@ export function calculateEconomicDistress(input: ScoringInput): EconomicDistress
     non_metro_flag: 0,
     high_migration_flag: 0,
     capital_desert: 0,
+    tribal_area_flag: 0,
+    concentrated_poverty_flag: 0,
   };
 
   // Poverty Rate (0-10 points)
@@ -112,6 +120,14 @@ export function calculateEconomicDistress(input: ScoringInput): EconomicDistress
     breakdown.capital_desert = 2;
   }
 
+  // Tribal Area Flag (0 or 2) - FHFA Duty to Serve data
+  // Federally recognized Indian tribe areas receive bonus points
+  breakdown.tribal_area_flag = tract.is_tribal_area ? 2 : 0;
+
+  // Concentrated Poverty Flag (0 or 2) - FHFA Duty to Serve data
+  // RCAP (Racially/Ethnically Concentrated Area of Poverty) or ACP (Area of Concentrated Poverty)
+  breakdown.concentrated_poverty_flag = (tract.is_rcap || tract.is_acp) ? 2 : 0;
+
   const total = Math.min(
     breakdown.poverty_rate +
     breakdown.mfi +
@@ -119,7 +135,9 @@ export function calculateEconomicDistress(input: ScoringInput): EconomicDistress
     breakdown.ppc_flag +
     breakdown.non_metro_flag +
     breakdown.high_migration_flag +
-    breakdown.capital_desert,
+    breakdown.capital_desert +
+    breakdown.tribal_area_flag +
+    breakdown.concentrated_poverty_flag,
     MAX_DISTRESS
   );
 
@@ -391,6 +409,10 @@ export function generateReasonCodes(
   if (input.tract.is_non_metro) codes.push('NON_METRO_RURAL');
   if (input.tract.is_high_migration) codes.push('HIGH_MIGRATION_COUNTY');
   if (input.tract.is_opportunity_zone) codes.push('OPPORTUNITY_ZONE');
+  if (input.tract.is_tribal_area) codes.push('TRIBAL_AREA');
+  if (input.tract.is_rcap) codes.push('RCAP_CONCENTRATED_POVERTY');
+  if (input.tract.is_acp) codes.push('ACP_CONCENTRATED_POVERTY');
+  if (input.tract.is_high_opportunity_area) codes.push('HIGH_OPPORTUNITY_AREA');
   if (distress.breakdown.poverty_rate >= 8) codes.push('HIGH_POVERTY_TRACT');
   if (distress.breakdown.mfi >= 8) codes.push('LOW_MFI_TRACT');
   if (distress.breakdown.capital_desert >= 3) codes.push('CAPITAL_DESERT');
@@ -436,7 +458,9 @@ export function generateExplanation(
   lines.push(`  ├─ PPC: ${distress.breakdown.ppc_flag}/3`);
   lines.push(`  ├─ Non-Metro: ${distress.breakdown.non_metro_flag}/3`);
   lines.push(`  ├─ High Migration: ${distress.breakdown.high_migration_flag}/2`);
-  lines.push(`  └─ Capital Desert: ${distress.breakdown.capital_desert}/4`);
+  lines.push(`  ├─ Capital Desert: ${distress.breakdown.capital_desert}/4`);
+  lines.push(`  ├─ Tribal Area: ${distress.breakdown.tribal_area_flag}/2`);
+  lines.push(`  └─ Concentrated Poverty: ${distress.breakdown.concentrated_poverty_flag}/2`);
   lines.push('');
 
   lines.push(`Impact Potential: ${impact.total}/${MAX_IMPACT} (${impact.percentile.toFixed(0)}%)`);
@@ -509,6 +533,11 @@ export function calculateDealScore(
       persistent_poverty_county: input.tract.is_persistent_poverty_county,
       non_metro: input.tract.is_non_metro,
       high_migration: input.tract.is_high_migration,
+      // FHFA Duty to Serve flags
+      tribal_area: input.tract.is_tribal_area,
+      rcap: input.tract.is_rcap,
+      acp: input.tract.is_acp,
+      high_opportunity_area: input.tract.is_high_opportunity_area,
     },
     reason_codes: reasonCodes,
     score_explanation: explanation,

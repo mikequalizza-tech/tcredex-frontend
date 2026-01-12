@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Logo from '@/components/ui/logo';
 import { MessageCircle } from 'lucide-react';
 import { useUser } from '@clerk/nextjs';
+import MessagesPopup from '@/components/messages/MessagesPopup';
 
 interface MarketplaceFooterProps {
   onChatSubmit?: (message: string) => void;
@@ -24,29 +25,53 @@ export default function MarketplaceFooter({ onChatSubmit, onOpenMessages, unread
   ]);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatMessage.trim()) return;
+    if (!chatMessage.trim() || isLoading) return;
+
+    const userMsg = chatMessage.trim();
+    setChatMessage('');
 
     // Add user message
-    setChatHistory((prev) => [...prev, { role: 'user', content: chatMessage }]);
+    setChatHistory((prev) => [...prev, { role: 'user', content: userMsg }]);
+    setIsLoading(true);
 
-    // Simulate AI response (in production, this calls the API)
-    setTimeout(() => {
+    try {
+      // Call the real ChatTC API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...chatHistory, { role: 'user', content: userMsg }],
+        }),
+      });
+
+      if (!response.ok) throw new Error('Chat request failed');
+
+      const data = await response.json();
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.content },
+      ]);
+    } catch (error) {
+      console.error('Chat error:', error);
       setChatHistory((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: `I found several projects matching "${chatMessage}". Let me filter the marketplace for you. You can also use the column filters above to narrow down by program type, state, or allocation amount.`,
+          content: "I'm having trouble connecting. For platform support: support@tcredex.com. For deal advisory: deals@americanimpactventures.com",
         },
       ]);
-    }, 1000);
-
-    if (onChatSubmit) {
-      onChatSubmit(chatMessage);
+    } finally {
+      setIsLoading(false);
     }
 
-    setChatMessage('');
+    if (onChatSubmit) {
+      onChatSubmit(userMsg);
+    }
   };
 
   return (
@@ -81,14 +106,25 @@ export default function MarketplaceFooter({ onChatSubmit, onOpenMessages, unread
                   <div
                   className={`max-w-[80%] px-4 py-2 rounded-lg ${
                       msg.role === 'user'
-                        ? 'bg-green-600 text-white'
+                        ? 'bg-indigo-600 text-white'
                         : 'bg-gray-800 border border-gray-700 text-gray-100'
                     }`}
                   >
-                    <p className="text-sm">{msg.content}</p>
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                   </div>
                 </div>
               ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-800 border border-gray-700 px-4 py-2 rounded-lg">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span>
+                      <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></span>
+                      <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -137,9 +173,10 @@ export default function MarketplaceFooter({ onChatSubmit, onOpenMessages, unread
             />
             <button
               type="submit"
-              className="absolute right-2 px-3 py-1 bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-indigo-500 transition-colors"
+              disabled={isLoading || !chatMessage.trim()}
+              className="absolute right-2 px-3 py-1 bg-indigo-600 text-white rounded-full text-sm font-medium hover:bg-indigo-500 disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors"
             >
-              Send
+              {isLoading ? '...' : 'Send'}
             </button>
           </div>
         </form>
@@ -166,6 +203,13 @@ export default function MarketplaceFooter({ onChatSubmit, onOpenMessages, unread
           <span className="hidden lg:inline text-sm text-gray-400">© 2025 tCredex</span>
         </div>
       </div>
+
+      {/* Messages Popup */}
+      <MessagesPopup
+        isOpen={isMessagesOpen}
+        onClose={() => setIsMessagesOpen(false)}
+        unreadCount={unreadCount}
+      />
     </footer>
   );
 }

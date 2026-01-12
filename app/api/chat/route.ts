@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getEnhancedSystemPrompt } from '@/lib/knowledge/retriever';
+import type { Citation } from '@/lib/knowledge/types';
 
 const BASE_SYSTEM_PROMPT = `You are ChatTC, an AI assistant specialized in U.S. tax credit programs for community development and real estate finance. You are the official assistant for tCredex, an AI-powered tax credit marketplace platform.
 
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { messages } = body;
-    
+
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { content: 'Invalid request format', citations: [] },
@@ -71,39 +73,56 @@ export async function POST(req: NextRequest) {
     }
 
     const userMessage = messages[messages.length - 1]?.content || '';
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
 
     // If no API key, use fallback responses
-    if (!anthropicKey) {
-      console.log('No ANTHROPIC_API_KEY configured, using fallback');
+    if (!openaiKey) {
+      console.log('No OPENAI_API_KEY configured, using fallback');
       return NextResponse.json({
         content: getFallbackResponse(userMessage),
         citations: [],
       });
     }
 
-    // Call Anthropic API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Get enhanced system prompt with RAG context (if knowledge base has content)
+    let systemPrompt = BASE_SYSTEM_PROMPT;
+    let citations: Citation[] = [];
+
+    try {
+      const ragResult = await getEnhancedSystemPrompt(BASE_SYSTEM_PROMPT, userMessage);
+      systemPrompt = ragResult.systemPrompt;
+      citations = ragResult.citations;
+      if (ragResult.chunksUsed > 0) {
+        console.log(`[ChatTC] Retrieved ${ragResult.chunksUsed} knowledge chunks for query`);
+      }
+    } catch (ragError) {
+      // RAG failed - continue with base prompt
+      console.log('[ChatTC] RAG retrieval failed, using base prompt:', ragError);
+    }
+
+    // Call OpenAI ChatGPT API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'gpt-4o-mini',
         max_tokens: 1024,
-        system: BASE_SYSTEM_PROMPT,
-        messages: messages.map((m: { role: string; content: string }) => ({
-          role: m.role,
-          content: m.content,
-        })),
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages.map((m: { role: string; content: string }) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        ],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Anthropic API error:', response.status, errorText);
+      console.error('OpenAI API error:', response.status, errorText);
       // Fall back to hardcoded response on API error
       return NextResponse.json({
         content: getFallbackResponse(userMessage),
@@ -112,11 +131,15 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await response.json();
-    const assistantMessage = data.content?.[0]?.text || getFallbackResponse(userMessage);
+    const assistantMessage = data.choices?.[0]?.message?.content || getFallbackResponse(userMessage);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       content: assistantMessage,
-      citations: [],
+      citations: citations.map(c => ({
+        id: c.id,
+        source: c.source,
+        page: c.page,
+      })),
     });
   } catch (error) {
     console.error('Chat API error:', error);

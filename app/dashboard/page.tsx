@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useCurrentUser } from '@/lib/auth';
 import { SponsorDashboard, CDEDashboard, InvestorDashboard } from '@/components/dashboard';
-import NewSponsorDashboard from '@/components/dashboard/NewSponsorDashboard';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import WelcomeModal from '@/components/WelcomeModal';
 
@@ -60,7 +59,7 @@ function DashboardContent() {
       return (
         <div className="p-6 bg-gray-950 min-h-screen">
           {showWelcome && <WelcomeModal onDismiss={handleDismissWelcome} />}
-          <NewSponsorDashboard userName={userName} orgName={orgName || 'Demo Organization'} organizationId={organizationId} />
+          <SponsorDashboard userName={userName} orgName={orgName || 'Demo Organization'} organizationId={organizationId} />
         </div>
       );
     case 'cde':
@@ -81,7 +80,7 @@ function DashboardContent() {
       return (
         <div className="p-6 bg-gray-950 min-h-screen">
           {showWelcome && <WelcomeModal onDismiss={handleDismissWelcome} />}
-          <NewSponsorDashboard userName={userName} orgName={orgName || 'Demo Organization'} organizationId={organizationId} />
+          <SponsorDashboard userName={userName} orgName={orgName || 'Demo Organization'} organizationId={organizationId} />
         </div>
       );
   }

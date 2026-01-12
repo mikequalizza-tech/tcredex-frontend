@@ -61,6 +61,9 @@ export interface EconomicDistressScore {
     non_metro_flag: number;       // 0 or 3
     high_migration_flag: number;  // 0 or 2 (bonus for high migration counties)
     capital_desert: number;       // 0-4
+    // NEW: Bonus points for concentrated poverty areas
+    tribal_area_flag: number;     // 0 or 2 (bonus for tribal areas)
+    concentrated_poverty_flag: number;  // 0 or 2 (bonus for RCAP/ACP)
   };
   percentile: number;             // Normalized to 0-100
 }
@@ -242,6 +245,11 @@ export interface DealScore {
     non_metro: boolean;
     high_migration?: boolean;     // High Migration Rural County
     underserved_state?: boolean;
+    // NEW: From FHFA Duty to Serve data
+    tribal_area?: boolean;        // Federally recognized Indian tribe area
+    rcap?: boolean;               // Racially/Ethnically Concentrated Area of Poverty
+    acp?: boolean;                // Area of Concentrated Poverty
+    high_opportunity_area?: boolean;  // LIHTC High Opportunity Area
   };
   
   // Explainability
@@ -261,7 +269,7 @@ export interface DealScore {
 export interface ScoringInput {
   deal_id: string;
   
-  // Tract data (from nmtc_ct_data_2025 SOT)
+  // Tract data (from master_tax_credit_sot)
   tract: {
     geoid: string;
     poverty_rate: number;
@@ -276,6 +284,11 @@ export interface ScoringInput {
     is_persistent_poverty_county: boolean;
     is_non_metro: boolean;
     is_high_migration?: boolean;  // High Migration Rural County LIC tract
+    // NEW: From FHFA Duty to Serve data
+    is_tribal_area?: boolean;     // Federally recognized Indian tribe area
+    is_rcap?: boolean;            // Racially/Ethnically Concentrated Area of Poverty
+    is_acp?: boolean;             // Area of Concentrated Poverty
+    is_high_opportunity_area?: boolean;  // LIHTC High Opportunity Area
   };
   
   // Project data (from intake)

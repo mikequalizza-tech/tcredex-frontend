@@ -1,45 +1,202 @@
-﻿export const metadata = {
-  title: "Reset Password - Open PRO",
-  description: "Page description",
-};
+"use client";
 
+import { useSignIn } from "@clerk/nextjs";
+import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function ResetPassword() {
+  const { signIn, isLoaded } = useSignIn();
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [step, setStep] = useState<"email" | "code" | "success">("email");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSendCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoaded || !signIn) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      await signIn.create({
+        strategy: "reset_password_email_code",
+        identifier: email,
+      });
+      setStep("code");
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      setError(err.errors?.[0]?.message || "Failed to send reset code. Please check your email.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoaded || !signIn) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const result = await signIn.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code,
+        password: newPassword,
+      });
+
+      if (result.status === "complete") {
+        setStep("success");
+      } else {
+        setError("Password reset incomplete. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      setError(err.errors?.[0]?.message || "Failed to reset password. Please check your code.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <section>
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="py-12 md:py-20">
-          {/* Section header */}
-          <div className="pb-12 text-center">
-            <h1 className="animate-[gradient_6s_linear_infinite] bg-[linear-gradient(to_right,var(--color-gray-200),var(--color-indigo-200),var(--color-gray-50),var(--color-indigo-300),var(--color-gray-200))] bg-[length:200%_auto] bg-clip-text font-nacelle text-3xl font-semibold text-transparent md:text-4xl">
-              Reset your password
-            </h1>
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent" />
+
+      <div className="relative w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-gray-800">
+          <div className="flex items-center gap-3 mb-2">
+            <Image
+              src="/brand/tcredex-icon.svg"
+              alt="tCredex"
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
+            <h1 className="text-xl font-semibold text-white">Reset Password</h1>
           </div>
-          {/* Contact form */}
-          <form className="mx-auto max-w-[400px]">
-            <div>
-              <label
-                className="mb-1 block text-sm font-medium text-indigo-200/65"
-                htmlFor="email"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                className="form-input w-full"
-                placeholder="Your email"
-              />
-            </div>
-            <div className="mt-6">
-              <button className="btn w-full bg-linear-to-t from-indigo-600 to-indigo-500 bg-[length:100%_100%] bg-[bottom] text-white shadow-[inset_0px_1px_0px_0px_--theme(--color-white/.16)] hover:bg-[length:100%_150%]">
-                Reset Password
-              </button>
-            </div>
-          </form>
+          <p className="text-sm text-gray-400">
+            {step === "email" && "Enter your email to receive a reset code"}
+            {step === "code" && "Enter the code sent to your email"}
+            {step === "success" && "Your password has been reset"}
+          </p>
         </div>
+
+        {/* Body */}
+        <div className="p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
+          {step === "email" && (
+            <form onSubmit={handleSendCode} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || !email}
+                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
+              >
+                {isLoading ? "Sending..." : "Send Reset Code"}
+              </button>
+            </form>
+          )}
+
+          {step === "code" && (
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Reset Code
+                </label>
+                <input
+                  type="text"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Enter 6-digit code"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="At least 8 characters"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || !code || !newPassword}
+                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
+              >
+                {isLoading ? "Resetting..." : "Reset Password"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep("email")}
+                className="w-full py-2 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Didn't receive code? Try again
+              </button>
+            </form>
+          )}
+
+          {step === "success" && (
+            <div className="text-center py-4">
+              <div className="w-12 h-12 bg-green-900/50 border border-green-500/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-gray-300 mb-4">Your password has been reset successfully.</p>
+              <Link
+                href="/signin"
+                className="inline-block py-2.5 px-6 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-medium transition-colors"
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {step !== "success" && (
+          <div className="px-6 py-4 bg-gray-800/50 border-t border-gray-800">
+            <p className="text-sm text-center text-gray-400">
+              Remember your password?{" "}
+              <Link href="/signin" className="text-indigo-400 hover:text-indigo-300">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 }

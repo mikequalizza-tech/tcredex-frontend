@@ -58,13 +58,17 @@ export async function GET(request: NextRequest) {
     } else if (user.organizationType === 'cde') {
       // CDEs see: assigned deals + public/available deals
       // FIXED: Get CDE ID first, then filter properly
-      const { data: cdeRecord } = await supabase
+      const { data: cdeRecord, error: cdeError } = await supabase
         .from('cdes')
         .select('id')
         .eq('organization_id', user.organizationId)
         .single();
       
-      if (cdeRecord) {
+      if (cdeError) {
+        console.error('[Deals API] Error fetching CDE record:', cdeError);
+        // If CDE lookup fails, show only public deals as fallback
+        query = query.in('status', ['available', 'seeking_capital', 'matched']);
+      } else if (cdeRecord) {
         // CDE can see deals assigned to them OR public deals
         query = query.or(
           `assigned_cde_id.eq.${cdeRecord.id},status.in.(available,seeking_capital,matched)`
@@ -76,13 +80,17 @@ export async function GET(request: NextRequest) {
     } else if (user.organizationType === 'investor') {
       // Investors see: public deals + deals with their commitments
       // FIXED: Get investor ID first, then filter properly
-      const { data: investorRecord } = await supabase
+      const { data: investorRecord, error: investorError } = await supabase
         .from('investors')
         .select('id')
         .eq('organization_id', user.organizationId)
         .single();
       
-      if (investorRecord) {
+      if (investorError) {
+        console.error('[Deals API] Error fetching investor record:', investorError);
+        // If investor lookup fails, show only public deals as fallback
+        query = query.in('status', ['available', 'seeking_capital', 'matched']);
+      } else if (investorRecord) {
         // Investor can see public deals OR deals they're involved in
         query = query.or(
           `status.in.(available,seeking_capital,matched),investor_id.eq.${investorRecord.id}`

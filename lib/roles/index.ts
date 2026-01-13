@@ -20,9 +20,10 @@
  */
 
 // Core types and validation
-export type { OrgType } from './config';
+export type { OrgType, SystemOrgType, AllOrgTypes } from './config';
 export { 
-  isValidOrgType, 
+  isValidOrgType,
+  isValidAllOrgType,
   validateOrgType 
 } from './config';
 

@@ -46,6 +46,7 @@
     "react-dom": "19.0.0",
     "react-map-gl": "^8.1.0",
     "rehype-pretty-code": "^0.13.2",
+    "shiki": "^1.29.2",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "stripe": "^20.1.0",

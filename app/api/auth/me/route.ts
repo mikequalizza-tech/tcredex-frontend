@@ -165,7 +165,13 @@ export async function GET(request: NextRequest) {
     if (!validOrgTypes.includes(typedRecord.organization.type)) {
       console.error(`[Auth] Invalid organization type: ${typedRecord.organization.type} for user ${userId}`);
       return NextResponse.json(
-        { error: 'Invalid organization configuration. Please contact support.' },
+        {
+          error: 'Invalid organization configuration. Please contact support.',
+          details: {
+            invalidOrganizationType: typedRecord.organization.type,
+            organizationId: typedRecord.organization.id,
+          },
+        },
         { status: 500 }
       );
     }

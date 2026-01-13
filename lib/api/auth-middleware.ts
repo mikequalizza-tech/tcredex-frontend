@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { isValidAllOrgType } from '@/lib/roles';
 
 export class AuthError extends Error {
   constructor(
@@ -96,9 +97,6 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
     const typedOrg = org as { id: string; type: string };
 
     // Validate organization type is valid (including admin)
-    // Import isValidAllOrgType from lib/roles to validate against all types including admin
-    const { isValidAllOrgType } = await import('@/lib/roles');
-    
     if (!isValidAllOrgType(typedOrg.type)) {
       console.error(`[Auth] Invalid organization type: ${typedOrg.type} for user ${userId}`);
       throw new AuthError('INVALID_ORG_TYPE', 'Organization has invalid type', 403);

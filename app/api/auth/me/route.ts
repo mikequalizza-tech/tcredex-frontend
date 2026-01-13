@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { isValidAllOrgType } from '@/lib/roles';
 
 /**
  * GET /api/auth/me
@@ -161,7 +162,6 @@ export async function GET(request: NextRequest) {
     };
 
     // Validate organization type (including admin)
-    const { isValidAllOrgType } = await import('@/lib/roles');
     if (!isValidAllOrgType(typedRecord.organization.type)) {
       console.error(`[Auth] Invalid organization type: ${typedRecord.organization.type} for user ${userId}`);
       return NextResponse.json(

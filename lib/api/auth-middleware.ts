@@ -96,14 +96,16 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
     const typedOrg = org as { id: string; type: string };
 
     // Validate organization type is valid
-    const validOrgTypes = ['sponsor', 'cde', 'investor', 'admin'];
-    if (!validOrgTypes.includes(typedOrg.type)) {
+    const validOrgTypes = ['sponsor', 'cde', 'investor', 'admin'] as const;
+    if (!validOrgTypes.includes(typedOrg.type as any)) {
+      console.error(`[Auth] Invalid organization type: ${typedOrg.type} for user ${userId}`);
       throw new AuthError('INVALID_ORG_TYPE', 'Organization has invalid type', 403);
     }
 
     // Validate user role is valid
-    const validUserRoles = ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'];
-    if (!validUserRoles.includes(typedUserRecord.role)) {
+    const validUserRoles = ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'] as const;
+    if (!validUserRoles.includes(typedUserRecord.role as any)) {
+      console.error(`[Auth] Invalid user role: ${typedUserRecord.role} for user ${userId}`);
       throw new AuthError('INVALID_USER_ROLE', 'User has invalid role', 403);
     }
 

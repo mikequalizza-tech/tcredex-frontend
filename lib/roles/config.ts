@@ -11,6 +11,25 @@
 
 export type OrgType = 'sponsor' | 'cde' | 'investor';
 
+/**
+ * Type guard to validate organization type at runtime
+ * Use this to safely validate org types from database or API
+ */
+export function isValidOrgType(type: unknown): type is OrgType {
+  return type === 'sponsor' || type === 'cde' || type === 'investor';
+}
+
+/**
+ * Safely cast organization type with validation
+ * Throws error if type is invalid
+ */
+export function validateOrgType(type: unknown): OrgType {
+  if (!isValidOrgType(type)) {
+    throw new Error(`Invalid organization type: ${type}. Must be sponsor, cde, or investor.`);
+  }
+  return type;
+}
+
 // Pipeline stage definitions per role
 export interface PipelineStage {
   id: string;

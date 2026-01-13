@@ -19,6 +19,13 @@
  * ```
  */
 
+// Core types and validation
+export type { OrgType } from './config';
+export { 
+  isValidOrgType, 
+  validateOrgType 
+} from './config';
+
 // Configuration exports
 export {
   PIPELINE_STAGES,
@@ -34,8 +41,6 @@ export {
   getDealVisibility,
   canAccessPage,
 } from './config';
-
-export type { OrgType } from './config';
 
 export type {
   PipelineStage,

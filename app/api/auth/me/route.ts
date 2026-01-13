@@ -121,7 +121,8 @@ export async function GET(request: NextRequest) {
 
     if (!userRecord) {
       // User authenticated with Clerk but not in our database
-      // Return partial info so frontend can redirect to registration
+      // Return partial info so frontend can redirect to registration/onboarding
+      console.warn(`[Auth] User ${userId} authenticated with Clerk but not found in database`);
       return NextResponse.json({
         user: null,
         clerkUser: {
@@ -131,6 +132,7 @@ export async function GET(request: NextRequest) {
           avatar: clerkUser.imageUrl,
         },
         needsRegistration: true,
+        message: 'Please complete your registration to access the platform'
       });
     }
 
@@ -157,6 +159,26 @@ export async function GET(request: NextRequest) {
         verified: boolean;
       };
     };
+
+    // Validate organization type
+    const validOrgTypes = ['sponsor', 'cde', 'investor', 'admin'];
+    if (!validOrgTypes.includes(typedRecord.organization.type)) {
+      console.error(`[Auth] Invalid organization type: ${typedRecord.organization.type} for user ${userId}`);
+      return NextResponse.json(
+        { error: 'Invalid organization configuration. Please contact support.' },
+        { status: 500 }
+      );
+    }
+
+    // Validate user role
+    const validUserRoles = ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'];
+    if (!validUserRoles.includes(typedRecord.role)) {
+      console.error(`[Auth] Invalid user role: ${typedRecord.role} for user ${userId}`);
+      return NextResponse.json(
+        { error: 'Invalid user role. Please contact support.' },
+        { status: 500 }
+      );
+    }
 
     // Update last login
     await supabase

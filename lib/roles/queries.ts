@@ -9,7 +9,7 @@
  */
 
 import { getSupabase } from '../supabase';
-import { OrgType } from './config';
+import { OrgType, isValidOrgType } from './config';
 import { Deal, ProgramType, ProgramLevel, DealStatus, TractType } from '@/lib/data/deals';
 import { CDEDealCard } from '@/lib/types/cde';
 import { logger } from '@/lib/utils/logger';
@@ -46,6 +46,12 @@ export async function fetchMarketplaceForRole(
   orgId?: string
 ): Promise<MarketplaceResult> {
   try {
+    // Validate orgType if provided
+    if (orgType && !isValidOrgType(orgType)) {
+      logger.error('Invalid organization type provided', { orgType });
+      return { deals: [], cdes: [], investors: [] };
+    }
+
     switch (orgType) {
       case 'sponsor':
         return await fetchMarketplaceForSponsorViaAPI(orgId);

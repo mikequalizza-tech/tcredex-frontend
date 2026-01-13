@@ -56,15 +56,49 @@ export async function GET(request: NextRequest) {
       // Sponsors see only their own deals
       query = query.eq('sponsor_organization_id', user.organizationId);
     } else if (user.organizationType === 'cde') {
-      // CDEs see: assigned deals + public deals
-      query = query.or(
-        `assigned_cde_id.in.(${user.organizationId}),status.in.(available,seeking_capital,matched)`
-      );
+      // CDEs see: assigned deals + public/available deals
+      // FIXED: Get CDE ID first, then filter properly
+      const { data: cdeRecord, error: cdeError } = await supabase
+        .from('cdes')
+        .select('id')
+        .eq('organization_id', user.organizationId)
+        .single();
+      
+      if (cdeError) {
+        console.error('[Deals API] Error fetching CDE record:', cdeError);
+        // If CDE lookup fails, show only public deals as fallback
+        query = query.in('status', ['available', 'seeking_capital', 'matched']);
+      } else if (cdeRecord) {
+        // CDE can see deals assigned to them OR public deals
+        query = query.or(
+          `assigned_cde_id.eq.${cdeRecord.id},status.in.(available,seeking_capital,matched)`
+        );
+      } else {
+        // CDE has no profile yet, show only public deals
+        query = query.in('status', ['available', 'seeking_capital', 'matched']);
+      }
     } else if (user.organizationType === 'investor') {
       // Investors see: public deals + deals with their commitments
-      query = query.or(
-        `status.in.(available,seeking_capital,matched),investor_id.eq.${user.organizationId}`
-      );
+      // FIXED: Get investor ID first, then filter properly
+      const { data: investorRecord, error: investorError } = await supabase
+        .from('investors')
+        .select('id')
+        .eq('organization_id', user.organizationId)
+        .single();
+      
+      if (investorError) {
+        console.error('[Deals API] Error fetching investor record:', investorError);
+        // If investor lookup fails, show only public deals as fallback
+        query = query.in('status', ['available', 'seeking_capital', 'matched']);
+      } else if (investorRecord) {
+        // Investor can see public deals OR deals they're involved in
+        query = query.or(
+          `status.in.(available,seeking_capital,matched),investor_id.eq.${investorRecord.id}`
+        );
+      } else {
+        // Investor has no profile yet, show only public deals
+        query = query.in('status', ['available', 'seeking_capital', 'matched']);
+      }
     }
     // Admin sees all deals (no filter)
 

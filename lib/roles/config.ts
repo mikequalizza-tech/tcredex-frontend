@@ -11,6 +11,42 @@
 
 export type OrgType = 'sponsor' | 'cde' | 'investor';
 
+/**
+ * System admin type - separate from regular organization types
+ */
+export type SystemOrgType = 'admin';
+
+/**
+ * All possible organization types including admin
+ */
+export type AllOrgTypes = OrgType | SystemOrgType;
+
+/**
+ * Type guard to validate organization type at runtime
+ * Use this to safely validate org types from database or API
+ */
+export function isValidOrgType(type: unknown): type is OrgType {
+  return type === 'sponsor' || type === 'cde' || type === 'investor';
+}
+
+/**
+ * Type guard for all organization types including admin
+ */
+export function isValidAllOrgType(type: unknown): type is AllOrgTypes {
+  return isValidOrgType(type) || type === 'admin';
+}
+
+/**
+ * Safely cast organization type with validation
+ * Throws error if type is invalid
+ */
+export function validateOrgType(type: unknown): OrgType {
+  if (!isValidOrgType(type)) {
+    throw new Error(`Invalid organization type: ${type}. Must be sponsor, cde, or investor.`);
+  }
+  return type;
+}
+
 // Pipeline stage definitions per role
 export interface PipelineStage {
   id: string;

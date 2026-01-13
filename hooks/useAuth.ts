@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import type { User } from "@/lib/auth/types";
 
 // CRITICAL: Use the correct auth endpoint
 const SESSION_API = "/api/auth/me"; 
 
 export function useAuth() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

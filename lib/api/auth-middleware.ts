@@ -95,11 +95,11 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
 
     const typedOrg = org as { id: string; type: string };
 
-    // Validate organization type is valid
-    const validOrgTypes = ['sponsor', 'cde', 'investor', 'admin'] as const;
-    type ValidOrgType = typeof validOrgTypes[number];
+    // Validate organization type is valid (including admin)
+    // Import isValidAllOrgType from lib/roles to validate against all types including admin
+    const { isValidAllOrgType } = await import('@/lib/roles');
     
-    if (!validOrgTypes.includes(typedOrg.type as ValidOrgType)) {
+    if (!isValidAllOrgType(typedOrg.type)) {
       console.error(`[Auth] Invalid organization type: ${typedOrg.type} for user ${userId}`);
       throw new AuthError('INVALID_ORG_TYPE', 'Organization has invalid type', 403);
     }

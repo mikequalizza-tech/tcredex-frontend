@@ -160,12 +160,18 @@ export async function GET(request: NextRequest) {
       };
     };
 
-    // Validate organization type
-    const validOrgTypes = ['sponsor', 'cde', 'investor', 'admin'];
-    if (!validOrgTypes.includes(typedRecord.organization.type)) {
+    // Validate organization type (including admin)
+    const { isValidAllOrgType } = await import('@/lib/roles');
+    if (!isValidAllOrgType(typedRecord.organization.type)) {
       console.error(`[Auth] Invalid organization type: ${typedRecord.organization.type} for user ${userId}`);
       return NextResponse.json(
-        { error: 'Invalid organization configuration. Please contact support.' },
+        { 
+          error: 'Invalid organization configuration. Please contact support.',
+          details: {
+            invalidOrganizationType: typedRecord.organization.type,
+            organizationId: typedRecord.organization.id,
+          }
+        },
         { status: 500 }
       );
     }
@@ -175,7 +181,10 @@ export async function GET(request: NextRequest) {
     if (!validUserRoles.includes(typedRecord.role)) {
       console.error(`[Auth] Invalid user role: ${typedRecord.role} for user ${userId}`);
       return NextResponse.json(
-        { error: 'Invalid user role. Please contact support.' },
+        { 
+          error: 'Invalid user role. Please contact support.', 
+          invalidRole: typedRecord.role 
+        },
         { status: 500 }
       );
     }

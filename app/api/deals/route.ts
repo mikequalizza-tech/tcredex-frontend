@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
     } else if (user.organizationType === 'cde') {
       // CDEs see: assigned deals + public/available deals
       // FIXED: Get CDE ID first, then filter properly
+      // NOTE: This creates an additional query. For optimization, consider:
+      // - Adding CDE/investor entity ID to user session data during authentication
+      // - Using a JOIN query to fetch both organization and entity data in a single query
       const { data: cdeRecord, error: cdeError } = await supabase
         .from('cdes')
         .select('id')
@@ -68,11 +71,19 @@ export async function GET(request: NextRequest) {
         console.error('[Deals API] Error fetching CDE record:', cdeError);
         // If CDE lookup fails, show only public deals as fallback
         query = query.in('status', ['available', 'seeking_capital', 'matched']);
-      } else if (cdeRecord) {
-        // CDE can see deals assigned to them OR public deals
-        query = query.or(
-          `assigned_cde_id.eq.${cdeRecord.id},status.in.(available,seeking_capital,matched)`
-        );
+      } else if (cdeRecord?.id && typeof cdeRecord.id === 'string') {
+        // Validate ID format (UUID) before using in query to prevent SQL injection
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(cdeRecord.id)) {
+          // CDE can see deals assigned to them OR public deals
+          query = query.or(
+            `assigned_cde_id.eq.${cdeRecord.id},status.in.(available,seeking_capital,matched)`
+          );
+        } else {
+          console.error('[Deals API] Invalid CDE ID format:', cdeRecord.id);
+          // Invalid ID format, show only public deals
+          query = query.in('status', ['available', 'seeking_capital', 'matched']);
+        }
       } else {
         // CDE has no profile yet, show only public deals
         query = query.in('status', ['available', 'seeking_capital', 'matched']);
@@ -80,6 +91,9 @@ export async function GET(request: NextRequest) {
     } else if (user.organizationType === 'investor') {
       // Investors see: public deals + deals with their commitments
       // FIXED: Get investor ID first, then filter properly
+      // NOTE: This creates an additional query. For optimization, consider:
+      // - Adding CDE/investor entity ID to user session data during authentication
+      // - Using a JOIN query to fetch both organization and entity data in a single query
       const { data: investorRecord, error: investorError } = await supabase
         .from('investors')
         .select('id')
@@ -90,11 +104,19 @@ export async function GET(request: NextRequest) {
         console.error('[Deals API] Error fetching investor record:', investorError);
         // If investor lookup fails, show only public deals as fallback
         query = query.in('status', ['available', 'seeking_capital', 'matched']);
-      } else if (investorRecord) {
-        // Investor can see public deals OR deals they're involved in
-        query = query.or(
-          `status.in.(available,seeking_capital,matched),investor_id.eq.${investorRecord.id}`
-        );
+      } else if (investorRecord?.id && typeof investorRecord.id === 'string') {
+        // Validate ID format (UUID) before using in query to prevent SQL injection
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(investorRecord.id)) {
+          // Investor can see public deals OR deals they're involved in
+          query = query.or(
+            `status.in.(available,seeking_capital,matched),investor_id.eq.${investorRecord.id}`
+          );
+        } else {
+          console.error('[Deals API] Invalid investor ID format:', investorRecord.id);
+          // Invalid ID format, show only public deals
+          query = query.in('status', ['available', 'seeking_capital', 'matched']);
+        }
       } else {
         // Investor has no profile yet, show only public deals
         query = query.in('status', ['available', 'seeking_capital', 'matched']);

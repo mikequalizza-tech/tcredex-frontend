@@ -89,7 +89,8 @@ describe('Role Validation Functions', () => {
     it('should have the correct error message format', () => {
       try {
         validateOrgType('test');
-        fail('Should have thrown an error');
+        // If we get here, the test failed
+        throw new Error('validateOrgType should have thrown an error');
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toContain('Invalid organization type');

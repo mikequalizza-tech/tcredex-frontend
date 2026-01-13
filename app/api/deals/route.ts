@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { requireAuth, handleAuthError, verifyDealAccess } from '@/lib/api/auth-middleware';
 
+// UUID validation regex for preventing SQL injection
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // =============================================================================
 // GET /api/deals - List deals with filters or fetch single deal by id
 // =============================================================================
@@ -73,8 +76,7 @@ export async function GET(request: NextRequest) {
         query = query.in('status', ['available', 'seeking_capital', 'matched']);
       } else if (cdeRecord?.id && typeof cdeRecord.id === 'string') {
         // Validate ID format (UUID) before using in query to prevent SQL injection
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (uuidRegex.test(cdeRecord.id)) {
+        if (UUID_REGEX.test(cdeRecord.id)) {
           // CDE can see deals assigned to them OR public deals
           query = query.or(
             `assigned_cde_id.eq.${cdeRecord.id},status.in.(available,seeking_capital,matched)`
@@ -106,8 +108,7 @@ export async function GET(request: NextRequest) {
         query = query.in('status', ['available', 'seeking_capital', 'matched']);
       } else if (investorRecord?.id && typeof investorRecord.id === 'string') {
         // Validate ID format (UUID) before using in query to prevent SQL injection
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (uuidRegex.test(investorRecord.id)) {
+        if (UUID_REGEX.test(investorRecord.id)) {
           // Investor can see public deals OR deals they're involved in
           query = query.or(
             `status.in.(available,seeking_capital,matched),investor_id.eq.${investorRecord.id}`

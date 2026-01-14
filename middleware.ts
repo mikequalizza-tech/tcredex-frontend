@@ -82,6 +82,7 @@ export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
   // Let API calls pass through directly to the backend proxy while still protecting private endpoints
+  // isPublicRoute (defined above) covers marketing pages, auth flows, and explicitly public API endpoints.
   if (pathname.startsWith('/api')) {
     if (!isPublicRoute(request)) {
       const { userId } = await auth();

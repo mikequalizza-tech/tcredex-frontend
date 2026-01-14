@@ -110,18 +110,38 @@ const nextConfig = {
       'http://localhost:3001';
 
     const backendUrl = backendBase.replace(/\/$/, '');
+    let backendOrigin = null;
+    try {
+      backendOrigin = new URL(backendUrl);
+    } catch (error) {
+      // Invalid backend URL - skip rewriting to avoid runtime errors
+      return [];
+    }
+
     const frontendUrl =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
       (process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`.replace(/\/$/, '')
         : undefined);
-    const localPort = process.env.PORT || '3000';
-    const localHosts = [
-      `http://localhost:${localPort}`,
-      `https://localhost:${localPort}`,
-    ];
+    const frontendOriginFromEnv = process.env.FRONTEND_ORIGIN?.replace(/\/$/, '');
+    let frontendHost = process.env.HOST || 'localhost';
+    let frontendPort = process.env.PORT || '3000';
+
+    if (frontendOriginFromEnv) {
+      try {
+        const parsed = new URL(frontendOriginFromEnv);
+        frontendHost = parsed.hostname;
+        frontendPort = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+      } catch {
+        // ignore malformed FRONTEND_ORIGIN and fall back to HOST/PORT
+      }
+    }
+
+    const backendPort =
+      backendOrigin.port || (backendOrigin.protocol === 'https:' ? '443' : '80');
     const isSelfTarget =
-      localHosts.includes(backendUrl) || (frontendUrl && backendUrl === frontendUrl);
+      (backendOrigin.hostname === frontendHost && backendPort === frontendPort) ||
+      (frontendUrl && backendUrl === frontendUrl);
 
     // Avoid self-proxying to prevent redirect loops when backend points to frontend host
     if (isSelfTarget) {

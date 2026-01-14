@@ -110,10 +110,12 @@ const nextConfig = {
       'http://localhost:3001';
 
     const backendUrl = backendBase.replace(/\/$/, '');
-    const normalizePort = (origin) =>
-      origin.port && origin.port !== ''
-        ? origin.port
-        : origin.protocol === 'https:' ? '443' : '80';
+    const normalizePort = (value) => {
+      const url = value instanceof URL ? value : new URL(value);
+      return url.port && url.port !== ''
+        ? url.port
+        : url.protocol === 'https:' ? '443' : '80';
+    };
     let backendOrigin = null;
     try {
       backendOrigin = new URL(backendUrl);

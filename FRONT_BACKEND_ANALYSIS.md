@@ -11,7 +11,7 @@
 3) Frontend requests to `/api/*` will be proxied to `<backend>/api/*`; non-public API routes still require Clerk auth before forwarding, and the backend must enforce its own auth/ACLs.
 
 ## Operational checklist
-- Verify backend health: `curl $BACKEND_SERVICE_URL/api/health`.
+- Verify backend health: `curl "${BACKEND_SERVICE_URL}/api/health"`.
 - Smoke critical engines through the proxy:
   - Automatch: `POST /api/automatch` with a `dealId`.
   - Scoring: `POST /api/scoring`.

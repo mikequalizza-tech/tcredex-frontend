@@ -101,6 +101,23 @@ const nextConfig = {
       },
     ];
   },
+
+  // Proxy API traffic to consolidated backend services
+  async rewrites() {
+    const backendBase =
+      process.env.BACKEND_SERVICE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:3001';
+
+    const backendUrl = backendBase.replace(/\/$/, '');
+
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
+      },
+    ];
+  },
 };
 
 module.exports = withBundleAnalyzer(nextConfig);

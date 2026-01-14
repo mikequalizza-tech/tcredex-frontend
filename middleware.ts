@@ -81,6 +81,11 @@ const requiresOnboarding = createRouteMatcher([
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
+  // Let API calls pass through directly to the backend proxy without auth overhead
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+
   // Handle QR/Referral redirects
   if (pathname.startsWith('/r/')) {
     const code = pathname.replace('/r/', '').split('/')[0];

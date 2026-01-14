@@ -36,6 +36,9 @@ yarn-error.log*
 Thumbs.db
 nul
 
+# Claude temp files
+tmpclaude-*
+
 # TypeScript
 *.tsbuildinfo
 .env*.local

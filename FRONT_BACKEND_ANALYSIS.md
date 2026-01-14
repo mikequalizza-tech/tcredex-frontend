@@ -8,7 +8,7 @@
 ## How to run locally
 1) Start the backend on the port in `BACKEND_SERVICE_URL` (default `http://localhost:3001`).
 2) Start the frontend with `npm run dev`.
-3) Frontend requests to `/api/*` will be proxied to `<backend>/api/*` with no additional auth from the middleware (backend must enforce auth/ACLs).
+3) Frontend requests to `/api/*` will be proxied to `<backend>/api/*`; non-public API routes still require Clerk auth before forwarding, and the backend must enforce its own auth/ACLs.
 
 ## Operational checklist
 - Verify backend health: `curl $BACKEND_SERVICE_URL/api/health`.

@@ -110,6 +110,10 @@ const nextConfig = {
       'http://localhost:3001';
 
     const backendUrl = backendBase.replace(/\/$/, '');
+    const normalizePort = (origin) =>
+      origin.port && origin.port !== ''
+        ? origin.port
+        : origin.protocol === 'https:' ? '443' : '80';
     let backendOrigin = null;
     try {
       backendOrigin = new URL(backendUrl);
@@ -131,16 +135,15 @@ const nextConfig = {
       try {
         const parsed = new URL(frontendOriginFromEnv);
         frontendHost = parsed.hostname;
-        frontendPort = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+        frontendPort = normalizePort(parsed);
       } catch {
         // ignore malformed FRONTEND_ORIGIN and fall back to HOST/PORT
       }
     }
 
-    const backendPort =
-      backendOrigin.port || (backendOrigin.protocol === 'https:' ? '443' : '80');
+    const backendPort = normalizePort(backendOrigin);
     const isSelfTarget =
-      (backendOrigin.hostname === frontendHost && backendPort === frontendPort) ||
+      (backendOrigin.hostname === frontendHost && backendPort === String(frontendPort)) ||
       (frontendUrl && backendUrl === frontendUrl);
 
     // Avoid self-proxying to prevent redirect loops when backend points to frontend host

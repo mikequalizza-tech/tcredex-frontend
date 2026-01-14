@@ -110,6 +110,16 @@ const nextConfig = {
       'http://localhost:3001';
 
     const backendUrl = backendBase.replace(/\/$/, '');
+    const frontendUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
+    const isSelfTarget =
+      backendUrl === 'http://localhost:3000' ||
+      backendUrl === 'https://localhost:3000' ||
+      (frontendUrl && backendUrl === frontendUrl);
+
+    // Avoid self-proxying to prevent redirect loops when backend points to frontend host
+    if (isSelfTarget) {
+      return [];
+    }
 
     return [
       {

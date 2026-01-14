@@ -81,8 +81,12 @@ const requiresOnboarding = createRouteMatcher([
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
-  // Let API calls pass through directly to the backend proxy without auth overhead
+  // Let API calls pass through directly to the backend proxy while still protecting private endpoints
   if (pathname.startsWith('/api')) {
+    if (!isPublicRoute(request)) {
+      await auth.protect();
+    }
+
     return NextResponse.next();
   }
 

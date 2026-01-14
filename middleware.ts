@@ -84,7 +84,11 @@ export default clerkMiddleware(async (auth, request) => {
   // Let API calls pass through directly to the backend proxy while still protecting private endpoints
   if (pathname.startsWith('/api')) {
     if (!isPublicRoute(request)) {
-      await auth.protect();
+      const { userId } = await auth();
+
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     return NextResponse.next();

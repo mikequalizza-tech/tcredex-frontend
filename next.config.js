@@ -111,13 +111,7 @@ const nextConfig = {
 
     const backendUrl = backendBase.replace(/\/$/, '');
     const normalizePort = (value) => {
-      if (value && typeof value === 'object' && 'port' in value && 'protocol' in value) {
-        return value.port && value.port !== ''
-          ? value.port
-          : value.protocol === 'https:' ? '443' : '80';
-      }
-
-      const parsed = new URL(value);
+      const parsed = typeof value === 'string' ? new URL(value) : value;
       return parsed.port && parsed.port !== ''
         ? parsed.port
         : parsed.protocol === 'https:' ? '443' : '80';

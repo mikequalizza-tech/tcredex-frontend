@@ -62,15 +62,13 @@ SMTP_HOST=smtp.resend.com
 SMTP_PORT=587
 SMTP_USER=resend
 SMTP_PASS=your-resend-api-key
-
-# Demo Account Passwords (development only - use secure values in production)
-DEMO_PASSWORD=your-demo-password
-DEMO_ADMIN_PASSWORD=your-admin-password
-DEMO_CDE_EMAIL=demo-cde@your-domain.com
-DEMO_SPONSOR_EMAIL=demo-sponsor@your-domain.com
-DEMO_INVESTOR_EMAIL=demo-investor@your-domain.com
-DEMO_ADMIN_EMAIL=demo-admin@your-domain.com
 ```
+
+### Development-Only Variables
+
+For development and testing environments, you may need additional demo account configurations. These should be stored in a separate `.env.local` file and never committed to version control or used in production.
+
+```bash
 
 ## Vercel Configuration
 

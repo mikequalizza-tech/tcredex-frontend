@@ -124,24 +124,13 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 
-  // Protect non-public routes
+  // Protect non-public routes - require authentication
   if (!isPublicRoute(request)) {
     await auth.protect();
   }
 
-  // Check if authenticated user needs onboarding
-  const { userId } = await auth();
-  if (userId && requiresOnboarding(request)) {
-    // Check onboarding status via cookie (set after onboarding complete)
-    const onboardingComplete = request.cookies.get('tcredex_onboarded')?.value;
-
-    if (!onboardingComplete) {
-      // Redirect to onboarding - page-level will handle the check
-      // Avoid middleware fetch to prevent edge runtime issues
-      const onboardingUrl = new URL('/onboarding', request.url);
-      return NextResponse.redirect(onboardingUrl);
-    }
-  }
+  // NOTE: Onboarding check removed from middleware - handled at page level
+  // The useCurrentUser hook sets needsRegistration flag for pages to handle
 });
 
 export const config = {

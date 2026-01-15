@@ -2,18 +2,32 @@
  * tCredex API - Login
  * POST /api/auth/login
  *
- * CRITICAL FLOW:
- * 1. Authenticate with Supabase Auth
- * 2. Fetch user record from users table (source of truth)
- * 3. Validate organization exists
- * 4. Return user data with organization and role
- * 5. Set secure session cookie
+ * SIMPLIFIED: Uses users_simplified table directly
+ * No organizations FK chain - organization_id + organization_type tells you which entity table
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24;
+
+// User record type for users_simplified
+type UserRecord = {
+  id: string;
+  clerk_id: string | null;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  phone: string | null;
+  title: string | null;
+  organization_id: string | null;
+  organization_type: string | null;
+  role: string;
+  is_active: boolean;
+  email_verified: boolean;
+  last_login_at: string | null;
+  created_at: string;
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,32 +55,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Fetch user record from users table (source of truth)
+    // Step 2: Fetch user record from users_simplified (no FK joins)
     const { data: userRecord, error: userError } = await supabase
-      .from('users')
-      .select(`
-        id,
-        email,
-        name,
-        role,
-        organization_id,
-        avatar_url,
-        title,
-        phone,
-        is_active,
-        email_verified,
-        last_login_at,
-        created_at,
-        organization:organizations(
-          id,
-          name,
-          slug,
-          type,
-          logo_url,
-          website,
-          verified
-        )
-      `)
+      .from('users_simplified')
+      .select('*')
       .eq('id', authData.user.id)
       .single();
 
@@ -78,29 +70,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const typedRecord = userRecord as {
-      id: string;
-      email: string;
-      name: string;
-      role: string;
-      organization_id: string;
-      avatar_url?: string;
-      title?: string;
-      phone?: string;
-      is_active: boolean;
-      email_verified: boolean;
-      last_login_at?: string;
-      created_at: string;
-      organization: {
-        id: string;
-        name: string;
-        slug: string;
-        type: string;
-        logo_url?: string;
-        website?: string;
-        verified: boolean;
-      };
-    };
+    const typedRecord = userRecord as UserRecord;
 
     // Step 3: Validate user is active
     if (!typedRecord.is_active) {
@@ -110,13 +80,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 4: Validate organization exists
-    if (!typedRecord.organization) {
-      console.error('[Login] Organization not found for user:', typedRecord.id);
-      return NextResponse.json(
-        { error: 'User organization not found' },
-        { status: 403 }
-      );
+    // Step 4: Get organization details from the appropriate table
+    let organization = null;
+    if (typedRecord.organization_id && typedRecord.organization_type) {
+      const tableName = typedRecord.organization_type === 'sponsor' ? 'sponsors_simplified'
+        : typedRecord.organization_type === 'investor' ? 'investors_simplified'
+        : 'cdes_merged';
+
+      const { data: org } = await supabase
+        .from(tableName)
+        .select('name, slug, website, logo_url, verified, status')
+        .eq('organization_id', typedRecord.organization_id)
+        .single();
+
+      if (org) {
+        organization = {
+          id: typedRecord.organization_id,
+          name: org.name,
+          slug: org.slug,
+          type: typedRecord.organization_type,
+          logo: org.logo_url,
+          website: org.website,
+          verified: org.verified || false,
+        };
+      }
     }
 
     // Step 5: Return user data
@@ -128,15 +115,8 @@ export async function POST(request: NextRequest) {
         name: typedRecord.name,
         role: typedRecord.role,
         organizationId: typedRecord.organization_id,
-        organization: {
-          id: typedRecord.organization.id,
-          name: typedRecord.organization.name,
-          slug: typedRecord.organization.slug,
-          type: typedRecord.organization.type,
-          logo: typedRecord.organization.logo_url,
-          website: typedRecord.organization.website,
-          verified: typedRecord.organization.verified,
-        },
+        organizationType: typedRecord.organization_type,
+        organization,
         avatar: typedRecord.avatar_url,
         title: typedRecord.title,
         phone: typedRecord.phone,
@@ -172,6 +152,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Update last login
+    await supabase
+      .from('users_simplified')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', typedRecord.id);
+
     // Log to ledger
     try {
       await supabase.from('ledger_events').insert({
@@ -181,7 +167,6 @@ export async function POST(request: NextRequest) {
         entity_id: typedRecord.id,
         action: 'login',
         payload_json: { email: typedRecord.email },
-        hash: generateHash({ email: typedRecord.email, timestamp: Date.now() }),
       } as never);
     } catch (err) {
       console.error('[Login] Ledger error:', err);
@@ -195,15 +180,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function generateHash(data: Record<string, unknown>): string {
-  const str = JSON.stringify(data) + Date.now();
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(16, '0');
 }

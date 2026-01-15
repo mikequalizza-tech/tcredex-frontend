@@ -1,7 +1,7 @@
 /**
  * Team Members API
  * Manage team members within an organization
- * CRITICAL: Requires org admin role
+ * SIMPLIFIED: Uses users_simplified table
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -13,31 +13,19 @@ import { requireAuth, requireOrgAdmin, handleAuthError } from '@/lib/api/auth-mi
 // =============================================================================
 export async function GET(request: NextRequest) {
   try {
-    // CRITICAL: Require authentication
     const user = await requireAuth(request);
     const supabase = getSupabaseAdmin();
 
-    // List team members in user's organization
     const { data, error } = await supabase
-      .from('users')
-      .select(`
-        id,
-        email,
-        name,
-        role,
-        title,
-        avatar_url,
-        is_active,
-        last_login_at,
-        created_at
-      `)
+      .from('users_simplified')
+      .select('id, email, name, role, title, avatar_url, is_active, last_login_at, created_at')
       .eq('organization_id', user.organizationId)
       .eq('is_active', true)
       .order('name');
 
     if (error) throw error;
 
-    return NextResponse.json({ members: data });
+    return NextResponse.json({ members: data || [] });
   } catch (error) {
     return handleAuthError(error);
   }
@@ -48,7 +36,6 @@ export async function GET(request: NextRequest) {
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
-    // CRITICAL: Require org admin
     const user = await requireOrgAdmin(request);
     const supabase = getSupabaseAdmin();
 
@@ -56,24 +43,17 @@ export async function POST(request: NextRequest) {
     const { email, role, name } = body;
 
     if (!email) {
-      return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
-    // Validate role
     const validRoles = ['ORG_ADMIN', 'PROJECT_ADMIN', 'MEMBER', 'VIEWER'];
     if (role && !validRoles.includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
     // Check if user already exists in this org
     const { data: existing } = await supabase
-      .from('users')
+      .from('users_simplified')
       .select('id')
       .eq('email', email.toLowerCase())
       .eq('organization_id', user.organizationId)
@@ -86,15 +66,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create user record (they'll need to sign up separately)
+    // Create user record
     const { data, error } = await supabase
-      .from('users')
+      .from('users_simplified')
       .insert({
         email: email.toLowerCase(),
         name: name || email.split('@')[0],
         role: role || 'MEMBER',
         organization_id: user.organizationId,
+        organization_type: user.organizationType,
         is_active: true,
+        email_verified: false,
       } as never)
       .select()
       .single();
@@ -102,17 +84,18 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
 
     // Log to ledger
-    await supabase.from('ledger_events').insert({
-      actor_type: 'human',
-      actor_id: user.id,
-      entity_type: 'user',
-      entity_id: (data as { id: string }).id,
-      action: 'team_member_invited',
-      payload_json: { email, role },
-      hash: generateHash(data as Record<string, unknown>),
-    } as never);
-
-    // TODO: Send invite email via Resend when email service is ready
+    try {
+      await supabase.from('ledger_events').insert({
+        actor_type: 'human',
+        actor_id: user.id,
+        entity_type: 'user',
+        entity_id: (data as { id: string }).id,
+        action: 'team_member_invited',
+        payload_json: { email, role },
+      } as never);
+    } catch (e) {
+      // Ledger logging is optional
+    }
 
     return NextResponse.json({
       success: true,
@@ -122,15 +105,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return handleAuthError(error);
   }
-}
-
-function generateHash(data: Record<string, unknown>): string {
-  const str = JSON.stringify(data) + Date.now();
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(16, '0');
 }

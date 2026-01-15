@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Building2, Briefcase, TrendingUp, ArrowRight, Check } from "lucide-react";
@@ -33,12 +33,63 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
 
-  const [step, setStep] = useState<"role" | "complete">("role");
+  const [step, setStep] = useState<"role" | "complete" | "checking">("checking");
   const [selectedType, setSelectedType] = useState<OrgType | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  if (!isLoaded) {
+  // Check if user is already onboarded on mount
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    const checkOnboardingStatus = async () => {
+      try {
+        const response = await fetch("/api/onboarding");
+        const data = await response.json();
+
+        if (!data.needsOnboarding && data.user) {
+          // User already onboarded - set cookie via a POST call and redirect
+          // This handles the case where cookie was lost but user exists
+          const orgType = data.user.role?.toLowerCase()?.includes('cde') ? 'cde'
+            : data.user.role?.toLowerCase()?.includes('investor') ? 'investor'
+            : 'sponsor';
+
+          // Call POST to set the cookie
+          await fetch("/api/onboarding", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              organizationType: orgType,
+              organizationName: "Existing", // Won't be used for existing users
+            }),
+          });
+
+          // Redirect based on role
+          setStep("complete");
+          setTimeout(() => {
+            if (orgType === "cde") {
+              router.push("/dashboard/pipeline");
+            } else if (orgType === "investor") {
+              router.push("/deals");
+            } else {
+              router.push("/dashboard");
+            }
+          }, 500);
+        } else {
+          // User needs onboarding
+          setStep("role");
+        }
+      } catch (err) {
+        console.error("[Onboarding] Status check error:", err);
+        setStep("role"); // Default to showing role selection
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [isLoaded, user, router]);
+
+  // Show loading while Clerk loads or while checking onboarding status
+  if (!isLoaded || step === "checking") {
     return (
       <div className="min-h-screen bg-black/60 backdrop-blur-sm flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -46,6 +97,7 @@ export default function OnboardingPage() {
     );
   }
 
+  // Redirect to signin if no user
   if (!user) {
     router.push("/signin");
     return null;
@@ -80,16 +132,24 @@ export default function OnboardingPage() {
 
       setStep("complete");
 
-      // Redirect based on role
+      // Redirect based on role (handle new, existing, and invited users)
+      // For existing/invited users, use the org type from the response
+      const redirectType = (result.alreadyOnboarded || result.wasInvited) && result.organization?.type
+        ? result.organization.type
+        : type;
+
+      // Faster redirect for existing/invited users
+      const delay = (result.alreadyOnboarded || result.wasInvited) ? 500 : 1500;
+
       setTimeout(() => {
-        if (type === "sponsor") {
+        if (redirectType === "sponsor") {
           router.push("/dashboard");
-        } else if (type === "cde") {
+        } else if (redirectType === "cde") {
           router.push("/dashboard/pipeline");
         } else {
           router.push("/deals");
         }
-      }, 1500);
+      }, delay);
     } catch (err) {
       console.error("[Onboarding] Error:", err);
       setError("Something went wrong. Please try again.");

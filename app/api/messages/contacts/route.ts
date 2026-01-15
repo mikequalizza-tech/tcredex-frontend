@@ -1,3 +1,8 @@
+/**
+ * Contacts API
+ * SIMPLIFIED: Uses *_simplified and cdes_merged tables - no organization FK joins
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -17,14 +22,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'organizationId required' }, { status: 400 });
   }
 
+  // Handle Clerk org IDs (start with 'org_') - user needs registration, return empty
+  if (organizationId.startsWith('org_') || organizationId === 'pending') {
+    return NextResponse.json({ contacts: [] });
+  }
+
   try {
     const supabase = getSupabaseAdmin();
     let contacts: any[] = [];
 
     if (category === 'team') {
-      // Fetch team members from same organization
+      // Fetch team members from same organization (users_simplified)
       const { data, error } = await supabase
-        .from('users')
+        .from('users_simplified')
         .select('id, name, email, role, clerk_id')
         .eq('organization_id', organizationId);
 
@@ -39,56 +49,53 @@ export async function GET(request: NextRequest) {
         clerkId: user.clerk_id,
       }));
     } else if (category === 'cde') {
-      // Fetch CDEs
+      // Fetch CDEs from cdes_merged
       const { data, error } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .eq('type', 'cde')
-        .neq('id', organizationId)
+        .from('cdes_merged')
+        .select('id, organization_id, name')
+        .neq('organization_id', organizationId)
         .limit(50);
 
       if (error) throw error;
 
-      contacts = (data || []).map((org: any) => ({
-        id: org.id,
-        name: org.name,
-        organization: org.name,
+      contacts = (data || []).map((cde: any) => ({
+        id: cde.organization_id || cde.id,
+        name: cde.name,
+        organization: cde.name,
         role: 'CDE',
         org_type: 'cde',
       }));
     } else if (category === 'investor') {
-      // Fetch Investors
+      // Fetch Investors from investors_simplified
       const { data, error } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .eq('type', 'investor')
-        .neq('id', organizationId)
+        .from('investors_simplified')
+        .select('id, organization_id, name')
+        .neq('organization_id', organizationId)
         .limit(50);
 
       if (error) throw error;
 
-      contacts = (data || []).map((org: any) => ({
-        id: org.id,
-        name: org.name,
-        organization: org.name,
+      contacts = (data || []).map((inv: any) => ({
+        id: inv.organization_id || inv.id,
+        name: inv.name,
+        organization: inv.name,
         role: 'Investor',
         org_type: 'investor',
       }));
     } else if (category === 'sponsor') {
-      // Fetch Sponsors
+      // Fetch Sponsors from sponsors_simplified
       const { data, error } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .eq('type', 'sponsor')
-        .neq('id', organizationId)
+        .from('sponsors_simplified')
+        .select('id, organization_id, name')
+        .neq('organization_id', organizationId)
         .limit(50);
 
       if (error) throw error;
 
-      contacts = (data || []).map((org: any) => ({
-        id: org.id,
-        name: org.name,
-        organization: org.name,
+      contacts = (data || []).map((sp: any) => ({
+        id: sp.organization_id || sp.id,
+        name: sp.name,
+        organization: sp.name,
         role: 'Sponsor',
         org_type: 'sponsor',
       }));

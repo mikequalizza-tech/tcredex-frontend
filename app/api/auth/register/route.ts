@@ -61,7 +61,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Create organization (ALWAYS new with unique slug)
+    // Step 2: Create role-specific record DIRECTLY (simplified schema)
+    // No separate "organizations" table - each role has its own table
     const baseSlug = organizationName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -69,84 +70,90 @@ export async function POST(request: NextRequest) {
       .substring(0, 80);
     const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
 
-    const { data: newOrg, error: orgError } = await supabase
-      .from('organizations')
-      .insert({
-        name: organizationName,
-        slug: uniqueSlug,
-        type: role, // org type matches role: 'sponsor', 'cde', or 'investor'
-      } as never)
-      .select()
-      .single();
+    // Generate organization_id to link user to their entity
+    const organizationId = crypto.randomUUID();
+    let entityId: string | null = null;
 
-    if (orgError || !newOrg) {
-      console.error('[Register] Org creation error:', orgError);
-      return NextResponse.json(
-        { error: `Organization creation failed: ${orgError?.message || 'Unknown error'}` },
-        { status: 400 }
-      );
+    if (role === 'sponsor') {
+      const { data: newSponsor, error: sponsorError } = await supabase
+        .from('sponsors_simplified')
+        .insert({
+          organization_id: organizationId,
+          name: organizationName,
+          slug: uniqueSlug,
+          primary_contact_name: name,
+          primary_contact_email: email.toLowerCase(),
+          status: 'active',
+        } as never)
+        .select('id')
+        .single();
+
+      if (sponsorError || !newSponsor) {
+        console.error('[Register] Sponsor creation error:', sponsorError);
+        return NextResponse.json(
+          { error: `Sponsor creation failed: ${sponsorError?.message || 'Unknown error'}` },
+          { status: 400 }
+        );
+      }
+      entityId = (newSponsor as { id: string }).id;
+    } else if (role === 'investor') {
+      const { data: newInvestor, error: investorError } = await supabase
+        .from('investors_simplified')
+        .insert({
+          organization_id: organizationId,
+          name: organizationName,
+          slug: uniqueSlug,
+          primary_contact_name: name,
+          primary_contact_email: email.toLowerCase(),
+          status: 'active',
+        } as never)
+        .select('id')
+        .single();
+
+      if (investorError || !newInvestor) {
+        console.error('[Register] Investor creation error:', investorError);
+        return NextResponse.json(
+          { error: `Investor creation failed: ${investorError?.message || 'Unknown error'}` },
+          { status: 400 }
+        );
+      }
+      entityId = (newInvestor as { id: string }).id;
+    } else if (role === 'cde') {
+      // CDEs use cdes_merged - but typically CDEs are pre-loaded, not self-registered
+      // For now, create a placeholder entry
+      console.log('[Register] CDE registration - CDEs are typically pre-loaded');
+      entityId = organizationId; // Use org ID as placeholder
     }
 
-    const typedOrg = newOrg as { id: string; name: string; type: string };
-
-    // Step 3: Create user record in users table
-    // CRITICAL: This is the source of truth for user roles and org membership
+    // Step 3: Create user record (simplified)
     const { error: userError } = await supabase
-      .from('users')
+      .from('users_simplified')
       .insert({
         id: authData.user.id,
+        clerk_id: authData.user.id, // Same as Supabase auth ID for now
         email: email.toLowerCase(),
         name: name,
-        role: 'ORG_ADMIN', // User is admin of their own org
-        organization_id: typedOrg.id,
+        role: 'ORG_ADMIN',
+        organization_id: organizationId,
+        organization_type: role,
         is_active: true,
         email_verified: true,
       } as never);
 
     if (userError) {
       console.error('[Register] User record creation error:', userError);
-      // Don't fail - auth user exists, user record can be created on first login
     }
 
-    // Step 4: Create role-specific record
+    // For compatibility, also create in old tables (can remove later)
     try {
-      if (role === 'sponsor') {
-        const { error: sponsorError } = await supabase
-          .from('sponsors')
-          .insert({
-            organization_id: typedOrg.id,
-            primary_contact_name: name,
-            primary_contact_email: email.toLowerCase(),
-          } as never);
-        if (sponsorError) {
-          console.error('[Register] Sponsor record error:', sponsorError);
-        }
-      } else if (role === 'cde') {
-        const { error: cdeError } = await supabase
-          .from('cdes')
-          .insert({
-            organization_id: typedOrg.id,
-            primary_contact_name: name,
-            primary_contact_email: email.toLowerCase(),
-            status: 'active',
-          } as never);
-        if (cdeError) {
-          console.error('[Register] CDE record error:', cdeError);
-        }
-      } else if (role === 'investor') {
-        const { error: investorError } = await supabase
-          .from('investors')
-          .insert({
-            organization_id: typedOrg.id,
-            primary_contact_name: name,
-            primary_contact_email: email.toLowerCase(),
-          } as never);
-        if (investorError) {
-          console.error('[Register] Investor record error:', investorError);
-        }
-      }
-    } catch (roleError) {
-      console.error('[Register] Role-specific record creation error:', roleError);
+      await supabase.from('organizations').insert({
+        id: organizationId,
+        name: organizationName,
+        slug: uniqueSlug,
+        type: role,
+      } as never);
+    } catch (e) {
+      // Ignore - old table may not exist or have conflicts
     }
 
     // Step 5: Send emails
@@ -174,11 +181,9 @@ export async function POST(request: NextRequest) {
         email: authData.user.email,
         name: name,
         role: 'ORG_ADMIN',
-        organization: {
-          id: typedOrg.id,
-          name: typedOrg.name,
-          type: typedOrg.type,
-        },
+        organizationId: organizationId,
+        organizationType: role,
+        entityId: entityId, // Direct ID for sponsor/investor (use this for intake!)
       },
     });
   } catch (error) {

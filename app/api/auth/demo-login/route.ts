@@ -2,11 +2,7 @@
  * tCredex API - Demo Login
  * POST /api/auth/demo-login
  *
- * Authenticates demo users from Supabase tables:
- * - investors table for investor users
- * - sponsors table for sponsor users
- * - users table for CDE and admin users
- *
+ * SIMPLIFIED: Uses *_simplified tables - no organization FK joins
  * Password: "demo123" for all demo accounts
  */
 
@@ -42,25 +38,23 @@ export async function POST(request: NextRequest) {
     }
 
     // ===================================================================
-    // Try to find user in each table by email
+    // Try to find user in each simplified table by email
     // ===================================================================
 
-    // 1. Check investors table
+    // 1. Check investors_simplified table
     const { data: investorData } = await supabase
-      .from('investors')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
+      .from('investors_simplified')
+      .select('id, name, primary_contact_name, primary_contact_email, organization_id, slug')
       .eq('primary_contact_email', normalizedEmail)
       .single();
 
-    type OrgData = { id: string; name: string; slug: string; type: string };
     type InvestorData = {
       id: string;
+      name: string | null;
       primary_contact_name: string | null;
+      primary_contact_email: string;
       organization_id: string | null;
-      organization: OrgData | null;
+      slug: string | null;
     };
     const investor = investorData as InvestorData | null;
 
@@ -70,35 +64,35 @@ export async function POST(request: NextRequest) {
         user: {
           id: investor.id,
           email: normalizedEmail,
-          name: investor.primary_contact_name || 'Investor User',
+          name: investor.primary_contact_name || investor.name || 'Investor User',
           role: 'ORG_ADMIN',
           organizationId: investor.organization_id,
-          organization: investor.organization ? {
-            id: investor.organization.id,
-            name: investor.organization.name,
-            slug: investor.organization.slug,
+          organizationType: 'investor',
+          organization: {
+            id: investor.organization_id,
+            name: investor.name,
+            slug: investor.slug,
             type: 'investor',
-          } : null,
+          },
           userType: 'investor',
         },
       });
     }
 
-    // 2. Check sponsors table
+    // 2. Check sponsors_simplified table
     const { data: sponsorData } = await supabase
-      .from('sponsors')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
+      .from('sponsors_simplified')
+      .select('id, name, primary_contact_name, primary_contact_email, organization_id, slug')
       .eq('primary_contact_email', normalizedEmail)
       .single();
 
     type SponsorData = {
       id: string;
+      name: string | null;
       primary_contact_name: string | null;
+      primary_contact_email: string;
       organization_id: string | null;
-      organization: OrgData | null;
+      slug: string | null;
     };
     const sponsor = sponsorData as SponsorData | null;
 
@@ -108,27 +102,25 @@ export async function POST(request: NextRequest) {
         user: {
           id: sponsor.id,
           email: normalizedEmail,
-          name: sponsor.primary_contact_name || 'Sponsor User',
+          name: sponsor.primary_contact_name || sponsor.name || 'Sponsor User',
           role: 'ORG_ADMIN',
           organizationId: sponsor.organization_id,
-          organization: sponsor.organization ? {
-            id: sponsor.organization.id,
-            name: sponsor.organization.name,
-            slug: sponsor.organization.slug,
+          organizationType: 'sponsor',
+          organization: {
+            id: sponsor.organization_id,
+            name: sponsor.name,
+            slug: sponsor.slug,
             type: 'sponsor',
-          } : null,
+          },
           userType: 'sponsor',
         },
       });
     }
 
-    // 3. Check users table (for CDEs and admins)
+    // 3. Check users_simplified table (for CDEs and admins)
     const { data: userData } = await supabase
-      .from('users')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
+      .from('users_simplified')
+      .select('id, email, name, role, organization_id, organization_type')
       .eq('email', normalizedEmail)
       .single();
 
@@ -138,12 +130,30 @@ export async function POST(request: NextRequest) {
       name: string | null;
       role: string | null;
       organization_id: string | null;
-      organization: OrgData | null;
+      organization_type: string | null;
     };
     const user = userData as UserData | null;
 
     if (user) {
-      const orgType = user.organization?.type || 'cde';
+      // Get org details from appropriate table
+      let orgName = null;
+      let orgSlug = null;
+      if (user.organization_id && user.organization_type) {
+        const tableName = user.organization_type === 'sponsor' ? 'sponsors_simplified'
+          : user.organization_type === 'investor' ? 'investors_simplified'
+          : 'cdes_merged';
+        const { data: org } = await supabase
+          .from(tableName)
+          .select('name, slug')
+          .eq('organization_id', user.organization_id)
+          .single();
+        if (org) {
+          orgName = (org as { name: string; slug: string }).name;
+          orgSlug = (org as { name: string; slug: string }).slug;
+        }
+      }
+
+      const orgType = user.organization_type || 'cde';
       return NextResponse.json({
         success: true,
         user: {
@@ -152,10 +162,11 @@ export async function POST(request: NextRequest) {
           name: user.name,
           role: user.role || 'ORG_ADMIN',
           organizationId: user.organization_id,
-          organization: user.organization ? {
-            id: user.organization.id,
-            name: user.organization.name,
-            slug: user.organization.slug,
+          organizationType: orgType,
+          organization: user.organization_id ? {
+            id: user.organization_id,
+            name: orgName,
+            slug: orgSlug,
             type: orgType,
           } : null,
           userType: orgType === 'admin' ? 'admin' : 'cde',

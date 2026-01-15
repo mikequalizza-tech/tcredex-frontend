@@ -1,3 +1,8 @@
+/**
+ * Supabase Query Functions
+ * SIMPLIFIED: Uses *_simplified and cdes_merged tables - no organization FK joins
+ */
+
 import { getSupabase, getSupabaseAdmin } from '../supabase';
 import { CDEDealCard } from '@/lib/types/cde';
 import { Deal, ProgramType, ProgramLevel, DealStatus, TractType } from '@/lib/data/deals';
@@ -23,74 +28,70 @@ function mapAllocationByProgram(deal: any, programType: ProgramType): number {
 }
 
 /**
- * Fetch all deals from Supabase and map them to the Deal interface from lib/data/deals
+ * Fetch all deals - uses backend API for reliability
  */
 export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> {
-  const supabase = getSupabaseAdmin();
-  
-  let query = supabase
-    .from('deals')
-    .select('*');
+  // Use backend API instead of direct Supabase call
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
 
-  if (onlyVisible) {
-    query = query.eq('visible', true);
-  }
+  try {
+    const params = onlyVisible ? '?visible=true' : '';
+    const response = await fetch(`${API_BASE_URL}/api/deals${params}`);
 
-  const { data, error } = await query.order('created_at', { ascending: false });
-
-  if (error) {
-    // Suppress recursion errors during build
-    const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
-    const isRecursion = error.message?.toLowerCase().includes('recursion');
-    
-    if (!isBuild || !isRecursion) {
-      logger.error('Error fetching deals', error);
+    if (!response.ok) {
+      logger.error('Error fetching deals from backend', { status: response.status });
+      return [];
     }
+
+    const result = await response.json();
+    const data = result.data?.deals || result.deals || [];
+
+    return data.map((deal: any) => {
+      const programType = (deal.programs && deal.programs[0]) as ProgramType || 'NMTC';
+      return {
+        id: deal.id,
+        projectName: deal.project_name,
+        sponsorName: deal.sponsor_name || 'Unknown Sponsor',
+        sponsorDescription: deal.project_description,
+        website: deal.website,
+        programType,
+        programLevel: (deal.program_level) as ProgramLevel || 'federal',
+        stateProgram: deal.state_program,
+        allocation: mapAllocationByProgram(deal, programType),
+        creditPrice: 0.76,
+        state: deal.state || '',
+        city: deal.city || '',
+        tractType: (deal.tract_types || []) as TractType[],
+        status: (deal.status || 'draft') as DealStatus,
+        description: deal.project_description,
+        communityImpact: deal.community_benefit,
+        projectHighlights: [],
+        useOfFunds: deal.total_project_cost ? [
+          { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
+          { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
+          { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
+        ].filter(item => item.amount > 0) : [],
+        timeline: [
+          { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
+          { milestone: 'Projected Completion', date: deal.projected_completion_date || 'TBD', completed: false },
+        ].filter(item => item.date !== 'TBD'),
+        foundedYear: 2020,
+        submittedDate: deal.created_at,
+        povertyRate: Number(deal.tract_poverty_rate) || 0,
+        medianIncome: Number(deal.tract_median_income) || 0,
+        jobsCreated: deal.jobs_created || 0,
+        visible: deal.visible ?? true,
+        coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
+        projectCost: Number(deal.total_project_cost) || 0,
+        financingGap: Number(deal.financing_gap) || 0,
+        censusTract: deal.census_tract,
+        unemployment: Number(deal.tract_unemployment) || 0,
+      };
+    });
+  } catch (error) {
+    logger.error('Error fetching deals', error);
     return [];
   }
-
-  return (data || []).map((deal: any) => {
-    const programType = (deal.programs && deal.programs[0]) as ProgramType || 'NMTC';
-    return {
-      id: deal.id,
-      projectName: deal.project_name,
-      sponsorName: deal.sponsor_name || 'Unknown Sponsor',
-      sponsorDescription: deal.project_description,
-      website: deal.website,
-      programType,
-      programLevel: (deal.program_level) as ProgramLevel || 'federal',
-      stateProgram: deal.state_program,
-      allocation: mapAllocationByProgram(deal, programType),
-      creditPrice: 0.76,
-      state: deal.state || '',
-      city: deal.city || '',
-      tractType: (deal.tract_types || []) as TractType[],
-      status: (deal.status || 'draft') as DealStatus,
-      description: deal.project_description,
-      communityImpact: deal.community_benefit,
-      projectHighlights: [],
-      useOfFunds: deal.total_project_cost ? [
-        { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
-        { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
-        { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
-      ].filter(item => item.amount > 0) : [],
-      timeline: [
-        { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
-        { milestone: 'Projected Completion', date: deal.projected_completion_date || 'TBD', completed: false },
-      ].filter(item => item.date !== 'TBD'),
-      foundedYear: 2020,
-      submittedDate: deal.created_at,
-      povertyRate: Number(deal.tract_poverty_rate) || 0,
-      medianIncome: Number(deal.tract_median_income) || 0,
-      jobsCreated: deal.jobs_created || 0,
-      visible: deal.visible ?? true,
-      coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
-      projectCost: Number(deal.total_project_cost) || 0,
-      financingGap: Number(deal.financing_gap) || 0,
-      censusTract: deal.census_tract,
-      unemployment: Number(deal.tract_unemployment) || 0,
-    };
-  });
 }
 
 /**
@@ -206,7 +207,7 @@ export async function fetchDealsByOrganization(orgId: string, userEmail?: string
       programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
       programLevel: (deal.program_level) as ProgramLevel || 'federal',
       stateProgram: deal.state_program,
-      allocation: deal.programType === 'LIHTC' 
+      allocation: deal.programType === 'LIHTC'
         ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
         : deal.programType === 'HTC'
         ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
@@ -247,52 +248,58 @@ export async function fetchDealsByOrganization(orgId: string, userEmail?: string
 }
 
 /**
- * Fetch all CDEs from Supabase and map them to the CDEDealCard interface
+ * Fetch all CDEs - uses backend API for reliability
+ * Returns CDE organizations from the cdes_merged table
  */
 export async function fetchCDEs(): Promise<CDEDealCard[]> {
-  const supabase = getSupabaseAdmin();
-  
-  const { data, error } = await supabase
-    .from('cdes')
-    .select(`
-      *,
-      organizations:organization_id (
-        name
-      )
-    `)
-    .eq('status', 'active');
+  // Use backend API instead of direct Supabase call
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
 
-  if (error) {
-    const isBuild = process.env.NODE_ENV === 'production' && typeof window === 'undefined';
-    const isRecursion = error.message?.toLowerCase().includes('recursion');
-    
-    if (!isBuild || !isRecursion) {
-      logger.error('Error fetching CDEs', error);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/cdes`);
+
+    if (!response.ok) {
+      logger.error('Error fetching CDEs from backend', { status: response.status });
+      return [];
     }
+
+    const result = await response.json();
+    const data = result.data?.cdes || result.cdes || [];
+
+    // Map CDE data to CDEDealCard format
+    return data.map((cde: any) => {
+      return {
+        id: cde.id,
+        organizationName: cde.name || 'Unknown CDE',
+        missionSnippet: cde.mission_statement || '',
+        remainingAllocation: Number(cde.remaining_allocation) || 0,
+        allocationDeadline: cde.deployment_deadline || '',
+        primaryStates: cde.primary_states || (cde.state ? [cde.state] : []),
+        targetSectors: cde.target_sectors || [],
+        impactPriorities: cde.impact_priorities || [],
+        dealSizeRange: {
+          min: Number(cde.min_deal_size) || 0,
+          max: Number(cde.max_deal_size) || 0
+        },
+        ruralFocus: cde.rural_focus || false,
+        urbanFocus: cde.urban_focus || false,
+        requireSeverelyDistressed: cde.require_severely_distressed || false,
+        htcExperience: cde.htc_experience || false,
+        smallDealFund: cde.small_deal_fund || false,
+        status: 'active',
+        lastUpdated: cde.updated_at || '',
+        // Extra fields
+        website: cde.website || '',
+        city: cde.city || '',
+        state: cde.state || '',
+        contactName: cde.primary_contact_name || '',
+        contactEmail: cde.primary_contact_email || '',
+      };
+    });
+  } catch (error) {
+    logger.error('Error fetching CDEs', error);
     return [];
   }
-
-  return (data || []).map((cde: any) => ({
-    id: cde.id,
-    organizationName: cde.organizations?.name || 'Unknown CDE',
-    missionSnippet: cde.mission_statement || '',
-    remainingAllocation: Number(cde.remaining_allocation) || 0,
-    allocationDeadline: cde.deployment_deadline || '',
-    primaryStates: cde.primary_states || [],
-    targetSectors: cde.target_sectors || [],
-    impactPriorities: cde.impact_priorities || [],
-    dealSizeRange: {
-      min: Number(cde.min_deal_size) || 0,
-      max: Number(cde.max_deal_size) || 0
-    },
-    ruralFocus: cde.rural_focus || false,
-    urbanFocus: cde.urban_focus || false,
-    requireSeverelyDistressed: cde.require_severely_distressed || false,
-    htcExperience: cde.htc_experience || false,
-    smallDealFund: cde.small_deal_fund || false,
-    status: 'active',
-    lastUpdated: cde.updated_at || '',
-  }));
 }
 
 /**
@@ -326,36 +333,23 @@ export interface CDEDetail {
 }
 
 /**
- * Fetch a single CDE by slug
+ * Fetch a single CDE by slug - uses cdes_merged table
  */
 export async function fetchCDEBySlug(slug: string): Promise<CDEDetail | null> {
   const supabase = getSupabaseAdmin();
 
+  // Try to find by slug first
   const { data, error } = await supabase
-    .from('cdes')
-    .select(`
-      *,
-      organizations:organization_id (
-        name,
-        slug,
-        website
-      )
-    `)
-    .eq('organizations.slug', slug)
+    .from('cdes_merged')
+    .select('*')
+    .eq('slug', slug)
     .single();
 
   if (error || !data) {
     // Try by CDE id as fallback
     const { data: byId, error: byIdError } = await supabase
-      .from('cdes')
-      .select(`
-        *,
-        organizations:organization_id (
-          name,
-          slug,
-          website
-        )
-      `)
+      .from('cdes_merged')
+      .select('*')
       .eq('id', slug)
       .single();
 
@@ -372,11 +366,11 @@ export async function fetchCDEBySlug(slug: string): Promise<CDEDetail | null> {
 function mapCDEToDetail(cde: any): CDEDetail {
   return {
     id: cde.id,
-    name: cde.organizations?.name || 'Unknown CDE',
-    slug: cde.organizations?.slug || cde.id,
+    name: cde.name || 'Unknown CDE',
+    slug: cde.slug || cde.id,
     description: cde.mission_statement || '',
-    headquartersCity: cde.headquarters_city || '',
-    headquartersState: cde.headquarters_state || '',
+    headquartersCity: cde.headquarters_city || cde.city || '',
+    headquartersState: cde.headquarters_state || cde.state || '',
     missionFocus: cde.impact_priorities || [],
     projectTypes: cde.target_sectors || [],
     serviceArea: cde.primary_states || [],
@@ -391,10 +385,10 @@ function mapCDEToDetail(cde: any): CDEDetail {
     avgDealSize: Number(cde.avg_deal_size) || 0,
     responseTime: cde.response_time || '2-3 weeks',
     acceptingApplications: cde.status === 'active',
-    website: cde.organizations?.website || '',
-    primaryContact: cde.contact_name || '',
-    contactEmail: cde.contact_email || '',
-    contactPhone: cde.contact_phone || '',
+    website: cde.website || '',
+    primaryContact: cde.primary_contact_name || '',
+    contactEmail: cde.primary_contact_email || '',
+    contactPhone: cde.primary_contact_phone || '',
   };
 }
 
@@ -430,36 +424,23 @@ export interface InvestorDetail {
 }
 
 /**
- * Fetch a single investor by slug
+ * Fetch a single investor by slug - uses investors_simplified table
  */
 export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail | null> {
   const supabase = getSupabaseAdmin();
 
+  // Try to find by slug first
   const { data, error } = await supabase
-    .from('investors')
-    .select(`
-      *,
-      organizations:organization_id (
-        name,
-        slug,
-        website
-      )
-    `)
-    .eq('organizations.slug', slug)
+    .from('investors_simplified')
+    .select('*')
+    .eq('slug', slug)
     .single();
 
   if (error || !data) {
     // Try by investor id as fallback
     const { data: byId, error: byIdError } = await supabase
-      .from('investors')
-      .select(`
-        *,
-        organizations:organization_id (
-          name,
-          slug,
-          website
-        )
-      `)
+      .from('investors_simplified')
+      .select('*')
       .eq('id', slug)
       .single();
 
@@ -476,8 +457,8 @@ export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail 
 function mapInvestorToDetail(investor: any): InvestorDetail {
   return {
     id: investor.id,
-    name: investor.organizations?.name || 'Unknown Investor',
-    slug: investor.organizations?.slug || investor.id,
+    name: investor.name || 'Unknown Investor',
+    slug: investor.slug || investor.id,
     description: investor.investment_thesis || '',
     investorType: investor.investor_type || 'institutional',
     programs: investor.programs || ['NMTC'],
@@ -496,15 +477,15 @@ function mapInvestorToDetail(investor: any): InvestorDetail {
     activelyInvesting: investor.status === 'active',
     requiresCDE: investor.requires_cde ?? true,
     directInvestment: investor.direct_investment ?? false,
-    website: investor.organizations?.website || '',
-    primaryContact: investor.contact_name || '',
-    contactEmail: investor.contact_email || '',
-    contactPhone: investor.contact_phone || '',
+    website: investor.website || '',
+    primaryContact: investor.primary_contact_name || '',
+    contactEmail: investor.primary_contact_email || '',
+    contactPhone: investor.primary_contact_phone || '',
   };
 }
 
 // =============================================================================
-// CDE ALLOCATION QUERIES
+// CDE ALLOCATION QUERIES - Now uses cdes_merged with embedded allocation data
 // =============================================================================
 
 /**
@@ -528,56 +509,42 @@ export interface CDEAllocation {
 
 /**
  * Fetch all allocations for a specific CDE organization
+ * Now uses cdes_merged which has allocation data embedded
  */
 export async function fetchCDEAllocations(cdeOrgId: string): Promise<CDEAllocation[]> {
   const supabase = getSupabaseAdmin();
 
   try {
-    // First get the CDE record for this organization
-    const { data: cdeRaw, error: cdeError } = await supabase
-      .from('cdes')
-      .select('id')
+    // Get the CDE record from cdes_merged
+    const { data: cdeData, error: cdeError } = await supabase
+      .from('cdes_merged')
+      .select('*')
       .eq('organization_id', cdeOrgId)
       .single();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cdeData = cdeRaw as Record<string, any> | null;
 
     if (cdeError || !cdeData) {
       logger.error('Error finding CDE for organization', cdeError);
       return [];
     }
 
-    // Now fetch allocations for this CDE
-    const { data: rawData, error } = await supabase
-      .from('cde_allocations')
-      .select('*')
-      .eq('cde_id', cdeData.id)
-      .order('year', { ascending: false });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = rawData as Record<string, any>[] | null;
-
-    if (error) {
-      logger.error('Error fetching CDE allocations', error);
+    // cdes_merged has allocation data embedded - return as single allocation
+    const cde = cdeData as Record<string, any>;
+    if (!cde.remaining_allocation && !cde.total_allocation) {
       return [];
     }
 
-    return (data || []).map((alloc) => ({
-      id: alloc.id,
-      cdeId: alloc.cde_id,
-      type: alloc.type as 'federal' | 'state',
-      year: alloc.year,
-      stateCode: alloc.state_code,
-      awardedAmount: Number(alloc.awarded_amount) || 0,
-      availableOnPlatform: Number(alloc.available_on_platform) || 0,
-      deployedAmount: Number(alloc.deployed_amount) || 0,
-      percentageWon: alloc.percentage_won ? Number(alloc.percentage_won) : undefined,
-      deploymentDeadline: alloc.deployment_deadline,
-      notes: alloc.notes,
-      createdAt: alloc.created_at,
-      updatedAt: alloc.updated_at,
-    }));
+    return [{
+      id: cde.id,
+      cdeId: cde.id,
+      type: 'federal',
+      year: cde.allocation_year || new Date().getFullYear().toString(),
+      awardedAmount: Number(cde.total_allocation) || 0,
+      availableOnPlatform: Number(cde.remaining_allocation) || 0,
+      deployedAmount: (Number(cde.total_allocation) || 0) - (Number(cde.remaining_allocation) || 0),
+      deploymentDeadline: cde.deployment_deadline,
+      createdAt: cde.created_at,
+      updatedAt: cde.updated_at,
+    }];
   } catch (error) {
     logger.error('Error in fetchCDEAllocations', error);
     return [];
@@ -605,12 +572,11 @@ export async function fetchCDECriteria(cdeOrgId: string): Promise<CDEInvestmentC
 
   try {
     const { data: rawData, error } = await supabase
-      .from('cdes')
+      .from('cdes_merged')
       .select('*')
       .eq('organization_id', cdeOrgId)
       .single();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = rawData as Record<string, any> | null;
 
     if (error || !data) {
@@ -642,14 +608,13 @@ export async function fetchCDECriteria(cdeOrgId: string): Promise<CDEInvestmentC
 export async function fetchCDEPipelineDeals(cdeOrgId: string): Promise<Deal[]> {
   const supabase = getSupabaseAdmin();
 
-  // Get CDE record
+  // Get CDE record from cdes_merged
   const { data: cdeRaw } = await supabase
-    .from('cdes')
+    .from('cdes_merged')
     .select('id')
     .eq('organization_id', cdeOrgId)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cdeData = cdeRaw as Record<string, any> | null;
 
   if (!cdeData) return [];

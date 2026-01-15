@@ -1,8 +1,9 @@
 /**
  * tCredex CDEs API
  * CRUD operations for Community Development Entities
- * 
- * CRITICAL: All endpoints require authentication and org filtering
+ *
+ * SIMPLIFIED: Uses cdes_merged table directly
+ * Each row = 1 CDE + 1 allocation year (no FK chains)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,43 +20,19 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
 
     const { searchParams } = new URL(request.url);
-    
+
     const status = searchParams.get('status');
     const state = searchParams.get('state');
     const minAllocation = searchParams.get('min_allocation');
     const smallDealFund = searchParams.get('small_deal_fund');
+    const year = searchParams.get('year');
     const limit = parseInt(searchParams.get('limit') || '50');
 
+    // Query cdes_merged directly - no FK joins needed
     let query = supabase
-      .from('cdes')
-      .select(`
-        id,
-        organization_id,
-        certification_number,
-        year_established,
-        primary_contact_name,
-        primary_contact_email,
-        primary_contact_phone,
-        total_allocation,
-        remaining_allocation,
-        min_deal_size,
-        max_deal_size,
-        small_deal_fund,
-        service_area_type,
-        primary_states,
-        rural_focus,
-        urban_focus,
-        mission_statement,
-        impact_priorities,
-        target_sectors,
-        nmtc_experience,
-        htc_experience,
-        status,
-        created_at,
-        organization:organizations(id, name, slug, website, city, state),
-        allocations:cde_allocations(*)
-      `)
-      .order('remaining_allocation', { ascending: false })
+      .from('cdes_merged')
+      .select('*')
+      .order('amount_remaining', { ascending: false })
       .limit(limit);
 
     // CRITICAL: Filter by organization based on user type
@@ -70,15 +47,47 @@ export async function GET(request: NextRequest) {
 
     if (status) query = query.eq('status', status);
     if (state) query = query.contains('primary_states', [state]);
-    if (minAllocation) query = query.gte('remaining_allocation', parseInt(minAllocation));
+    if (minAllocation) query = query.gte('amount_remaining', parseInt(minAllocation));
     if (smallDealFund === 'true') query = query.eq('small_deal_fund', true);
+    if (year) query = query.eq('year', parseInt(year));
 
     const { data, error } = await query;
 
     if (error) throw error;
 
-    return NextResponse.json({ 
-      cdes: data,
+    // Map to expected format (normalize column names)
+    const cdes = (data || []).map((cde: Record<string, unknown>) => ({
+      id: cde.id,
+      organization_id: cde.organization_id,
+      name: cde.name,
+      slug: cde.slug,
+      year: cde.year,
+      total_allocation: cde.total_allocation,
+      remaining_allocation: cde.amount_remaining,
+      amount_finalized: cde.amount_finalized,
+      min_deal_size: cde.min_deal_size,
+      max_deal_size: cde.max_deal_size,
+      small_deal_fund: cde.small_deal_fund,
+      service_area_type: cde.service_area_type,
+      service_area: cde.service_area,
+      primary_states: cde.primary_states,
+      rural_focus: cde.rural_focus,
+      urban_focus: cde.urban_focus,
+      contact_name: cde.contact_name,
+      contact_email: cde.contact_email,
+      contact_phone: cde.contact_phone,
+      controlling_entity: cde.controlling_entity,
+      predominant_financing: cde.predominant_financing,
+      predominant_market: cde.predominant_market,
+      innovative_activities: cde.innovative_activities,
+      non_metro_commitment: cde.non_metro_commitment,
+      deployment_deadline: cde.deployment_deadline,
+      status: cde.status,
+      created_at: cde.created_at,
+    }));
+
+    return NextResponse.json({
+      cdes,
       organizationId: user.organizationId,
       organizationType: user.organizationType,
     });
@@ -88,13 +97,13 @@ export async function GET(request: NextRequest) {
 }
 
 // =============================================================================
-// POST /api/cdes - Create new CDE profile
+// POST /api/cdes - Create new CDE allocation year
 // =============================================================================
 export async function POST(request: NextRequest) {
   try {
     // CRITICAL: Require authentication and ORG_ADMIN role
     const user = await requireAuth(request);
-    
+
     if (user.organizationType !== 'cde' || user.userRole !== 'ORG_ADMIN') {
       return NextResponse.json(
         { error: 'Only CDE organization admins can create CDE profiles' },
@@ -108,30 +117,43 @@ export async function POST(request: NextRequest) {
     // CRITICAL: CDE profile must belong to user's organization
     const organizationId = user.organizationId;
 
-    // Create CDE profile
+    // Generate unique slug
+    const baseSlug = (body.name || 'cde')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .substring(0, 80);
+    const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+
+    // Create CDE row in cdes_merged (one row = one CDE + one allocation year)
     const { data, error } = await supabase
-      .from('cdes')
+      .from('cdes_merged')
       .insert({
         organization_id: organizationId,
-        certification_number: body.certification_number,
-        year_established: body.year_established,
-        primary_contact_name: body.primary_contact_name,
-        primary_contact_email: body.primary_contact_email,
-        primary_contact_phone: body.primary_contact_phone,
+        name: body.name,
+        slug: uniqueSlug,
+        year: body.year || new Date().getFullYear(),
+        allocation_type: body.allocation_type || 'federal',
         total_allocation: body.total_allocation || 0,
-        remaining_allocation: body.remaining_allocation || 0,
+        amount_finalized: body.amount_finalized || 0,
+        amount_remaining: body.remaining_allocation || body.total_allocation || 0,
+        non_metro_commitment: body.non_metro_commitment || 0,
+        deployment_deadline: body.deployment_deadline,
+        service_area: body.service_area,
+        service_area_type: body.service_area_type || 'national',
+        controlling_entity: body.controlling_entity,
+        predominant_financing: body.predominant_financing,
+        predominant_market: body.predominant_market,
+        innovative_activities: body.innovative_activities,
+        contact_name: body.primary_contact_name || body.contact_name,
+        contact_phone: body.primary_contact_phone || body.contact_phone,
+        contact_email: body.primary_contact_email || body.contact_email,
+        primary_states: body.primary_states || [],
         min_deal_size: body.min_deal_size || 1000000,
         max_deal_size: body.max_deal_size || 15000000,
         small_deal_fund: body.small_deal_fund || false,
-        service_area_type: body.service_area_type || 'national',
-        primary_states: body.primary_states || [],
         rural_focus: body.rural_focus || false,
-        urban_focus: body.urban_focus || true,
-        mission_statement: body.mission_statement,
-        impact_priorities: body.impact_priorities || [],
-        target_sectors: body.target_sectors || [],
-        nmtc_experience: body.nmtc_experience ?? true,
-        htc_experience: body.htc_experience || false,
+        urban_focus: body.urban_focus ?? true,
         status: 'active',
       } as never)
       .select()
@@ -139,25 +161,8 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    const typedData = data as Record<string, unknown> & { id: string };
-
-    // Create allocations if provided
-    if (body.allocations && body.allocations.length > 0) {
-      const allocationsToInsert = body.allocations.map((a: Record<string, unknown>) => ({
-        cde_id: typedData.id,
-        type: a.type,
-        year: a.year,
-        state_code: a.state_code,
-        awarded_amount: a.awarded_amount,
-        available_on_platform: a.available_on_platform,
-        deployment_deadline: a.deployment_deadline,
-      }));
-
-      await supabase.from('cde_allocations').insert(allocationsToInsert as never);
-    }
-
     return NextResponse.json({
-      ...typedData,
+      ...data,
       organizationId: user.organizationId,
     }, { status: 201 });
   } catch (error) {

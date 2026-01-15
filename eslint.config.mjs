@@ -1,22 +1,12 @@
-import unicorn from 'eslint-plugin-unicorn';
+import { FlatCompat } from "@eslint/eslintrc";
+import path from "path";
+import { fileURLToPath } from "url";
 
-export default [
-  {
-    ignores: ['.next/**', 'node_modules/**'],
-  },
-  {
-    plugins: {
-      unicorn,
-    },
-    rules: {
-      'unicorn/filename-case': [
-        'error',
-        {
-          cases: {
-            pascalCase: true,
-          },
-        },
-      ],
-    },
-  },
-];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
+export default [...compat.extends("next/core-web-vitals")];

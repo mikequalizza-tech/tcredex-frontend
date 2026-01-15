@@ -17,6 +17,7 @@ export interface ExtendedAuthContext extends AuthContext {
   userId: string | undefined;
   userName: string;
   userEmail: string;
+  needsRegistration: boolean; // True when user is authenticated but not in database
 }
 
 const normalizeOrgType = (type?: string | null): 'sponsor' | 'cde' | 'investor' | 'admin' | undefined => {
@@ -64,6 +65,8 @@ export function useCurrentUser(): ExtendedAuthContext {
   } | null>(null);
   const [isLoadingDbData, setIsLoadingDbData] = useState(true);
 
+  const [needsRegistration, setNeedsRegistration] = useState(false);
+
   // Fetch additional user data from our database (organization info, role, etc.)
   const fetchDbUserData = useCallback(async () => {
     if (!clerkUser?.id) {
@@ -76,10 +79,23 @@ export function useCurrentUser(): ExtendedAuthContext {
       const res = await fetch('/api/auth/me', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        if (data.user) {
+
+        // Check if user needs to complete registration
+        if (data.needsRegistration) {
+          setNeedsRegistration(true);
+          // Set default data so pages can render
+          setDbUserData({
+            organizationId: undefined,
+            orgType: 'sponsor', // Default to sponsor for new users
+            orgName: 'Complete Registration',
+            role: 'ORG_ADMIN',
+            projectAssignments: [],
+          });
+        } else if (data.user) {
+          setNeedsRegistration(false);
           setDbUserData({
             organizationId: data.user.organizationId || data.user.organization?.id,
-            orgType: data.user.organization?.type || data.user.orgType,
+            orgType: data.user.organizationType || data.user.organization?.type,
             orgName: data.user.organization?.name || 'Organization',
             orgLogo: data.user.organization?.logo,
             role: data.user.role,
@@ -110,22 +126,29 @@ export function useCurrentUser(): ExtendedAuthContext {
   const orgType = normalizeOrgType(dbUserData?.orgType);
   const userRole = mapUserRoleToRole(dbUserData?.role);
 
+  // Build organization - may be undefined for new users
   const organization: Organization | undefined = orgType ? {
-    id: dbUserData?.organizationId || clerkOrg?.id || 'org-unknown',
+    id: dbUserData?.organizationId || clerkOrg?.id || 'org-pending',
     name: dbUserData?.orgName || clerkOrg?.name || 'Organization',
     slug: clerkOrg?.slug || 'org',
     logo: dbUserData?.orgLogo || clerkOrg?.imageUrl,
     type: orgType,
   } : undefined;
 
-  const user: User | null = clerkUser && organization ? {
+  // Build user - now works even without organization (for needsRegistration flow)
+  const user: User | null = clerkUser ? {
     id: clerkUser.id,
     email: clerkUser.emailAddresses[0]?.emailAddress || '',
     name: clerkUser.fullName || clerkUser.firstName || 'User',
     avatar: clerkUser.imageUrl,
     role: userRole,
-    organizationId: organization.id,
-    organization,
+    organizationId: organization?.id || 'pending',
+    organization: organization || {
+      id: 'pending',
+      name: 'Complete Registration',
+      slug: 'pending',
+      type: 'sponsor',
+    },
     projectAssignments: dbUserData?.projectAssignments || [],
     createdAt: clerkUser.createdAt?.toISOString() || new Date().toISOString(),
     lastLoginAt: clerkUser.lastSignInAt?.toISOString(),
@@ -215,6 +238,7 @@ export function useCurrentUser(): ExtendedAuthContext {
     user,
     isLoading,
     isAuthenticated,
+    needsRegistration,
     canViewDocument,
     canEditDocument,
     canDeleteDocument,
@@ -228,7 +252,7 @@ export function useCurrentUser(): ExtendedAuthContext {
     refresh,
     switchRole,
     currentDemoRole: null,
-    orgType: organization?.type,
+    orgType: organization?.type || 'sponsor',
     orgName: organization?.name || '',
     orgLogo: organization?.logo,
     organizationId: organization?.id,

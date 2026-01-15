@@ -6,6 +6,9 @@ import { getSupabaseAdmin } from '@/lib/supabase';
  * GET /api/auth/me
  * Returns current authenticated user with organization and role
  * Uses Clerk for authentication, Supabase for user/organization data
+ *
+ * SIMPLIFIED: Uses users_simplified table directly
+ * No organizations FK chain - organization_id + organization_type tells you which entity table
  */
 export async function GET(request: NextRequest) {
   try {
@@ -43,78 +46,53 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
-    // Try to find user by clerk_id
-    let userRecord;
+    // User record type for users_simplified
+    type UserRecord = {
+      id: string;
+      clerk_id: string | null;
+      email: string;
+      name: string;
+      avatar_url: string | null;
+      phone: string | null;
+      title: string | null;
+      organization_id: string | null;
+      organization_type: string | null;
+      role: string;
+      is_active: boolean;
+      email_verified: boolean;
+      last_login_at: string | null;
+      created_at: string;
+      updated_at: string;
+    };
+
+    // Try to find user by clerk_id (simplified table - no FK joins)
+    let userRecord: UserRecord | null = null;
     const { data: clerkMatch } = await supabase
-      .from('users')
-      .select(`
-        id,
-        email,
-        name,
-        role,
-        organization_id,
-        avatar_url,
-        title,
-        phone,
-        is_active,
-        email_verified,
-        last_login_at,
-        created_at,
-        organization:organizations(
-          id,
-          name,
-          slug,
-          type,
-          logo_url,
-          website,
-          verified
-        )
-      `)
+      .from('users_simplified')
+      .select('*')
       .eq('clerk_id', userId)
       .single();
 
     if (clerkMatch) {
-      userRecord = clerkMatch;
+      userRecord = clerkMatch as UserRecord;
     } else {
       // Try to find by email for migration
       const primaryEmail = clerkUser.emailAddresses[0]?.emailAddress;
       if (primaryEmail) {
         const { data: emailMatch } = await supabase
-          .from('users')
-          .select(`
-            id,
-            email,
-            name,
-            role,
-            organization_id,
-            avatar_url,
-            title,
-            phone,
-            is_active,
-            email_verified,
-            last_login_at,
-            created_at,
-            organization:organizations(
-              id,
-              name,
-              slug,
-              type,
-              logo_url,
-              website,
-              verified
-            )
-          `)
+          .from('users_simplified')
+          .select('*')
           .eq('email', primaryEmail.toLowerCase())
           .single();
 
         if (emailMatch) {
           // Update user with clerk_id for future lookups
           await supabase
-            .from('users')
+            .from('users_simplified')
             .update({ clerk_id: userId })
-            .eq('id', (emailMatch as { id: string }).id);
+            .eq('id', (emailMatch as UserRecord).id);
 
-          userRecord = emailMatch;
+          userRecord = emailMatch as UserRecord;
         }
       }
     }
@@ -134,59 +112,54 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const typedRecord = userRecord as {
-      id: string;
-      email: string;
-      name: string;
-      role: string;
-      organization_id: string;
-      avatar_url?: string;
-      title?: string;
-      phone?: string;
-      is_active: boolean;
-      email_verified: boolean;
-      last_login_at?: string;
-      created_at: string;
-      organization: {
-        id: string;
-        name: string;
-        slug: string;
-        type: string;
-        logo_url?: string;
-        website?: string;
-        verified: boolean;
-      };
-    };
+    // Get organization details from the appropriate table based on type
+    let organization = null;
+    if (userRecord.organization_id && userRecord.organization_type) {
+      const tableName = userRecord.organization_type === 'sponsor' ? 'sponsors_simplified'
+        : userRecord.organization_type === 'investor' ? 'investors_simplified'
+        : 'cdes_merged';
+
+      const { data: org } = await supabase
+        .from(tableName)
+        .select('name, slug, website, logo_url, verified, status')
+        .eq('organization_id', userRecord.organization_id)
+        .single();
+
+      if (org) {
+        organization = {
+          id: userRecord.organization_id,
+          name: org.name,
+          slug: org.slug,
+          type: userRecord.organization_type,
+          logo: org.logo_url,
+          website: org.website,
+          verified: org.verified || false,
+        };
+      }
+    }
 
     // Update last login
     await supabase
-      .from('users')
+      .from('users_simplified')
       .update({ last_login_at: new Date().toISOString() })
-      .eq('id', typedRecord.id);
+      .eq('id', userRecord.id);
 
     return NextResponse.json({
       user: {
-        id: typedRecord.id,
-        email: typedRecord.email,
-        name: typedRecord.name,
-        role: typedRecord.role,
-        organizationId: typedRecord.organization_id,
-        organization: {
-          id: typedRecord.organization.id,
-          name: typedRecord.organization.name,
-          slug: typedRecord.organization.slug,
-          type: typedRecord.organization.type,
-          logo: typedRecord.organization.logo_url,
-          website: typedRecord.organization.website,
-          verified: typedRecord.organization.verified,
-        },
-        avatar: typedRecord.avatar_url || clerkUser.imageUrl,
-        title: typedRecord.title,
-        phone: typedRecord.phone,
-        isActive: typedRecord.is_active,
-        emailVerified: typedRecord.email_verified,
-        lastLoginAt: typedRecord.last_login_at,
-        createdAt: typedRecord.created_at,
+        id: userRecord.id,
+        email: userRecord.email,
+        name: userRecord.name,
+        role: userRecord.role,
+        organizationId: userRecord.organization_id,
+        organizationType: userRecord.organization_type,
+        organization,
+        avatar: userRecord.avatar_url || clerkUser.imageUrl,
+        title: userRecord.title,
+        phone: userRecord.phone,
+        isActive: userRecord.is_active,
+        emailVerified: userRecord.email_verified,
+        lastLoginAt: userRecord.last_login_at,
+        createdAt: userRecord.created_at,
       },
     });
   } catch (error) {

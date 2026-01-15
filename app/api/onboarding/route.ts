@@ -28,27 +28,107 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
-    // Check if user already exists
+    // Check if user already exists by clerk_id
     const { data: existingUser } = await supabase
       .from("users")
-      .select("id")
+      .select("id, organization_id, role")
       .eq("clerk_id", userId)
       .single();
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: "User already onboarded" },
-        { status: 400 }
-      );
+      // User already onboarded - set cookie and return success (don't error)
+      // This fixes the stuck loop when cookie was lost but user exists
+      const { data: existingOrg } = await supabase
+        .from("organizations")
+        .select("id, type")
+        .eq("id", existingUser.organization_id)
+        .single();
+
+      const response = NextResponse.json({
+        success: true,
+        alreadyOnboarded: true,
+        user: existingUser,
+        organization: existingOrg,
+      });
+
+      // Set the cookie they're missing
+      response.cookies.set('tcredex_onboarded', 'true', {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+      });
+
+      return response;
     }
 
-    // Get user info from Clerk
+    // Get user info from Clerk first (we need the email to check for invites)
     const clerkUser = await currentUser();
     if (!clerkUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const userEmail = clerkUser.emailAddresses?.[0]?.emailAddress;
+    const userEmail = clerkUser.emailAddresses?.[0]?.emailAddress?.toLowerCase();
+
+    // Check if user was INVITED (has a user record by email with org_id already assigned)
+    // This happens when an admin invites them via /dashboard/teams
+    if (userEmail) {
+      const { data: invitedUser } = await supabase
+        .from("users")
+        .select("id, organization_id, role, email")
+        .eq("email", userEmail)
+        .single();
+
+      if (invitedUser && invitedUser.organization_id) {
+        // User was invited! Update their record with clerk_id instead of creating new org
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({
+            clerk_id: userId,
+            name: clerkUser.firstName
+              ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
+              : userEmail?.split("@")[0] || "User",
+            is_active: true,
+          })
+          .eq("id", invitedUser.id);
+
+        if (updateError) {
+          console.error("[Onboarding] Invited user update error:", updateError);
+          return NextResponse.json(
+            { error: "Failed to activate invited user" },
+            { status: 500 }
+          );
+        }
+
+        // Get their existing organization
+        const { data: invitedOrg } = await supabase
+          .from("organizations")
+          .select("id, name, type, slug")
+          .eq("id", invitedUser.organization_id)
+          .single();
+
+        const response = NextResponse.json({
+          success: true,
+          wasInvited: true,
+          user: { ...invitedUser, clerk_id: userId },
+          organization: invitedOrg,
+        });
+
+        // Set the onboarding cookie
+        response.cookies.set('tcredex_onboarded', 'true', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 365,
+        });
+
+        console.log(`[Onboarding] Invited user ${userEmail} activated in org ${invitedOrg?.name}`);
+        return response;
+      }
+    }
+
+    // If we get here, user is NOT invited - they need to create their own org
+    // (clerkUser is already fetched above)
     const userName = clerkUser.firstName
       ? `${clerkUser.firstName} ${clerkUser.lastName || ""}`.trim()
       : userEmail?.split("@")[0] || "User";

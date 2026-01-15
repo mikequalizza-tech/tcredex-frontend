@@ -1,3 +1,8 @@
+/**
+ * Deals by Organization API
+ * SIMPLIFIED: Uses *_simplified and cdes_merged tables - no organization FK joins
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -5,55 +10,90 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const orgId = searchParams.get('orgId');
-  const userEmail = searchParams.get('userEmail');
+  const orgType = searchParams.get('orgType'); // New: can pass org type directly
 
   if (!orgId) {
     return NextResponse.json({ error: 'orgId required' }, { status: 400 });
   }
 
   try {
-    const supabase = getSupabaseAdmin() as any;
+    const supabase = getSupabaseAdmin();
 
-    // Get organization type
-    const { data: orgData, error: orgError } = await supabase
-      .from('organizations')
-      .select('type')
-      .eq('id', orgId)
-      .single();
+    // If orgType is provided, use it directly. Otherwise, try to determine from entity tables.
+    let organizationType = orgType;
 
-    if (orgError || !orgData) {
-      console.error('[Deals by Org] Org not found:', orgId, orgError);
-      return NextResponse.json({ deals: [] });
+    if (!organizationType) {
+      // Try to find organization type by checking each simplified table
+      const { data: sponsor } = await supabase
+        .from('sponsors_simplified')
+        .select('id')
+        .eq('organization_id', orgId)
+        .single();
+
+      if (sponsor) {
+        organizationType = 'sponsor';
+      } else {
+        const { data: cde } = await supabase
+          .from('cdes_merged')
+          .select('id')
+          .eq('organization_id', orgId)
+          .single();
+
+        if (cde) {
+          organizationType = 'cde';
+        } else {
+          const { data: investor } = await supabase
+            .from('investors_simplified')
+            .select('id')
+            .eq('organization_id', orgId)
+            .single();
+
+          if (investor) {
+            organizationType = 'investor';
+          }
+        }
+      }
     }
 
     let query = supabase.from('deals').select('*');
 
     // Build conditions based on organization type
-    if ((orgData as any).type === 'sponsor') {
-      query = query.eq('sponsor_organization_id', orgId).neq('status', 'draft');
-    } else if ((orgData as any).type === 'cde') {
+    if (organizationType === 'sponsor') {
+      // For sponsors, look up sponsor_id from sponsors_simplified
+      const { data: sponsorData } = await supabase
+        .from('sponsors_simplified')
+        .select('id')
+        .eq('organization_id', orgId)
+        .single();
+
+      if (sponsorData) {
+        query = query.eq('sponsor_id', (sponsorData as { id: string }).id).neq('status', 'draft');
+      } else {
+        return NextResponse.json({ deals: [] });
+      }
+    } else if (organizationType === 'cde') {
       // For CDEs, find the CDE record and use its ID
       const { data: cdeData } = await supabase
-        .from('cdes')
+        .from('cdes_merged')
         .select('id')
         .eq('organization_id', orgId)
         .single();
 
       if (cdeData) {
-        query = query.eq('assigned_cde_id', (cdeData as any).id);
+        query = query.eq('assigned_cde_id', (cdeData as { id: string }).id);
       } else {
         return NextResponse.json({ deals: [] });
       }
-    } else if ((orgData as any).type === 'investor') {
+    } else if (organizationType === 'investor') {
       // For investors, find the investor record
       const { data: investorData } = await supabase
-        .from('investors')
+        .from('investors_simplified')
         .select('id')
         .eq('organization_id', orgId)
         .single();
 
       if (investorData) {
-        query = query.eq('assigned_investor_id', (investorData as any).id);
+        query = query.eq('assigned_investor_id', (investorData as { id: string }).id);
       } else {
         return NextResponse.json({ deals: [] });
       }

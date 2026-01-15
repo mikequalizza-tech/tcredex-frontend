@@ -6,7 +6,7 @@
  */
 
 // Backend API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
 
 // =============================================================================
 // TYPES
@@ -334,13 +334,405 @@ class BackendApiClient {
   }
 
   // ===========================================================================
+  // DEALS
+  // ===========================================================================
+
+  async getDeals(filters?: {
+    project_type?: string;
+    state?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const queryString = params.toString();
+    return this.request(`/api/deals${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getDealById(id: string) {
+    return this.request(`/api/deals/${id}`);
+  }
+
+  async getDealsByOrganization(orgId: string, options?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) {
+    const params = new URLSearchParams();
+    if (options) {
+      Object.entries(options).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const queryString = params.toString();
+    return this.request(`/api/deals/by-organization/${orgId}${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getMarketplace(filters?: {
+    project_type?: string;
+    state?: string;
+    tier?: number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const queryString = params.toString();
+    return this.request(`/api/deals/marketplace${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getDealStats(organizationId?: string) {
+    const params = organizationId ? `?organizationId=${organizationId}` : '';
+    return this.request(`/api/deals/stats${params}`);
+  }
+
+  async createDeal(dealData: Record<string, unknown>) {
+    return this.request('/api/deals', {
+      method: 'POST',
+      body: JSON.stringify(dealData),
+    });
+  }
+
+  async updateDeal(id: string, dealData: Record<string, unknown>) {
+    return this.request(`/api/deals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(dealData),
+    });
+  }
+
+  async updateDealStatus(id: string, status: string, userId?: string) {
+    return this.request(`/api/deals/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, userId }),
+    });
+  }
+
+  // ===========================================================================
+  // CDEs
+  // ===========================================================================
+
+  async getCDEs(filters?: { status?: string }) {
+    const params = filters?.status ? `?status=${filters.status}` : '';
+    return this.request(`/api/cdes${params}`);
+  }
+
+  async getCDEById(id: string) {
+    return this.request(`/api/cdes/${id}`);
+  }
+
+  // ===========================================================================
+  // INTAKE
+  // ===========================================================================
+
+  async submitIntake(intakeData: Record<string, unknown>) {
+    return this.request('/api/intake', {
+      method: 'POST',
+      body: JSON.stringify(intakeData),
+    });
+  }
+
+  async getIntakeStatus(dealId: string) {
+    return this.request(`/api/intake/${dealId}`);
+  }
+
+  // ===========================================================================
+  // DISCORD - Servers
+  // ===========================================================================
+
+  async createServer(data: {
+    name: string;
+    organizationId?: string;
+    dealId?: string;
+    createdByUserId: string;
+  }) {
+    return this.request('/api/discord/servers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getServer(id: string) {
+    return this.request(`/api/discord/servers/${id}`);
+  }
+
+  async getServerByInviteCode(code: string) {
+    return this.request(`/api/discord/servers/invite/${code}`);
+  }
+
+  async getUserServers(userId: string) {
+    return this.request(`/api/discord/users/${userId}/servers`);
+  }
+
+  async getOrganizationServers(orgId: string) {
+    return this.request(`/api/discord/organizations/${orgId}/servers`);
+  }
+
+  async getDealServers(dealId: string) {
+    return this.request(`/api/discord/deals/${dealId}/servers`);
+  }
+
+  async updateServer(id: string, data: { name?: string; imageUrl?: string }) {
+    return this.request(`/api/discord/servers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async generateInviteCode(serverId: string) {
+    return this.request(`/api/discord/servers/${serverId}/invite-code`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteServer(id: string) {
+    return this.request(`/api/discord/servers/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ===========================================================================
+  // DISCORD - Channels
+  // ===========================================================================
+
+  async createChannel(data: {
+    name: string;
+    type: 'TEXT' | 'AUDIO' | 'VIDEO';
+    serverId: string;
+  }) {
+    return this.request('/api/discord/channels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getServerChannels(serverId: string) {
+    return this.request(`/api/discord/servers/${serverId}/channels`);
+  }
+
+  async updateChannel(id: string, data: { name?: string }) {
+    return this.request(`/api/discord/channels/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteChannel(id: string) {
+    return this.request(`/api/discord/channels/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ===========================================================================
+  // DISCORD - Members
+  // ===========================================================================
+
+  async addMember(data: {
+    serverId: string;
+    userId: string;
+    role?: 'ADMIN' | 'MODERATOR' | 'GUEST';
+  }) {
+    return this.request('/api/discord/members', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async joinServerByInvite(inviteCode: string, userId: string) {
+    return this.request(`/api/discord/servers/join/${inviteCode}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  async updateMemberRole(memberId: string, role: 'ADMIN' | 'MODERATOR' | 'GUEST') {
+    return this.request(`/api/discord/members/${memberId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async removeMember(serverId: string, userId: string) {
+    return this.request(`/api/discord/servers/${serverId}/members/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async leaveServer(serverId: string, userId: string) {
+    return this.request(`/api/discord/servers/${serverId}/leave`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  // ===========================================================================
+  // DISCORD - Messages
+  // ===========================================================================
+
+  async sendMessage(data: {
+    content: string;
+    channelId: string;
+    memberId: string;
+    fileUrl?: string;
+  }) {
+    return this.request('/api/discord/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getChannelMessages(channelId: string, cursor?: string) {
+    const params = cursor ? `?cursor=${cursor}` : '';
+    return this.request(`/api/discord/channels/${channelId}/messages${params}`);
+  }
+
+  async updateMessage(id: string, content: string) {
+    return this.request(`/api/discord/messages/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async deleteMessage(id: string) {
+    return this.request(`/api/discord/messages/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ===========================================================================
+  // DISCORD - Direct Messages & Conversations
+  // ===========================================================================
+
+  async createConversation(memberOneId: string, memberTwoId: string) {
+    return this.request('/api/discord/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ memberOneId, memberTwoId }),
+    });
+  }
+
+  async getMemberConversations(memberId: string) {
+    return this.request(`/api/discord/members/${memberId}/conversations`);
+  }
+
+  async sendDirectMessage(data: {
+    content: string;
+    conversationId: string;
+    memberId: string;
+    fileUrl?: string;
+  }) {
+    return this.request('/api/discord/direct-messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getConversationMessages(conversationId: string, cursor?: string) {
+    const params = cursor ? `?cursor=${cursor}` : '';
+    return this.request(`/api/discord/conversations/${conversationId}/messages${params}`);
+  }
+
+  // ===========================================================================
+  // SCORING
+  // ===========================================================================
+
+  async calculateSectionCScore(dealId: string, dealData?: Record<string, unknown>) {
+    return this.request('/api/scoring/section-c', {
+      method: 'POST',
+      body: JSON.stringify({ dealId, dealData }),
+    });
+  }
+
+  async checkQALICBEligibility(dealData: Record<string, unknown>) {
+    return this.request('/api/scoring/qalicb', {
+      method: 'POST',
+      body: JSON.stringify(dealData),
+    });
+  }
+
+  // ===========================================================================
+  // AUTOMATCH
+  // ===========================================================================
+
+  async findCDEMatches(dealId: string, options?: {
+    minScore?: number;
+    maxResults?: number;
+  }) {
+    return this.request('/api/automatch/find', {
+      method: 'POST',
+      body: JSON.stringify({ dealId, ...options }),
+    });
+  }
+
+  // ===========================================================================
   // GEO
   // ===========================================================================
 
   async resolveTract(address: string) {
-    return this.request(
-      `/api/geo/resolve-tract?address=${encodeURIComponent(address)}`
-    );
+    return this.request(`/api/geo/resolve-tract?address=${encodeURIComponent(address)}`);
+  }
+
+  async getTractEligibility(censusTract: string) {
+    return this.request(`/api/geo/eligibility/${censusTract}`);
+  }
+
+  async getStates() {
+    return this.request('/api/geo/states');
+  }
+
+  // ===========================================================================
+  // PDF Generation
+  // ===========================================================================
+
+  async generateDealProfile(dealId: string) {
+    return this.request('/api/pdf/deal-profile', {
+      method: 'POST',
+      body: JSON.stringify({ dealId }),
+    });
+  }
+
+  async generateTermSheet(dealId: string, cdeId: string) {
+    return this.request('/api/pdf/term-sheet', {
+      method: 'POST',
+      body: JSON.stringify({ dealId, cdeId }),
+    });
+  }
+
+  async generateLOI(loiId: string) {
+    return this.request('/api/pdf/loi', {
+      method: 'POST',
+      body: JSON.stringify({ loiId }),
+    });
+  }
+
+  async generateCommitmentLetter(commitmentId: string) {
+    return this.request('/api/pdf/commitment-letter', {
+      method: 'POST',
+      body: JSON.stringify({ commitmentId }),
+    });
+  }
+
+  async generateClosingChecklist(dealId: string) {
+    return this.request('/api/pdf/closing-checklist', {
+      method: 'POST',
+      body: JSON.stringify({ dealId }),
+    });
+  }
+
+  async generateComplianceReport(dealId: string) {
+    return this.request('/api/pdf/compliance-report', {
+      method: 'POST',
+      body: JSON.stringify({ dealId }),
+    });
   }
 }
 

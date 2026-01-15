@@ -1,25 +1,45 @@
 /**
  * Drafts API (deals-backed)
  * Stores drafts on the deals table using status='draft' and draft_data
+ *
+ * SIMPLIFIED: Uses sponsors_simplified table
+ * With new schema, sponsor.id is passed directly from registration (entityId)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 // Resolve sponsor_id from organization_id (create sponsor row if missing)
-async function resolveSponsorId(supabase: ReturnType<typeof getSupabaseAdmin>, organizationId: string, fallbackName?: string, fallbackEmail?: string) {
+// NOTE: With simplified schema, this should rarely be needed - entityId from registration is the sponsor.id
+async function resolveSponsorId(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  organizationId: string,
+  fallbackName?: string,
+  fallbackEmail?: string
+) {
+  // First try sponsors_simplified
   const { data: sponsorRow } = await supabase
-    .from('sponsors')
+    .from('sponsors_simplified')
     .select('id')
     .eq('organization_id', organizationId)
     .single();
 
   if ((sponsorRow as any)?.id) return (sponsorRow as any).id as string;
 
+  // Create new sponsor if not found
+  const baseSlug = (fallbackName || 'sponsor')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .substring(0, 80);
+  const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+
   const { data: newSponsor, error: sponsorInsertError } = await supabase
-    .from('sponsors')
+    .from('sponsors_simplified')
     .insert({
       organization_id: organizationId,
+      name: fallbackName || 'Sponsor',
+      slug: uniqueSlug,
       primary_contact_name: fallbackName || 'Sponsor',
       primary_contact_email: fallbackEmail,
       status: 'active',
@@ -28,6 +48,7 @@ async function resolveSponsorId(supabase: ReturnType<typeof getSupabaseAdmin>, o
     .single();
 
   if (sponsorInsertError || !(newSponsor as any)?.id) {
+    console.error('[Drafts] Sponsor creation error:', sponsorInsertError);
     throw new Error('Unable to resolve sponsor record');
   }
 
@@ -40,10 +61,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const orgId = searchParams.get('orgId');
+  const sponsorId = searchParams.get('sponsorId'); // New: direct sponsor ID
 
-  if (!id && !orgId) {
+  if (!id && !orgId && !sponsorId) {
     return NextResponse.json(
-      { error: 'orgId or deal id required' },
+      { error: 'sponsorId, orgId, or deal id required' },
       { status: 400 }
     );
   }
@@ -63,14 +85,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ draft: data });
     }
 
-    const { data, error } = await supabase
+    // Query by sponsor_id directly (simplified) or fall back to organization lookup
+    let query = supabase
       .from('deals')
       .select('*')
-      .eq('sponsor_organization_id', orgId!)
       .eq('status', 'draft')
       .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    if (sponsorId) {
+      query = query.eq('sponsor_id', sponsorId);
+    } else if (orgId) {
+      // Legacy: look up sponsor by organization_id first
+      const resolvedSponsorId = await resolveSponsorId(supabase, orgId);
+      query = query.eq('sponsor_id', resolvedSponsorId);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('[Drafts] Load error:', error);
@@ -89,22 +120,32 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   try {
     const body = await request.json();
-    const { organizationId, data, readinessScore, dealId } = body;
+    const { organizationId, sponsorId: directSponsorId, data, readinessScore, dealId } = body;
 
-    if (!organizationId || !data) {
+    if (!data) {
       return NextResponse.json(
-        { error: 'organizationId and data are required' },
+        { error: 'data is required' },
         { status: 400 }
       );
     }
 
-    // Resolve sponsor_id
-    const sponsorId = await resolveSponsorId(
-      supabase,
-      organizationId,
-      data.sponsorName || data.personCompletingForm,
-      data.personCompletingForm || data.contactEmail
-    );
+    // Use direct sponsorId if provided (new simplified flow), otherwise resolve from org
+    let sponsorId = directSponsorId || data.sponsorId;
+    if (!sponsorId && organizationId) {
+      sponsorId = await resolveSponsorId(
+        supabase,
+        organizationId,
+        data.sponsorName || data.personCompletingForm,
+        data.personCompletingForm || data.contactEmail
+      );
+    }
+
+    if (!sponsorId) {
+      return NextResponse.json(
+        { error: 'sponsorId or organizationId required' },
+        { status: 400 }
+      );
+    }
 
     const readiness = readinessScore || 0;
     const projectName = data.projectName || 'Untitled Project';
@@ -113,9 +154,7 @@ export async function POST(request: NextRequest) {
       project_name: projectName,
       sponsor_id: sponsorId,
       sponsor_name: data.sponsorName,
-      sponsor_organization_id: organizationId,
       programs: data.programs || ['NMTC'],
-      program_level: data.programLevel || 'federal',
       address: data.address,
       city: data.city,
       state: data.state,
@@ -150,10 +189,11 @@ export async function POST(request: NextRequest) {
     let targetId = dealId as string | null;
 
     if (!targetId) {
+      // Find existing draft by sponsor_id
       const { data: existingDraft } = await supabase
         .from('deals')
         .select('id')
-        .eq('sponsor_organization_id', organizationId)
+        .eq('sponsor_id', sponsorId)
         .eq('status', 'draft')
         .order('updated_at', { ascending: false })
         .limit(1)
@@ -184,16 +224,10 @@ export async function POST(request: NextRequest) {
 
     if (result.error) {
       console.error('[Drafts] Save error:', result.error);
-      console.error('[Drafts] Error details:', {
-        code: result.error.code,
-        message: result.error.message,
-        details: result.error.details,
-        hint: result.error.hint
-      });
-      return NextResponse.json({ 
-        error: 'Failed to save draft', 
+      return NextResponse.json({
+        error: 'Failed to save draft',
         details: result.error.message,
-        code: result.error.code 
+        code: result.error.code
       }, { status: 500 });
     }
 
@@ -205,24 +239,24 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[Drafts] Error:', error);
-    console.error('[Drafts] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-    return NextResponse.json({ 
-      error: 'Server error', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+    return NextResponse.json({
+      error: 'Server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
 
-// DELETE - Delete draft (draft-status deals) by id or organization
+// DELETE - Delete draft (draft-status deals) by id or sponsor
 export async function DELETE(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
-  const orgId = searchParams.get('orgId');
+  const sponsorId = searchParams.get('sponsorId');
+  const orgId = searchParams.get('orgId'); // Legacy support
 
-  if (!id && !orgId) {
+  if (!id && !sponsorId && !orgId) {
     return NextResponse.json(
-      { error: 'Draft id or orgId required' },
+      { error: 'Draft id, sponsorId, or orgId required' },
       { status: 400 }
     );
   }
@@ -232,8 +266,12 @@ export async function DELETE(request: NextRequest) {
 
     if (id) {
       query = query.eq('id', id);
+    } else if (sponsorId) {
+      query = query.eq('sponsor_id', sponsorId);
     } else if (orgId) {
-      query = query.eq('sponsor_organization_id', orgId!);
+      // Legacy: resolve sponsor from org
+      const resolvedSponsorId = await resolveSponsorId(supabase, orgId);
+      query = query.eq('sponsor_id', resolvedSponsorId);
     }
 
     const { error } = await query;

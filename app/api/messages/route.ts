@@ -1,3 +1,8 @@
+/**
+ * Messages API
+ * SIMPLIFIED: Uses users_simplified - no organization FK joins
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
@@ -30,7 +35,7 @@ export async function GET(request: NextRequest) {
     // Also check by user_id for existing participants
     if (!participant) {
       const { data: user } = await supabase
-        .from('users')
+        .from('users_simplified')
         .select('id')
         .eq('clerk_id', userId)
         .single();

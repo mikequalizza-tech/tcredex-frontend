@@ -58,11 +58,11 @@ export async function GET(request: NextRequest) {
           deals (
             id,
             project_name,
-            program_type,
+            programs,
+            sponsor_name,
             total_project_cost,
             allocation_request,
-            credit_type,
-            organizations (name)
+            credit_type
           ),
           closing_room_participants (
             id,
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
           id,
           project_name,
           sponsor_name,
-          program_type,
+          programs,
           nmtc_financing_requested,
           total_project_cost
         )

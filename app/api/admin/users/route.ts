@@ -1,6 +1,7 @@
 /**
  * tCredex Admin API - Users Management
- * GET /api/admin/users - List all users from users, investors, and sponsors tables
+ * GET /api/admin/users - List all users from users_simplified, investors_simplified, sponsors_simplified
+ * SIMPLIFIED: Uses *_simplified tables - no organization FK joins
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -30,19 +31,10 @@ export async function GET(request: NextRequest) {
     const roleFilter = searchParams.get('role');
     const search = searchParams.get('search')?.toLowerCase();
 
-    // Fetch from users table (CDEs and admins)
+    // Fetch from users_simplified table (CDEs and admins)
     const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select(`
-        id,
-        name,
-        email,
-        role,
-        status,
-        organization_id,
-        last_login_at,
-        organization:organizations(name, type)
-      `)
+      .from('users_simplified')
+      .select('id, name, email, role, organization_id, organization_type, is_active, last_login_at')
       .order('created_at', { ascending: false });
 
     type UserRow = {
@@ -50,21 +42,35 @@ export async function GET(request: NextRequest) {
       name: string | null;
       email: string;
       role: string | null;
-      status: string | null;
       organization_id: string | null;
+      organization_type: string | null;
+      is_active: boolean;
       last_login_at: string | null;
-      organization: { name: string; type: string } | null;
     };
     const typedUsers = users as UserRow[] | null;
 
     if (!usersError && typedUsers) {
       for (const user of typedUsers) {
-        const orgType = user.organization?.type;
-        const userRole = orgType === 'admin' ? 'admin' : 'cde';
+        // Determine role from organization_type
+        const userRole = user.organization_type === 'admin' ? 'admin' : 'cde';
 
         // Apply filters
         if (roleFilter && roleFilter !== 'all' && roleFilter !== userRole) continue;
         if (search && !user.name?.toLowerCase().includes(search) && !user.email?.toLowerCase().includes(search)) continue;
+
+        // Get organization name if user has org
+        let orgName = 'Unknown Organization';
+        if (user.organization_id && user.organization_type) {
+          const tableName = user.organization_type === 'sponsor' ? 'sponsors_simplified'
+            : user.organization_type === 'investor' ? 'investors_simplified'
+            : 'cdes_merged';
+          const { data: org } = await supabase
+            .from(tableName)
+            .select('name')
+            .eq('organization_id', user.organization_id)
+            .single();
+          if (org) orgName = (org as { name: string }).name;
+        }
 
         // Count deals for this user's organization
         let dealsCount = 0;
@@ -72,7 +78,7 @@ export async function GET(request: NextRequest) {
           const { count } = await supabase
             .from('deals')
             .select('*', { count: 'exact', head: true })
-            .or(`sponsor_organization_id.eq.${user.organization_id},assigned_cde_id.eq.${user.organization_id}`);
+            .or(`sponsor_id.eq.${user.organization_id}`);
           dealsCount = count || 0;
         }
 
@@ -81,8 +87,8 @@ export async function GET(request: NextRequest) {
           name: user.name || 'Unknown',
           email: user.email,
           role: userRole as 'admin' | 'cde',
-          status: (user.status as 'active' | 'pending' | 'suspended') || 'active',
-          organization: user.organization?.name || 'Unknown Organization',
+          status: user.is_active ? 'active' : 'suspended',
+          organization: orgName,
           organizationId: user.organization_id || undefined,
           lastActive: user.last_login_at || new Date().toISOString(),
           dealsCount,
@@ -90,30 +96,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from investors table
+    // Fetch from investors_simplified table
     if (!roleFilter || roleFilter === 'all' || roleFilter === 'investor') {
       const { data: investors, error: investorsError } = await supabase
-        .from('investors')
-        .select(`
-          id,
-          primary_contact_name,
-          primary_contact_email,
-          status,
-          organization_id,
-          updated_at,
-          organization:organizations(name)
-        `)
+        .from('investors_simplified')
+        .select('id, name, primary_contact_name, primary_contact_email, status, organization_id, updated_at')
         .not('primary_contact_email', 'is', null)
         .order('created_at', { ascending: false });
 
       type InvestorRow = {
         id: string;
+        name: string | null;
         primary_contact_name: string | null;
         primary_contact_email: string;
         status: string | null;
         organization_id: string | null;
         updated_at: string | null;
-        organization: { name: string } | null;
       };
       const typedInvestors = investors as InvestorRow[] | null;
 
@@ -132,11 +130,11 @@ export async function GET(request: NextRequest) {
 
           adminUsers.push({
             id: inv.id,
-            name: inv.primary_contact_name || 'Investor User',
+            name: inv.primary_contact_name || inv.name || 'Investor User',
             email: inv.primary_contact_email,
             role: 'investor',
             status: (inv.status as 'active' | 'pending' | 'suspended') || 'active',
-            organization: inv.organization?.name || 'Unknown Organization',
+            organization: inv.name || 'Unknown Organization',
             organizationId: inv.organization_id || undefined,
             lastActive: inv.updated_at || new Date().toISOString(),
             dealsCount,
@@ -145,30 +143,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from sponsors table
+    // Fetch from sponsors_simplified table
     if (!roleFilter || roleFilter === 'all' || roleFilter === 'sponsor') {
       const { data: sponsors, error: sponsorsError } = await supabase
-        .from('sponsors')
-        .select(`
-          id,
-          primary_contact_name,
-          primary_contact_email,
-          status,
-          organization_id,
-          updated_at,
-          organization:organizations(name)
-        `)
+        .from('sponsors_simplified')
+        .select('id, name, primary_contact_name, primary_contact_email, status, organization_id, updated_at')
         .not('primary_contact_email', 'is', null)
         .order('created_at', { ascending: false });
 
       type SponsorRow = {
         id: string;
+        name: string | null;
         primary_contact_name: string | null;
         primary_contact_email: string;
         status: string | null;
         organization_id: string | null;
         updated_at: string | null;
-        organization: { name: string } | null;
       };
       const typedSponsors = sponsors as SponsorRow[] | null;
 
@@ -179,21 +169,21 @@ export async function GET(request: NextRequest) {
 
           // Count deals for this sponsor
           let dealsCount = 0;
-          if (sp.organization_id) {
+          if (sp.id) {
             const { count } = await supabase
               .from('deals')
               .select('*', { count: 'exact', head: true })
-              .eq('sponsor_organization_id', sp.organization_id);
+              .eq('sponsor_id', sp.id);
             dealsCount = count || 0;
           }
 
           adminUsers.push({
             id: sp.id,
-            name: sp.primary_contact_name || 'Sponsor User',
+            name: sp.primary_contact_name || sp.name || 'Sponsor User',
             email: sp.primary_contact_email,
             role: 'sponsor',
             status: (sp.status as 'active' | 'pending' | 'suspended') || 'active',
-            organization: sp.organization?.name || 'Unknown Organization',
+            organization: sp.name || 'Unknown Organization',
             organizationId: sp.organization_id || undefined,
             lastActive: sp.updated_at || new Date().toISOString(),
             dealsCount,

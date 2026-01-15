@@ -17,50 +17,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { dealId, intakeData, saveOnly } = body;
 
-    // Validate required sponsor org id
+    // Validate required sponsor ID
+    // With simplified schema, sponsorId IS the sponsor's primary key (no lookup needed)
     if (!intakeData.sponsorId) {
       console.error('POST /api/intake error: sponsorId is required');
       return NextResponse.json({
         success: false,
-        error: 'Organization ID (sponsorId) is required. Please ensure you are logged in with a valid organization.'
+        error: 'Sponsor ID is required. Please ensure you are logged in with a valid sponsor account.'
       }, { status: 400 });
     }
 
-    // Resolve sponsor_id to the sponsors table (FK) using organization_id
-    const sponsorOrgId = intakeData.sponsorId as string;
-    type SponsorRow = { id: string } | null;
-    const { data: sponsorRow, error: sponsorLookupError } = await supabase
-      .from('sponsors')
-      .select('id')
-      .eq('organization_id', sponsorOrgId)
-      .single();
-
-    let sponsorId = (sponsorRow as SponsorRow)?.id;
-
-    if (!sponsorId) {
-      type NewSponsorRow = { id: string } | null;
-      const { data: newSponsor, error: sponsorInsertError } = await supabase
-        .from('sponsors')
-        .insert({
-          organization_id: sponsorOrgId,
-          primary_contact_name: intakeData.sponsorName || intakeData.personCompletingForm || 'Sponsor',
-          primary_contact_email: intakeData.personCompletingForm || undefined,
-          status: 'active',
-        } as never)
-        .select('id')
-        .single();
-
-      const typedNewSponsor = newSponsor as NewSponsorRow;
-
-      if (sponsorInsertError || !typedNewSponsor) {
-        console.error('[Intake] Unable to resolve sponsor record:', sponsorLookupError || sponsorInsertError);
-        return NextResponse.json({
-          success: false,
-          error: 'Unable to save draft: sponsor record is missing. Please try again or contact support.',
-        }, { status: 400 });
-      }
-      sponsorId = typedNewSponsor.id;
-    }
+    // Use sponsor ID directly - no lookup needed with simplified schema
+    const sponsorId = intakeData.sponsorId as string;
 
     // Calculate readiness score
     const { score, tier, missingFields } = calculateReadiness(intakeData);
@@ -68,9 +36,8 @@ export async function POST(request: NextRequest) {
     // Prepare deal record
     const dealRecord = {
       project_name: intakeData.projectName,
-      sponsor_id: sponsorId,             // FK to sponsors.id
+      sponsor_id: sponsorId,             // Direct link to sponsors_simplified.id
       sponsor_name: intakeData.sponsorName,
-      sponsor_organization_id: sponsorOrgId,
       programs: intakeData.programs || ['NMTC'],
       address: intakeData.address,
       city: intakeData.city,

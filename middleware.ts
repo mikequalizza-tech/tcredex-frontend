@@ -47,10 +47,16 @@ const isPublicRoute = createRouteMatcher([
   '/who-we-serve',
   '/programs(.*)',
   '/r/(.*)',  // QR/referral redirects
-  '/onboarding', // Allow access to onboarding
+  '/onboarding',
+  '/map',  // Map is public (shows marketplace map)
+  '/deals',  // Marketplace is public
+  '/deals/(.*)',  // Individual deal pages
+  '/faq',
+  '/newsletter',
   '/api/auth/(.*)',
   '/api/register',
   '/api/contact',
+  '/api/chat',  // ChatTC API
   '/api/eligibility',
   '/api/geo/(.*)',
   '/api/tracts/(.*)',
@@ -59,11 +65,12 @@ const isPublicRoute = createRouteMatcher([
   '/api/pricing',
   '/api/founders/(.*)',
   '/api/deals',
-  '/api/deals/marketplace',
+  '/api/deals/(.*)',
   '/api/cdes',
   '/api/investors',
   '/api/webhook/(.*)',
-  '/api/onboarding', // Allow access to onboarding API
+  '/api/onboarding',
+  '/api/closing-room',  // Allow closing room API
 ]);
 
 // Routes that require onboarding to be complete

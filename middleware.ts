@@ -88,6 +88,20 @@ const requiresOnboarding = createRouteMatcher([
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
+  // Let API calls pass through directly to the backend proxy while still protecting private endpoints
+  // isPublicRoute (defined above) covers marketing pages, auth flows, and explicitly public API endpoints.
+  if (pathname.startsWith('/api')) {
+    if (!isPublicRoute(request)) {
+      const { userId } = await auth();
+
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    }
+
+    return NextResponse.next();
+  }
+
   // Handle QR/Referral redirects
   if (pathname.startsWith('/r/')) {
     const code = pathname.replace('/r/', '').split('/')[0];

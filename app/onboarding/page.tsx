@@ -3,13 +3,17 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 <<<<<<< HEAD
-import { useUser } from "@clerk/nextjs";
+<<<<<<< HEAD
 import { Building2, Briefcase, TrendingUp, ArrowRight, Check } from "lucide-react";
 import Image from "next/image";
 =======
 import { createClient } from "@/lib/supabase/client";
 import { Building2, Briefcase, TrendingUp, ArrowRight, Check } from "lucide-react";
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+import { createClient } from "@/lib/supabase/client";
+import { Building2, Briefcase, TrendingUp, ArrowRight, Check } from "lucide-react";
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 
 type OrgType = "sponsor" | "cde" | "investor";
 
@@ -37,6 +41,7 @@ const orgTypes: { id: OrgType; title: string; description: string; icon: React.R
 export default function OnboardingPage() {
   const router = useRouter();
 <<<<<<< HEAD
+<<<<<<< HEAD
   const { user, isLoaded } = useUser();
 
   const [step, setStep] = useState<"role" | "complete" | "checking">("checking");
@@ -44,12 +49,17 @@ export default function OnboardingPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
   const [selectedType, setSelectedType] = useState<OrgType | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [complete, setComplete] = useState(false);
   // Removed orgName state, no longer needed
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   // Check if user is already onboarded on mount
   useEffect(() => {
@@ -136,6 +146,25 @@ export default function OnboardingPage() {
         .eq("id", authUser.id)
         .single();
 
+=======
+  useEffect(() => {
+    const checkUser = async () => {
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
+      if (!authUser) {
+        router.push("/signin");
+        return;
+      }
+
+      // Check if already onboarded (role-driven only)
+      const { data: userProfile } = await supabase
+        .from("users")
+        .select("role_type")
+        .eq("id", authUser.id)
+        .single();
+
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
       if (userProfile?.role_type) {
         // Already onboarded, redirect to dashboard
         router.push("/dashboard");
@@ -153,7 +182,10 @@ export default function OnboardingPage() {
     if (!user) return;
 
     setSelectedType(roleType);
+<<<<<<< HEAD
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
     setIsSubmitting(true);
     setError("");
 
@@ -162,6 +194,7 @@ export default function OnboardingPage() {
     const orgName = `${userName}'s ${type === 'sponsor' ? 'Projects' : type === 'cde' ? 'CDE' : 'Investments'}`;
 
     try {
+<<<<<<< HEAD
 <<<<<<< HEAD
       const response = await fetch("/api/onboarding", {
         method: "POST",
@@ -172,12 +205,17 @@ export default function OnboardingPage() {
         }),
       });
 =======
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
       const supabase = createClient();
       const roleTable = roleType === "sponsor" ? "sponsors"
         : roleType === "cde" ? "cdes"
         : "investors";
       const userName = user.email.split("@")[0];
+<<<<<<< HEAD
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 
       // Create role record (no organization)
       const { data: roleRecord, error: roleError } = await supabase
@@ -190,12 +228,17 @@ export default function OnboardingPage() {
         .single();
 
 <<<<<<< HEAD
+<<<<<<< HEAD
       if (!response.ok) {
         setError(result.error || "Failed to complete onboarding");
 =======
       if (roleError) {
         setError("Failed to create role record");
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+      if (roleError) {
+        setError("Failed to create role record");
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
         setIsSubmitting(false);
         return;
       }
@@ -244,6 +287,7 @@ export default function OnboardingPage() {
       }
 
       setComplete(true);
+<<<<<<< HEAD
 
       // Redirect based on role (handle new, existing, and invited users)
       // For existing/invited users, use the org type from the response
@@ -253,8 +297,11 @@ export default function OnboardingPage() {
 
       // Faster redirect for existing/invited users
       const delay = (result.alreadyOnboarded || result.wasInvited) ? 500 : 1500;
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 
       setTimeout(() => {
+<<<<<<< HEAD
 <<<<<<< HEAD
         if (redirectType === "sponsor") {
           router.push("/dashboard");
@@ -264,6 +311,11 @@ export default function OnboardingPage() {
           router.push("/dashboard");
         } else if (roleType === "cde") {
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+        if (roleType === "sponsor") {
+          router.push("/dashboard");
+        } else if (roleType === "cde") {
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
           router.push("/dashboard/pipeline");
         } else {
           router.push("/deals");
@@ -276,6 +328,7 @@ export default function OnboardingPage() {
     }
   };
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
@@ -303,6 +356,8 @@ export default function OnboardingPage() {
                 </h2>
               </div>
 =======
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -318,11 +373,15 @@ export default function OnboardingPage() {
           <div className="text-center py-4">
             <div className="w-12 h-12 bg-green-900/50 rounded-full flex items-center justify-center mx-auto mb-3">
               <Check className="h-6 w-6 text-green-400" />
+<<<<<<< HEAD
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
             </div>
             <h2 className="text-lg font-semibold text-white mb-2">You're all set!</h2>
             <p className="text-gray-400 text-sm">Redirecting to your dashboard...</p>
           </div>
+<<<<<<< HEAD
 <<<<<<< HEAD
           {step !== "complete" && (
             <p className="text-sm text-gray-400 mt-1">
@@ -330,6 +389,8 @@ export default function OnboardingPage() {
             </p>
           )}
 =======
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
         </div>
       </div>
     );
@@ -346,11 +407,15 @@ export default function OnboardingPage() {
           <p className="text-sm text-gray-400 mt-1">
             Select your role to get started
           </p>
+<<<<<<< HEAD
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
         </div>
 
         {/* Body */}
         <div className="p-6">
+<<<<<<< HEAD
 <<<<<<< HEAD
           {step === "complete" && (
             <div className="text-center py-4">
@@ -434,12 +499,49 @@ export default function OnboardingPage() {
         </div>
 
         {/* Footer */}
+=======
+          {error && (
+            <div className="mb-4 p-2.5 bg-red-900/50 border border-red-700 rounded-lg text-red-300 text-xs">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {orgTypes.map((type) => (
+              <button
+                key={type.id}
+                onClick={() => handleSelectRole(type.id)}
+                disabled={isSubmitting}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-700 hover:border-indigo-500 hover:bg-indigo-500/10 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                  {type.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-white">{type.title}</h3>
+                  <p className="text-xs text-gray-400 truncate">{type.description}</p>
+                </div>
+                {isSubmitting && selectedType === type.id ? (
+                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <ArrowRight className="h-4 w-4 text-gray-500 group-hover:text-indigo-400 transition-colors" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
         <div className="px-6 py-4 bg-gray-800/50 border-t border-gray-800">
           <p className="text-xs text-center text-gray-500">
             Secured by tCredex
           </p>
         </div>
+<<<<<<< HEAD
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
       </div>
     </div>
   );

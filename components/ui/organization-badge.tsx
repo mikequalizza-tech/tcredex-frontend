@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
 import { createClient } from "@/lib/supabase/client";
 import { Building2, Briefcase, TrendingUp } from "lucide-react";
 

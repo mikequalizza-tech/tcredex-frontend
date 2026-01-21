@@ -34,30 +34,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (!participant) {
-<<<<<<< HEAD
-      const { data: user } = await supabase
-        .from('users_simplified')
-        .select('id')
-        .eq('clerk_id', userId)
-        .single();
-
-      if (user) {
-        const { data: participantByUser } = await supabase
-          .from('conversation_participants')
-          .select('id')
-          .eq('conversation_id', conversationId)
-          .eq('user_id', (user as { id: string }).id)
-          .single();
-
-        if (!participantByUser) {
-          return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
-        }
-      } else {
-        return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
-      }
-=======
       return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
     }
 
     const { data: messages, error } = await supabaseAdmin

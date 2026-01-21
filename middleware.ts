@@ -43,6 +43,7 @@ const PUBLIC_ROUTES = [
   '/founders',
   '/who-we-serve',
 <<<<<<< HEAD
+<<<<<<< HEAD
   '/programs(.*)',
   '/r/(.*)',  // QR/referral redirects
   '/onboarding',
@@ -53,6 +54,8 @@ const PUBLIC_ROUTES = [
   '/newsletter',
   '/api/auth/(.*)',
 =======
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 ];
 
 const PUBLIC_PREFIXES = [
@@ -64,7 +67,10 @@ const PUBLIC_PREFIXES = [
   '/programs',
   '/r/',
   '/api/auth',
+<<<<<<< HEAD
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
   '/api/register',
   '/api/contact',
   '/api/chat',  // ChatTC API
@@ -80,6 +86,7 @@ const PUBLIC_PREFIXES = [
   '/api/cdes',
   '/api/investors',
 <<<<<<< HEAD
+<<<<<<< HEAD
   '/api/webhook/(.*)',
   '/api/onboarding',
   '/api/closing-room',  // Allow closing room API
@@ -88,6 +95,10 @@ const PUBLIC_PREFIXES = [
   '/api/webhook',
 ];
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+  '/api/webhook',
+];
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.includes(pathname)) return true;
@@ -137,6 +148,7 @@ export async function middleware(request: NextRequest) {
   }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   // Protect non-public routes - require authentication
   if (!isPublicRoute(request)) {
     await auth.protect();
@@ -179,6 +191,41 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+=======
+  // Create Supabase client for auth check
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  // Refresh session if exists
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Public routes - allow through
+  if (isPublicRoute(pathname)) {
+    return response;
+  }
+
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
   // Protected routes - redirect to signin if not authenticated
   if (!user) {
     const signinUrl = new URL('/signin', request.url);
@@ -219,7 +266,10 @@ export async function middleware(request: NextRequest) {
 
   return response;
 }
+<<<<<<< HEAD
 >>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+=======
+>>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 
 export const config = {
   matcher: [

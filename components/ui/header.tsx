@@ -6,20 +6,9 @@ import { useRouter } from "next/navigation";
 import Logo from "./logo";
 import MobileMenu from "./mobile-menu";
 import HeaderSearch from "./header-search";
-<<<<<<< HEAD
-import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
-import { OrganizationBadge } from "./organization-badge";
-=======
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { LogOut, User as UserIcon } from "lucide-react";
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
 
 export default function Header() {
   const router = useRouter();
@@ -32,7 +21,6 @@ export default function Header() {
   const resourcesRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
     const supabase = createClient();
 
     // Get initial user
@@ -45,9 +33,7 @@ export default function Header() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
-
     return () => subscription.unsubscribe();
-  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -62,16 +48,11 @@ export default function Header() {
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
 
-  const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setUserMenuOpen(false);
-    router.push("/");
-    router.refresh();
-  };
+  }, []);
 
   return (
     <header className="z-30 mt-2 w-full md:mt-5">
@@ -162,28 +143,6 @@ export default function Header() {
           <div className="flex items-center gap-3">
             <HeaderSearch />
 
-<<<<<<< HEAD
-            {/* Clerk Auth Components */}
-            <SignedIn>
-              {/* Organization Badge */}
-              <OrganizationBadge />
-              <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">
-                Dashboard
-              </Link>
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8",
-                    userButtonPopoverCard: "bg-gray-900 border border-gray-800",
-                    userButtonPopoverActionButton: "text-gray-300 hover:text-white hover:bg-gray-800",
-                    userButtonPopoverActionButtonText: "text-gray-300",
-                    userButtonPopoverFooter: "hidden",
-                  },
-                }}
-                afterSignOutUrl="/"
-              />
-            </SignedIn>
-=======
             {/* Auth - Signed In */}
             {!loading && user && (
               <>
@@ -222,7 +181,6 @@ export default function Header() {
                 </div>
               </>
             )}
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
 
             {/* Auth - Signed Out */}
             {!loading && !user && (

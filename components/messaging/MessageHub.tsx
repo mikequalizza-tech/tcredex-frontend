@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useUser } from "@clerk/nextjs";
 import { useMessageHub } from "@/contexts/message-hub-context";
 import {
   MessageCircle,

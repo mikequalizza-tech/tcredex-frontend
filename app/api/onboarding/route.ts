@@ -29,6 +29,12 @@ export async function POST(request: NextRequest) {
   try {
     const { roleType } = await request.json();
 
+    
+    // Get user info from Clerk first (we need the email to check for invites)
+    const clerkUser = await currentUser();
+    if (!clerkUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
     if (!roleType) {
       return NextResponse.json(
         { error: "roleType required" },
@@ -46,17 +52,20 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin();
 
-<<<<<<< HEAD
-    // Check if user already exists by clerk_id
-    const { data: existingUser } = await supabase
+    // Check if user already exists and is fully onboarded
+    const { data: existingUser } = await supabaseAdmin
       .from("users")
-      .select("id, organization_id, role")
-      .eq("clerk_id", userId)
+      .select("id, role_type, email")
+      .eq("id", authUser.id)
       .single();
 
-    if (existingUser) {
-      // User already onboarded - set cookie and return success (don't error)
-      // This fixes the stuck loop when cookie was lost but user exists
+    // If user exists AND has role_type, they're already onboarded
+    if (existingUser?.role_type) {
+      return NextResponse.json(
+        { error: "User already onboarded" },
+        { status: 400 }
+      );
+    }
       const { data: existingOrg } = await supabase
         .from("organizations")
         .select("id, type")
@@ -271,8 +280,94 @@ export async function POST(request: NextRequest) {
       newUser = data;
       userError = error;
     }
+    if (userError) {
+      console.error("[Onboarding] User creation/update error:", userError);
+      console.error("[Onboarding] Attempted insert data:", {
+        id: authUser!.id,
+        email: userEmail,
+        name: userName,
+      });
+      // Cleanup role table record if user creation failed
+      // No organizationId to clean up in role-driven flow
+      return NextResponse.json(
+        { error: `Failed to create user: ${userError.message}` },
+        { status: 500 }
+      );
+    }
 
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
+    // If user exists AND has role_type, they're already onboarded
+    if (existingUser?.role_type) {
+      return NextResponse.json(
+        { error: "User already onboarded" },
+        { status: 400 }
+      );
+    }
+
+    // Get user info from auth
+    const userEmail = authUser.email;
+    const userName = authUser.user_metadata?.name
+      || `${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim()
+      || userEmail?.split("@")?.[0]
+      || "User";
+
+    // Determine which table to insert into based on role
+    const roleTable = roleType === "sponsor"
+      ? "sponsors"
+      : roleType === "cde"
+        ? "cdes"
+        : "investors";
+
+    // Create role profile (no organization)
+    await supabaseAdmin.from(roleTable).insert({
+      primary_contact_name: userName,
+      primary_contact_email: userEmail,
+    });
+
+    // Create user record (no organization)
+    await supabaseAdmin.from("users").insert({
+      id: authUser.id,
+      email: userEmail,
+      name: userName,
+      role_type: roleType,
+      role: "ORG_ADMIN",
+    });
+
+    return NextResponse.json({ success: true });
+    let newUser;
+    let userError;
+
+    if (existingUser) {
+      // User exists but not fully onboarded - update them
+      const userId = existingUser!.id;
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .update({
+          name: userName,
+          role: "ORG_ADMIN",
+          role_type: roleType,
+        })
+        .eq("id", userId)
+        .select()
+        .single();
+      newUser = data;
+      userError = error;
+    } else {
+      // Create new user with Supabase Auth ID
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .insert({
+          id: authUser!.id,  // Use Supabase Auth ID
+          email: userEmail,
+          name: userName,
+          role: "ORG_ADMIN",
+          role_type: roleType,
+        })
+        .select()
+        .single();
+      newUser = data;
+      userError = error;
+    }
+
     if (userError) {
       console.error("[Onboarding] User creation/update error:", userError);
       console.error("[Onboarding] Attempted insert data:", {
@@ -290,6 +385,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+  // End of onboarding handler
     const response = NextResponse.json({
       success: true,
       user: newUser,

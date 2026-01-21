@@ -2,25 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-/**
- * GET /api/auth/me
- * Returns current authenticated user with organization and role
-<<<<<<< HEAD
- * Uses Clerk for authentication, Supabase for user/organization data
- *
- * SIMPLIFIED: Uses users_simplified table directly
- * No organizations FK chain - organization_id + organization_type tells you which entity table
-=======
- * Uses Supabase for authentication and user/organization data
- *
- * Model:
- * - users.organization_id points to sponsors.id / cdes.id / investors.id
- * - users.role_type indicates which table to join (sponsor | cde | investor)
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
- */
 export async function GET(request: NextRequest) {
   try {
-    // Get Supabase auth session
     const supabase = await createClient();
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
@@ -31,85 +14,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-<<<<<<< HEAD
-    // Get Clerk user details
-    let clerkUser;
-    try {
-      clerkUser = await currentUser();
-    } catch (clerkError: any) {
-      // User was deleted from Clerk - return 401 to force re-auth
-      if (clerkError?.status === 404) {
-        return NextResponse.json(
-          { error: 'User not found', needsSignOut: true },
-          { status: 401 }
-        );
-      }
-      throw clerkError;
-    }
-
-    if (!clerkUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 401 }
-      );
-    }
-
-    const supabase = getSupabaseAdmin();
-
-    // User record type for users_simplified
-    type UserRecord = {
-      id: string;
-      clerk_id: string | null;
-      email: string;
-      name: string;
-      avatar_url: string | null;
-      phone: string | null;
-      title: string | null;
-      organization_id: string | null;
-      organization_type: string | null;
-      role: string;
-      is_active: boolean;
-      email_verified: boolean;
-      last_login_at: string | null;
-      created_at: string;
-      updated_at: string;
-    };
-
-    // Try to find user by clerk_id (simplified table - no FK joins)
-    let userRecord: UserRecord | null = null;
-    const { data: clerkMatch } = await supabase
-      .from('users_simplified')
-      .select('*')
-      .eq('clerk_id', userId)
-      .single();
-
-    if (clerkMatch) {
-      userRecord = clerkMatch as UserRecord;
-    } else {
-      // Try to find by email for migration
-      const primaryEmail = clerkUser.emailAddresses[0]?.emailAddress;
-      if (primaryEmail) {
-        const { data: emailMatch } = await supabase
-          .from('users_simplified')
-          .select('*')
-          .eq('email', primaryEmail.toLowerCase())
-          .single();
-
-        if (emailMatch) {
-          // Update user with clerk_id for future lookups
-          await supabase
-            .from('users_simplified')
-            .update({ clerk_id: userId })
-            .eq('id', (emailMatch as UserRecord).id);
-
-          userRecord = emailMatch as UserRecord;
-        }
-      }
-    }
-
-=======
     const supabaseAdmin = getSupabaseAdmin();
-
     // Find user by Supabase Auth ID
     const { data: userRecord } = await supabaseAdmin
       .from('users')
@@ -131,7 +36,6 @@ export async function GET(request: NextRequest) {
       .eq('id', authUser.id)
       .single();
 
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
     if (!userRecord) {
       // User authenticated with Supabase but not in our database
       return NextResponse.json({
@@ -145,39 +49,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-<<<<<<< HEAD
-    // Get organization details from the appropriate table based on type
-    let organization = null;
-    if (userRecord.organization_id && userRecord.organization_type) {
-      const tableName = userRecord.organization_type === 'sponsor' ? 'sponsors_simplified'
-        : userRecord.organization_type === 'investor' ? 'investors_simplified'
-        : 'cdes_merged';
-
-      const { data: org } = await supabase
-        .from(tableName)
-        .select('name, slug, website, logo_url, verified, status')
-        .eq('organization_id', userRecord.organization_id)
-        .single();
-
-      if (org) {
-        organization = {
-          id: userRecord.organization_id,
-          name: org.name,
-          slug: org.slug,
-          type: userRecord.organization_type,
-          logo: org.logo_url,
-          website: org.website,
-          verified: org.verified || false,
-        };
-      }
-    }
-
-    // Update last login
-    await supabase
-      .from('users_simplified')
-      .update({ last_login_at: new Date().toISOString() })
-      .eq('id', userRecord.id);
-
+    // Return user record (role-driven, no org logic)
     return NextResponse.json({
       user: {
         id: userRecord.id,
@@ -185,9 +57,8 @@ export async function GET(request: NextRequest) {
         name: userRecord.name,
         role: userRecord.role,
         organizationId: userRecord.organization_id,
-        organizationType: userRecord.organization_type,
-        organization,
-        avatar: userRecord.avatar_url || clerkUser.imageUrl,
+        roleType: userRecord.role_type,
+        avatar: userRecord.avatar_url,
         title: userRecord.title,
         phone: userRecord.phone,
         isActive: userRecord.is_active,
@@ -196,9 +67,6 @@ export async function GET(request: NextRequest) {
         createdAt: userRecord.created_at,
       },
     });
-=======
-    return await buildUserResponse(supabaseAdmin, userRecord, authUser);
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
   } catch (error) {
     console.error('[API] /api/auth/me error:', error);
     return NextResponse.json(

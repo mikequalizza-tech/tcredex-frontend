@@ -20,76 +20,24 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
+
     // Get specific user (role-driven only)
     if (id) {
       const { data, error } = await supabase
-<<<<<<< HEAD
-        .from('users_simplified')
-=======
         .from('users')
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
         .select('*')
         .eq('id', id)
         .single();
-
-      if (error || !data) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
       }
-
-<<<<<<< HEAD
-      type UserRecord = {
-        id: string;
-        organization_id: string | null;
-        organization_type: string | null;
-      };
-      const typedData = data as UserRecord;
-
-      // CRITICAL: Verify user belongs to same org or is admin
-      if (user.organizationId !== typedData.organization_id && user.organizationType !== 'admin') {
-        return NextResponse.json(
-          { error: 'You do not have access to this user' },
-          { status: 403 }
-        );
-      }
-
-      // Get organization details if needed
-      let organization = null;
-      if (typedData.organization_id && typedData.organization_type) {
-        const tableName = typedData.organization_type === 'sponsor' ? 'sponsors_simplified'
-          : typedData.organization_type === 'investor' ? 'investors_simplified'
-          : 'cdes_merged';
-        const { data: org } = await supabase
-          .from(tableName)
-          .select('name, slug')
-          .eq('organization_id', typedData.organization_id)
-          .single();
-        if (org) {
-          organization = {
-            id: typedData.organization_id,
-            name: (org as { name: string; slug: string }).name,
-            slug: (org as { name: string; slug: string }).slug,
-            type: typedData.organization_type,
-          };
-        }
-      }
-
-      return NextResponse.json({ user: { ...data, organization } });
-=======
-      // No org check, just return user
       return NextResponse.json({ user: data });
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
     }
 
     // List all users (role-driven only)
     const { data, error } = await supabase
-<<<<<<< HEAD
-      .from('users_simplified')
-      .select('id, email, name, role, title, avatar_url, is_active, last_login_at, created_at, organization_id, organization_type')
-      .eq('organization_id', user.organizationId)
-=======
       .from('users')
       .select('*')
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
       .eq('is_active', true)
       .order('name');
 
@@ -128,30 +76,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already exists in this organization
+
+    // Check if user already exists
     const { data: existing } = await supabase
-      .from('users_simplified')
+      .from('users')
       .select('id')
       .eq('email', body.email.toLowerCase())
-      .eq('organization_id', user.organizationId)
       .single();
 
     if (existing) {
       return NextResponse.json(
-        { error: 'User with this email already exists in this organization' },
+        { error: 'User with this email already exists' },
         { status: 409 }
       );
     }
 
-    // Create user in user's organization
+    // Create user
     const { data, error } = await supabase
-      .from('users_simplified')
+      .from('users')
       .insert({
         email: body.email.toLowerCase(),
         name: body.name,
         role: body.role || 'MEMBER',
-        organization_id: user.organizationId, // CRITICAL: Use user's org
-        organization_type: user.organizationType, // Use user's org type
         phone: body.phone,
         title: body.title,
         avatar_url: body.avatar_url,

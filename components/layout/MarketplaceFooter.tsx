@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/ui/logo';
 import { MessageCircle } from 'lucide-react';
-import { useUser } from '@clerk/nextjs';
 import MessagesPopup from '@/components/messages/MessagesPopup';
 
 interface MarketplaceFooterProps {

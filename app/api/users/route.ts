@@ -20,14 +20,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
-    // Get specific user
+    // Get specific user (role-driven only)
     if (id) {
       const { data, error } = await supabase
         .from('users')
-        .select(`
-          *,
-          organization:organizations(id, name, slug, type)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -35,27 +32,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
-      const typedData = data as { organization_id: string };
-
-      // CRITICAL: Verify user belongs to same org or is admin
-      if (user.organizationId !== typedData.organization_id && user.organizationType !== 'admin') {
-        return NextResponse.json(
-          { error: 'You do not have access to this user' },
-          { status: 403 }
-        );
-      }
-
+      // No org check, just return user
       return NextResponse.json({ user: data });
     }
 
-    // List team members in user's organization
+    // List all users (role-driven only)
     const { data, error } = await supabase
       .from('users')
-      .select(`
-        *,
-        organization:organizations(id, name, slug, type)
-      `)
-      .eq('organization_id', user.organizationId)
+      .select('*')
       .eq('is_active', true)
       .order('name');
 

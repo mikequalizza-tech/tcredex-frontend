@@ -1,5 +1,5 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
 // ============================================================================
 // QR/Referral Campaign Destinations
@@ -24,60 +24,59 @@ const CAMPAIGN_DESTINATIONS: Record<string, string> = {
 // ============================================================================
 // Public Routes - These don't require authentication
 // ============================================================================
-const isPublicRoute = createRouteMatcher([
+const PUBLIC_ROUTES = [
   '/',
-  '/signin(.*)',
-  '/signup(.*)',
-  '/sso-callback(.*)',
+  '/signin',
+  '/signup',
   '/register',
   '/forgot-password',
   '/reset-password',
+  '/auth/callback',
   '/about',
   '/pricing',
   '/contact',
   '/contact-aiv',
-  '/support(.*)',
   '/features',
   '/how-it-works',
   '/privacy',
   '/terms',
   '/founders',
-  '/blog(.*)',
-  '/help(.*)',
   '/who-we-serve',
-  '/programs(.*)',
-  '/r/(.*)',  // QR/referral redirects
-  '/onboarding', // Allow access to onboarding
-  '/api/auth/(.*)',
+];
+
+const PUBLIC_PREFIXES = [
+  '/sign-in',
+  '/sign-up',
+  '/support',
+  '/blog',
+  '/help',
+  '/programs',
+  '/r/',
+  '/api/auth',
   '/api/register',
   '/api/contact',
   '/api/eligibility',
-  '/api/geo/(.*)',
-  '/api/tracts/(.*)',
-  '/api/map/(.*)',
-  '/api/tiles/(.*)',
+  '/api/geo',
+  '/api/tracts',
+  '/api/map',
+  '/api/tiles',
   '/api/pricing',
-  '/api/founders/(.*)',
+  '/api/founders',
   '/api/deals',
   '/api/cdes',
   '/api/investors',
-  '/api/webhook/(.*)',
-  '/api/onboarding', // Allow access to onboarding API
-]);
+  '/api/webhook',
+];
 
-// Routes that require onboarding to be complete
-const requiresOnboarding = createRouteMatcher([
-  '/dashboard(.*)',
-  '/deals/new',
-  '/intake(.*)',
-  '/closing-room(.*)',
-  '/messages(.*)',
-]);
+function isPublicRoute(pathname: string): boolean {
+  if (PUBLIC_ROUTES.includes(pathname)) return true;
+  return PUBLIC_PREFIXES.some(prefix => pathname.startsWith(prefix));
+}
 
 // ============================================================================
-// Clerk Middleware
+// Supabase Middleware
 // ============================================================================
-export default clerkMiddleware(async (auth, request) => {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Handle QR/Referral redirects
@@ -116,42 +115,79 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 
-  // Protect non-public routes
-  if (!isPublicRoute(request)) {
-    await auth.protect();
+  // Create Supabase client for auth check
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
+  );
+
+  // Refresh session if exists
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Public routes - allow through
+  if (isPublicRoute(pathname)) {
+    return response;
   }
 
-  // Check if authenticated user needs onboarding
-  const { userId } = await auth();
-  if (userId && requiresOnboarding(request)) {
-    // Check onboarding status via cookie (set after onboarding complete)
+  // Protected routes - redirect to signin if not authenticated
+  if (!user) {
+    const signinUrl = new URL('/signin', request.url);
+    signinUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(signinUrl);
+  }
+
+  // Check if user needs onboarding for protected routes
+  const protectedRoutesRequiringOnboarding = [
+    '/dashboard',
+    '/deals/new',
+    '/intake',
+    '/closing-room',
+    '/messages',
+  ];
+
+  const needsOnboardingCheck = protectedRoutesRequiringOnboarding.some(
+    route => pathname.startsWith(route)
+  );
+
+  if (needsOnboardingCheck) {
     const onboardingComplete = request.cookies.get('tcredex_onboarded')?.value;
 
     if (!onboardingComplete) {
-      // Check with API if user is onboarded
-      try {
-        const baseUrl = request.nextUrl.origin;
-        const checkResponse = await fetch(`${baseUrl}/api/onboarding`, {
-          headers: {
-            Cookie: request.headers.get('cookie') || '',
-          },
-        });
+      // Check database for onboarding status
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('organization_id, role_type')
+        .eq('id', user.id)
+        .single();
 
-        if (checkResponse.ok) {
-          const { needsOnboarding } = await checkResponse.json();
-
-          if (needsOnboarding) {
-            const onboardingUrl = new URL('/onboarding', request.url);
-            return NextResponse.redirect(onboardingUrl);
-          }
-        }
-      } catch (error) {
-        // If check fails, allow through (will be caught by page-level checks)
-        console.error('[Middleware] Onboarding check failed:', error);
+      if (!userProfile?.organization_id || !userProfile?.role_type) {
+        const onboardingUrl = new URL('/onboarding', request.url);
+        return NextResponse.redirect(onboardingUrl);
       }
     }
   }
-});
+
+  return response;
+}
 
 export const config = {
   matcher: [

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 // GET - Fetch messages for a conversation
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -17,41 +18,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Verify user is a participant in this conversation
-    const { data: participant } = await supabase
+    const { data: participant } = await supabaseAdmin
       .from('conversation_participants')
       .select('id')
       .eq('conversation_id', conversationId)
-      .eq('clerk_id', userId)
+      .eq('user_id', authUser.id)
       .single();
 
-    // Also check by user_id for existing participants
     if (!participant) {
-      const { data: user } = await supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_id', userId)
-        .single();
-
-      if (user) {
-        const { data: participantByUser } = await supabase
-          .from('conversation_participants')
-          .select('id')
-          .eq('conversation_id', conversationId)
-          .eq('user_id', (user as { id: string }).id)
-          .single();
-
-        if (!participantByUser) {
-          return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
-        }
-      } else {
-        return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
-      }
+      return NextResponse.json({ error: 'Not a participant' }, { status: 403 });
     }
 
-    const { data: messages, error } = await supabase
+    const { data: messages, error } = await supabaseAdmin
       .from('messages')
       .select('*')
       .eq('conversation_id', conversationId)
@@ -68,8 +49,9 @@ export async function GET(request: NextRequest) {
 
 // POST - Send a new message
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -81,15 +63,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'conversationId and content required' }, { status: 400 });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Insert message
-    const { data: message, error: insertError } = await supabase
+    const { data: message, error: insertError } = await supabaseAdmin
       .from('messages')
       .insert({
         conversation_id: conversationId,
-        sender_id: senderId,
-        sender_clerk_id: userId,
+        sender_id: senderId || authUser.id,
         sender_name: senderName || 'User',
         sender_org: senderOrg || 'Organization',
         sender_org_id: body.senderOrgId || null,
@@ -102,7 +83,7 @@ export async function POST(request: NextRequest) {
     if (insertError) throw insertError;
 
     // Update conversation's last_message
-    await supabase
+    await supabaseAdmin
       .from('conversations')
       .update({
         last_message: content.substring(0, 100),

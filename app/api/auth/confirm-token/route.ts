@@ -21,18 +21,17 @@ export async function POST(request: NextRequest) {
 
     const user = userResult.user
 
-    // Fetch profile + organization
+    // Fetch profile (role-driven only)
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('*, organization:organization_id(*)')
+      .select('id, role, full_name')
       .eq('id', user.id)
       .single()
 
     type ProfileData = {
       id: string
       role: string | null
-      organization_id: string | null
-      organization: { id: string; name: string; type: string; slug: string } | null
+      full_name: string | null
     }
     const profile = profileData as ProfileData | null
 
@@ -45,15 +44,6 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name: userName,
         role: profile?.role || 'sponsor',
-        organizationId: profile?.organization?.id || profile?.organization_id || null,
-        organization: profile?.organization
-          ? {
-              id: profile.organization.id,
-              name: profile.organization.name,
-              type: profile.organization.type,
-              slug: profile.organization.slug,
-            }
-          : null,
       },
     })
 
@@ -71,7 +61,6 @@ export async function POST(request: NextRequest) {
     await recordAuditEvent({
       action: 'email_confirmed',
       userId: user.id,
-      orgId: profile?.organization?.id || profile?.organization_id || null,
       role: profile?.role || 'sponsor',
     })
 

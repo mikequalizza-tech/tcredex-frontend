@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 // GET - Fetch channels for a deal's closing room
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -17,10 +18,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Check if channels exist, if not create defaults
-    const { data: existingChannels } = await supabase
+    const { data: existingChannels } = await supabaseAdmin
       .from("closing_room_channels")
       .select("*")
       .eq("deal_id", dealId)
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
         { deal_id: dealId, name: "voice-chat", type: "audio" },
       ];
 
-      const { data: newChannels, error } = await supabase
+      const { data: newChannels, error } = await supabaseAdmin
         .from("closing_room_channels")
         .insert(defaultChannels)
         .select();
@@ -62,8 +63,9 @@ export async function GET(request: NextRequest) {
 
 // POST - Create a new channel
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -77,9 +79,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
-    const { data: channel, error } = await supabase
+    const { data: channel, error } = await supabaseAdmin
       .from("closing_room_channels")
       .insert({
         deal_id: dealId,

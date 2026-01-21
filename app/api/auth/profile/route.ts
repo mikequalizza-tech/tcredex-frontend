@@ -20,10 +20,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get profile with organization
+    // Get profile (role-driven only)
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('*, organizations(*)')
+      .select('id, full_name, role')
       .eq('id', user.id)
       .single();
 
@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
       id: string;
       full_name: string | null;
       role: string | null;
-      organizations: { id: string; name: string; type: string } | null;
     };
     const profile = profileData as ProfileData | null;
 
@@ -42,7 +41,6 @@ export async function GET(request: NextRequest) {
         email: user.email,
         name: user.user_metadata?.full_name || user.email?.split('@')[0],
         role: user.user_metadata?.role || 'sponsor',
-        organization: null,
       });
     }
 
@@ -51,11 +49,6 @@ export async function GET(request: NextRequest) {
       email: user.email,
       name: profile.full_name || user.email?.split('@')[0],
       role: profile.role || 'sponsor',
-      organization: profile.organizations ? {
-        id: profile.organizations.id,
-        name: profile.organizations.name,
-        type: profile.organizations.type,
-      } : null,
     });
   } catch (error) {
     console.error('Profile error:', error);

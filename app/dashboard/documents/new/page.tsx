@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  DocumentCategory, 
-  EntityType, 
+import {
+  DocumentCategory,
+  EntityType,
   DOCUMENT_CATEGORIES,
   DOCUMENT_TAGS,
   DocumentTag,
@@ -26,7 +26,7 @@ const demoEntities = {
   ],
 };
 
-export default function NewDocumentPage() {
+function NewDocumentPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -303,5 +303,21 @@ export default function NewDocumentPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="p-8 flex items-center justify-center min-h-[400px]">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+export default function NewDocumentPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <NewDocumentPageContent />
+    </Suspense>
   );
 }

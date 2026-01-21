@@ -20,20 +20,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     
     const { data, error } = await supabase
       .from('users')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
-    
+
     if (error) {
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
       throw error;
     }
-    
+
     return NextResponse.json(data);
     
   } catch (error) {

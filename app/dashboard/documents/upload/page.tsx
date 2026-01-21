@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import DocumentUploader from '@/components/documents/DocumentUploader';
@@ -22,7 +22,7 @@ const demoEntities = {
   ],
 };
 
-export default function DocumentUploadPage() {
+function DocumentUploadPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -180,5 +180,21 @@ export default function DocumentUploadPage() {
         />
       )}
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="p-8 flex items-center justify-center min-h-[400px]">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+export default function DocumentUploadPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <DocumentUploadPageContent />
+    </Suspense>
   );
 }

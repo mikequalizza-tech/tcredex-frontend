@@ -625,7 +625,7 @@ export default function MarketplacePage() {
   };
 
   return (
-    <AppLayout showRoleSwitcher={false}>
+    <AppLayout>
       <div className="h-full bg-gray-950 flex">
         {/* Left Sidebar - MapFilterRail */}
         {!sidebarCollapsed ? (

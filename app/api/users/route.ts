@@ -20,10 +20,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
-    // Get specific user
+    // Get specific user (role-driven only)
     if (id) {
       const { data, error } = await supabase
+<<<<<<< HEAD
         .from('users_simplified')
+=======
+        .from('users')
+>>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
         .select('*')
         .eq('id', id)
         .single();
@@ -32,6 +36,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
+<<<<<<< HEAD
       type UserRecord = {
         id: string;
         organization_id: string | null;
@@ -69,13 +74,22 @@ export async function GET(request: NextRequest) {
       }
 
       return NextResponse.json({ user: { ...data, organization } });
+=======
+      // No org check, just return user
+      return NextResponse.json({ user: data });
+>>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
     }
 
-    // List team members in user's organization
+    // List all users (role-driven only)
     const { data, error } = await supabase
+<<<<<<< HEAD
       .from('users_simplified')
       .select('id, email, name, role, title, avatar_url, is_active, last_login_at, created_at, organization_id, organization_type')
       .eq('organization_id', user.organizationId)
+=======
+      .from('users')
+      .select('*')
+>>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
       .eq('is_active', true)
       .order('name');
 

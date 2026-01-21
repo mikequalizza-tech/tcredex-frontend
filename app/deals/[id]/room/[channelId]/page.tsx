@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useCurrentUser } from "@/lib/auth/useCurrentUser";
 import {
   ChatHeader,
   ChatInput,
@@ -29,7 +29,7 @@ interface Participant {
 export default function ClosingRoomPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isLoaded } = useUser();
+  const { user, isLoading, isAuthenticated } = useCurrentUser();
   const dealId = (params?.id ?? '') as string;
   const channelId = (params?.channelId ?? '') as string;
 
@@ -45,8 +45,8 @@ export default function ClosingRoomPage() {
   const [showVideo, setShowVideo] = useState(false);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (!user) {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       router.push(`/signin?redirect=/deals/${dealId}/room/${channelId}`);
       return;
     }
@@ -91,9 +91,9 @@ export default function ClosingRoomPage() {
     };
 
     fetchData();
-  }, [dealId, channelId, user, isLoaded, router]);
+  }, [dealId, channelId, isAuthenticated, isLoading, router]);
 
-  if (!isLoaded || loading) {
+  if (isLoading || loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-950">
         <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />

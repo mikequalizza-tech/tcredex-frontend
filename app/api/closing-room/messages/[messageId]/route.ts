@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 // PATCH - Update a message
@@ -7,8 +7,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ messageId: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -20,21 +21,21 @@ export async function PATCH(
       return NextResponse.json({ error: "content required" }, { status: 400 });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from("closing_room_messages")
-      .select("sender_clerk_id")
+      .select("sender_id")
       .eq("id", messageId)
       .single();
 
-    if (!existing || (existing as any).sender_clerk_id !== userId) {
+    if (!existing || (existing as any).sender_id !== authUser.id) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
     // Update message - Supabase Realtime will broadcast it
-    const { data: message, error } = await supabase
+    const { data: message, error } = await supabaseAdmin
       .from("closing_room_messages")
       .update({
         content: content.trim(),
@@ -61,29 +62,30 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ messageId: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const { messageId } = await params;
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Verify ownership
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from("closing_room_messages")
-      .select("sender_clerk_id")
+      .select("sender_id")
       .eq("id", messageId)
       .single();
 
-    if (!existing || (existing as any).sender_clerk_id !== userId) {
+    if (!existing || (existing as any).sender_id !== authUser.id) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
     // Soft delete - Supabase Realtime will broadcast the update
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("closing_room_messages")
       .update({
         content: "This message has been deleted",

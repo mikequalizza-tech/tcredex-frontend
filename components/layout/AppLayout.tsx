@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation';
 import { useCurrentUser } from '@/lib/auth';
 import InternalHeader from './InternalHeader';
 import InternalFooter from './InternalFooter';
-import DemoRoleSwitcher from '@/components/ui/DemoRoleSwitcher';
 import Logo from '@/components/ui/logo';
 
 interface NavItem {
@@ -21,7 +20,6 @@ interface NavItem {
 
 interface AppLayoutProps {
   children: React.ReactNode;
-  showRoleSwitcher?: boolean;
 }
 
 // Icon components
@@ -145,7 +143,6 @@ const navItems: NavItem[] = [
 
 export default function AppLayout({
   children,
-  showRoleSwitcher = true,
 }: AppLayoutProps) {
   const pathname = usePathname();
   // Pre-collapse sidebar on /map for maximum map view
@@ -363,8 +360,6 @@ export default function AppLayout({
         </main>
       </div>
 
-      {/* Demo Role Switcher */}
-      {showRoleSwitcher && <DemoRoleSwitcher />}
     </div>
   );
 }

@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { createClient } from '@/lib/supabase/server';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { AccessToken } from 'livekit-server-sdk';
 
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const supabase = await createClient();
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await currentUser();
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 401 });
-    }
+    // Get user details from database
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: userRecord } = await supabaseAdmin
+      .from('users')
+      .select('id, name, email')
+      .eq('id', authUser.id)
+      .single();
 
     const { searchParams } = new URL(request.url);
     const room = searchParams.get('room');
@@ -32,15 +37,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const name =
-      user.fullName ||
-      user.firstName ||
-      user.lastName ||
-      user.emailAddresses[0]?.emailAddress?.split('@')[0] ||
-      'User';
+    const name = userRecord?.name || authUser.email?.split('@')[0] || 'User';
 
     const at = new AccessToken(apiKey, apiSecret, {
-      identity: userId,
+      identity: authUser.id,
       name: name,
     });
 

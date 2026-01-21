@@ -1,12 +1,13 @@
-import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase/server";
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 
 const f = createUploadthing();
 
 const handleAuth = async () => {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return { userId };
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("Unauthorized");
+  return { userId: user.id };
 };
 
 export const ourFileRouter = {

@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+<<<<<<< HEAD
     // User record type
     type UserRecord = {
       id: string;
@@ -42,13 +43,34 @@ export async function GET(request: NextRequest) {
 
     if (userError || !userData) {
       // Return basic user info if record doesn't exist
+=======
+    // Get profile (role-driven only)
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('id', user.id)
+      .single();
+
+    type ProfileData = {
+      id: string;
+      full_name: string | null;
+      role: string | null;
+    };
+    const profile = profileData as ProfileData | null;
+
+    if (profileError || !profile) {
+      // Return basic user info if profile doesn't exist
+>>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
       return NextResponse.json({
         id: user.id,
         email: user.email,
         name: user.user_metadata?.full_name || user.email?.split('@')[0],
         role: user.user_metadata?.role || 'sponsor',
+<<<<<<< HEAD
         organizationId: null,
         organizationType: null,
+=======
+>>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
       });
     }
 
@@ -73,11 +95,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       id: user.id,
       email: user.email,
+<<<<<<< HEAD
       name: typedUser.name || user.email?.split('@')[0],
       role: typedUser.role || 'MEMBER',
       organizationId: typedUser.organization_id,
       organizationType: typedUser.organization_type,
       organizationName,
+=======
+      name: profile.full_name || user.email?.split('@')[0],
+      role: profile.role || 'sponsor',
+>>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
     });
   } catch (error) {
     console.error('Profile error:', error);

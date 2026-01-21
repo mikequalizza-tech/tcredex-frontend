@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 // POST - Mark messages as read
 export async function POST(request: NextRequest) {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -17,13 +18,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'conversationId required' }, { status: 400 });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Reset unread count for this participant
-    const userIdToUse = userId || organizationId;
+    const userIdToUse = userId || organizationId || authUser.id;
     if (userIdToUse) {
-      // Try updating by user_id first
-      const { error: partError } = await supabase
+      // Update by user_id
+      const { error: partError } = await supabaseAdmin
         .from('conversation_participants')
         .update({
           unread_count: 0,
@@ -35,16 +36,6 @@ export async function POST(request: NextRequest) {
       if (partError) {
         console.error('[Messages] Error resetting unread:', partError);
       }
-
-      // Also try by clerk_id for Clerk users
-      await supabase
-        .from('conversation_participants')
-        .update({
-          unread_count: 0,
-          last_read_at: new Date().toISOString()
-        })
-        .eq('conversation_id', conversationId)
-        .eq('clerk_id', clerkUserId);
     }
 
     return NextResponse.json({ success: true });

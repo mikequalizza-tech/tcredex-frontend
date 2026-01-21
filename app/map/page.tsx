@@ -65,7 +65,7 @@ export default function MapPlatformPage() {
   }
 
   return (
-    <AppLayout showRoleSwitcher={false}>
+    <AppLayout>
       <MapContent />
     </AppLayout>
   );

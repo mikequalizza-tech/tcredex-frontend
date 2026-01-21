@@ -5,11 +5,11 @@
  * CRITICAL: This is the single source of truth for auth validation
  * All API endpoints MUST use requireAuth() before accessing data
  *
- * Uses Clerk for authentication, Supabase for user/organization data
+ * Uses Supabase for authentication and user/organization data
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 export class AuthError extends Error {
@@ -33,7 +33,6 @@ export interface AuthUser {
   organizationId: string;
   organizationType: 'sponsor' | 'cde' | 'investor' | 'admin';
   userRole: 'ORG_ADMIN' | 'PROJECT_ADMIN' | 'MEMBER' | 'VIEWER';
-  clerkUserId: string;
 }
 
 /**
@@ -43,31 +42,25 @@ export interface AuthUser {
  */
 export async function requireAuth(request: NextRequest): Promise<AuthUser> {
   try {
-    // Get Clerk auth session
-    const { userId } = await auth();
+    // Get Supabase auth session
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!userId) {
+    if (authError || !user) {
       throw new AuthError('UNAUTHENTICATED', 'Not authenticated', 401);
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
-    // Get user record from database using Clerk ID
-    // First try clerk_id, then fall back to id (for transition period)
-    let userRecord;
-    let userError;
-
-    // Try finding by clerk_id first
-    const clerkResult = await supabase
+    // Get user record from database using Supabase Auth ID
+    const { data: userRecord, error: userError } = await supabaseAdmin
       .from('users')
-      .select('id, email, role, organization_id')
-      .eq('clerk_id', userId)
+      .select('id, email, role, organization_id, role_type')
+      .eq('id', user.id)
       .single();
 
-    if (clerkResult.data) {
-      userRecord = clerkResult.data;
-    } else {
-      // User not found by clerk_id - they need to complete registration
+    if (userError || !userRecord) {
+      // User not found in database - they need to complete registration
       throw new AuthError(
         'USER_NOT_FOUND',
         'User not found in database. Please complete registration.',
@@ -76,29 +69,20 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
     }
 
     const typedUserRecord = userRecord as {
-      id: string
-      email: string
-      role: string
-      organization_id: string
+      id: string;
+      email: string;
+      role: string;
+      organization_id: string;
+      role_type: string;
     };
 
-    // Verify organization exists and is active
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .select('id, type')
-      .eq('id', typedUserRecord.organization_id)
-      .single();
-
-    if (orgError || !org) {
-      throw new AuthError('ORG_NOT_FOUND', 'User organization not found', 403);
-    }
-
-    const typedOrg = org as { id: string; type: string };
+    // Get organization type from role_type
+    const organizationType = typedUserRecord.role_type;
 
     // Validate organization type is valid
     const validOrgTypes = ['sponsor', 'cde', 'investor', 'admin'];
-    if (!validOrgTypes.includes(typedOrg.type)) {
-      throw new AuthError('INVALID_ORG_TYPE', 'Organization has invalid type', 403);
+    if (!validOrgTypes.includes(organizationType)) {
+      throw new AuthError('INVALID_ORG_TYPE', 'User has invalid organization type', 403);
     }
 
     // Validate user role is valid
@@ -111,9 +95,8 @@ export async function requireAuth(request: NextRequest): Promise<AuthUser> {
       id: typedUserRecord.id,
       email: typedUserRecord.email,
       organizationId: typedUserRecord.organization_id,
-      organizationType: typedOrg.type as 'sponsor' | 'cde' | 'investor' | 'admin',
+      organizationType: organizationType as 'sponsor' | 'cde' | 'investor' | 'admin',
       userRole: typedUserRecord.role as 'ORG_ADMIN' | 'PROJECT_ADMIN' | 'MEMBER' | 'VIEWER',
-      clerkUserId: userId,
     };
   } catch (error) {
     if (error instanceof AuthError) {
@@ -197,9 +180,9 @@ export async function verifyDealAccess(
   }
 
   const typedDeal = deal as {
-    sponsor_organization_id: string
-    assigned_cde_id: string | null
-    status: string
+    sponsor_organization_id: string;
+    assigned_cde_id: string | null;
+    status: string;
   };
 
   // System admin can access everything
@@ -268,7 +251,7 @@ export function withAuthErrorHandling(
 
 // Legacy function for backwards compatibility
 export function getTokenFromRequest(request: NextRequest): string | null {
-  // With Clerk, we don't need to extract tokens manually
-  // Clerk middleware handles this automatically
+  // With Supabase, we don't need to extract tokens manually
+  // Supabase middleware handles this automatically via cookies
   return null;
 }

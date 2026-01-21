@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 // GET - Fetch conversations
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -23,10 +24,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Fetch conversations where user's org is a participant
-    const { data: conversations, error } = await supabase
+    const { data: conversations, error } = await supabaseAdmin
       .from('conversations')
       .select(`
         id,
@@ -85,8 +86,9 @@ export async function GET(request: NextRequest) {
 
 // POST - Create a new conversation
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -98,10 +100,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'type, participantIds, and organizationId required' }, { status: 400 });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
     // Create conversation
-    const { data: conversation, error: convError } = await supabase
+    const { data: conversation, error: convError } = await supabaseAdmin
       .from('conversations')
       .insert({
         type,
@@ -119,8 +121,7 @@ export async function POST(request: NextRequest) {
     const participants = [
       {
         conversation_id: (conversation as { id: string }).id,
-        user_id: creatorId || organizationId,
-        clerk_id: userId,
+        user_id: creatorId || authUser.id,
         organization_id: organizationId,
         user_name: creatorName,
         organization_name: creatorOrg,
@@ -135,7 +136,6 @@ export async function POST(request: NextRequest) {
       participants.push({
         conversation_id: (conversation as { id: string }).id,
         user_id: participantData.userId || participantData.id,
-        clerk_id: participantData.clerkId || null,
         organization_id: participantData.organizationId || participantData.id,
         user_name: participantData.name || 'Participant',
         organization_name: participantData.organization || 'Organization',
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { error: partError } = await supabase
+    const { error: partError } = await supabaseAdmin
       .from('conversation_participants')
       .insert(participants);
 

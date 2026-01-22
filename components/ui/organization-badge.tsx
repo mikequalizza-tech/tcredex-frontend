@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useCurrentUser } from '@/lib/auth';
 import { createClient } from "@/lib/supabase/client";
 import { Building2, Briefcase, TrendingUp } from "lucide-react";
 
@@ -19,11 +19,11 @@ interface OrgData {
 }
 
 export function OrganizationBadge() {
-  const { user: clerkUser, isLoaded } = useUser();
+  const { user: clerkUser, isLoading } = useCurrentUser();
   const [org, setOrg] = useState<OrgData | null>(null);
 
   useEffect(() => {
-    if (!isLoaded || !clerkUser?.id) return;
+    if (!clerkUser?.id) return;
 
     const fetchOrg = async () => {
       try {
@@ -56,7 +56,7 @@ export function OrganizationBadge() {
     };
 
     fetchOrg();
-  }, [clerkUser?.id, isLoaded]);
+  }, [clerkUser?.id]);
 
   if (!org) return null;
 

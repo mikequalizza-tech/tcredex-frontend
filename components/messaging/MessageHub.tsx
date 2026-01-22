@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useCurrentUser } from '@/lib/auth';
 import { createClient } from "@/lib/supabase/client";
-import { useUser } from "@clerk/nextjs";
 import { useMessageHub } from "@/contexts/message-hub-context";
 import {
   MessageCircle,
@@ -56,7 +56,7 @@ const categoryIcons = {
 };
 
 export function MessageHub() {
-  const { user: clerkUser } = useUser();
+  const { user: clerkUser } = useCurrentUser();
   const { isOpen, closeMessages, setUnreadCount } = useMessageHub();
   const [view, setView] = useState<"list" | "chat">("list");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);

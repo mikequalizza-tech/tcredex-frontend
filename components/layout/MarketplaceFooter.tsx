@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useCurrentUser } from '@/lib/auth';
 import Link from 'next/link';
 import Logo from '@/components/ui/logo';
 import { MessageCircle } from 'lucide-react';
-import { useUser } from '@clerk/nextjs';
 import MessagesPopup from '@/components/messages/MessagesPopup';
 
 interface MarketplaceFooterProps {
@@ -14,7 +14,7 @@ interface MarketplaceFooterProps {
 }
 
 export default function MarketplaceFooter({ onChatSubmit, onOpenMessages, unreadCount = 0 }: MarketplaceFooterProps) {
-  const { user } = useUser();
+  const { user } = useCurrentUser();
   const [chatMessage, setChatMessage] = useState('');
   const [isMessagesOpen, setIsMessagesOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant'; content: string }[]>([

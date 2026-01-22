@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const MESSAGES_BATCH = 10;
 
 // POST - Send a new message
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -22,29 +23,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "content or fileUrl required" }, { status: 400 });
     }
 
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
-    // Get user info from Clerk
-    const user = await currentUser();
-    const userName = user?.firstName
-      ? `${user.firstName} ${user.lastName || ""}`.trim()
-      : user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "User";
-
-    // Get user's org name from our database
-    const { data: userData } = await supabase
+    // Get user info from database
+    const { data: userData } = await supabaseAdmin
       .from("users")
-      .select("organization_id, organizations(name)")
-      .eq("clerk_id", userId)
+      .select("id, name, email, organization_id, role_type")
+      .eq("id", authUser.id)
       .single();
 
-    const orgName = (userData as any)?.organizations?.name || "Unknown Org";
+    const userName = userData?.name || authUser.email?.split("@")[0] || "User";
+
+    // Get org name based on role_type
+    let orgName = "Unknown Org";
+    if (userData?.organization_id && userData?.role_type) {
+      const roleTable = userData.role_type === 'sponsor'
+        ? 'sponsors'
+        : userData.role_type === 'cde'
+          ? 'cdes'
+          : 'investors';
+
+      const { data: org } = await supabaseAdmin
+        .from(roleTable)
+        .select('primary_contact_name')
+        .eq('id', userData.organization_id)
+        .single();
+
+      orgName = org?.primary_contact_name || "Organization";
+    }
 
     // Insert message - Supabase Realtime will broadcast it
-    const { data: message, error } = await supabase
+    const { data: message, error } = await supabaseAdmin
       .from("closing_room_messages")
       .insert({
         room_id: roomId,
-        sender_clerk_id: userId,
+        sender_id: authUser.id,
         sender_name: userName,
         sender_org_name: orgName,
         content: content?.trim() || "",
@@ -68,8 +81,9 @@ export async function POST(request: NextRequest) {
 
 // GET - Fetch messages for a closing room channel
 export async function GET(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -82,9 +96,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = getSupabaseAdmin();
+    const supabaseAdmin = getSupabaseAdmin();
 
-    let query = supabase
+    let query = supabaseAdmin
       .from("closing_room_messages")
       .select("*")
       .eq("room_id", roomId)

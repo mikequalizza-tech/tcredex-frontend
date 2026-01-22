@@ -2,23 +2,48 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Logo from "./logo";
 import MobileMenu from "./mobile-menu";
 import HeaderSearch from "./header-search";
-import {
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
-import { OrganizationBadge } from "./organization-badge";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
+import { LogOut, User as UserIcon } from "lucide-react";
 
 export default function Header() {
+
+    const handleSignOut = async () => {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      setUser(null);
+      router.push("/");
+    };
+  const router = useRouter();
   const [platformOpen, setPlatformOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const platformRef = useRef<HTMLDivElement>(null);
   const resourcesRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+
+  useEffect(() => {
+    const supabase = createClient();
+    let subscription: any;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+      setLoading(false);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    subscription = data.subscription;
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -28,9 +53,15 @@ export default function Header() {
       if (resourcesRef.current && !resourcesRef.current.contains(event.target as Node)) {
         setResourcesOpen(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+
   }, []);
 
   return (
@@ -122,39 +153,59 @@ export default function Header() {
           <div className="flex items-center gap-3">
             <HeaderSearch />
 
-            {/* Clerk Auth Components */}
-            <SignedIn>
-              {/* Organization Badge */}
-              <OrganizationBadge />
-              <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">
-                Dashboard
-              </Link>
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8",
-                    userButtonPopoverCard: "bg-gray-900 border border-gray-800",
-                    userButtonPopoverActionButton: "text-gray-300 hover:text-white hover:bg-gray-800",
-                    userButtonPopoverActionButtonText: "text-gray-300",
-                    userButtonPopoverFooter: "hidden",
-                  },
-                }}
-                afterSignOutUrl="/"
-              />
-            </SignedIn>
+            {/* Auth - Signed In */}
+            {!loading && user && (
+              <>
+                <Link href="/dashboard" className="text-sm text-gray-300 hover:text-white">
+                  Dashboard
+                </Link>
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-medium hover:bg-indigo-500"
+                  >
+                    {user.email?.charAt(0).toUpperCase() || "U"}
+                  </button>
+                  {userMenuOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-xl z-50 py-2">
+                      <div className="px-4 py-2 border-b border-gray-800">
+                        <div className="text-sm text-white truncate">{user.email}</div>
+                      </div>
+                      <Link
+                        href="/dashboard/settings"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <UserIcon className="w-4 h-4" />
+                        Settings
+                      </Link>
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
-            <SignedOut>
-              <SignInButton mode="redirect">
-                <button className="text-sm text-gray-300 hover:text-white">
+            {/* Auth - Signed Out */}
+            {!loading && !user && (
+              <>
+                <Link href="/signin" className="text-sm text-gray-300 hover:text-white">
                   Login
-                </button>
-              </SignInButton>
-              <SignUpButton mode="redirect">
-                <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg">
+                </Link>
+                <Link
+                  href="/signup"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg"
+                >
                   Register
-                </button>
-              </SignUpButton>
-            </SignedOut>
+                </Link>
+              </>
+            )}
 
             <MobileMenu />
           </div>

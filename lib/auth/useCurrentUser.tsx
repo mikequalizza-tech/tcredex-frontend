@@ -1,12 +1,25 @@
 "use client";
 
-import { useUser, useAuth, useOrganization } from '@clerk/nextjs';
 import { useState, useEffect, useCallback } from 'react';
-import { User, Role, AuthContext, hasMinimumRole, Organization, ProjectAssignment } from './types';
+import { createClient } from '@/lib/supabase/client';
+import { User as SupabaseUser } from '@supabase/supabase-js';
+import { User, Role, hasMinimumRole, Organization } from './types';
 
-export interface ExtendedAuthContext extends AuthContext {
+export interface ExtendedAuthContext {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  needsRegistration: boolean;
+  canViewDocument: (ownerId: string) => boolean;
+  canEditDocument: (ownerId: string) => boolean;
+  canDeleteDocument: (ownerId: string) => boolean;
+  canShareDocument: (ownerId: string) => boolean;
+  canUploadDocument: (projectId?: string) => boolean;
+  canManageTeam: () => boolean;
+  canManageSettings: () => boolean;
+  hasProjectAccess: (projectId: string, requiredRole?: 'admin' | 'member' | 'viewer') => boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refresh: () => Promise<void>;
   switchRole: (role: 'sponsor' | 'cde' | 'investor' | 'admin') => void;
   currentDemoRole: 'sponsor' | 'cde' | 'investor' | 'admin' | null;
@@ -17,227 +30,127 @@ export interface ExtendedAuthContext extends AuthContext {
   userId: string | undefined;
   userName: string;
   userEmail: string;
-  needsRegistration: boolean; // True when user is authenticated but not in database
 }
 
-const normalizeOrgType = (type?: string | null): 'sponsor' | 'cde' | 'investor' | 'admin' | undefined => {
-  if (!type) return undefined;
-  const lower = type.toLowerCase();
-  if (['sponsor', 'cde', 'investor', 'admin'].includes(lower)) {
-    return lower as 'sponsor' | 'cde' | 'investor' | 'admin';
-  }
-  return undefined;
-};
-
-// Map user role to permission level
-const mapUserRoleToRole = (userRole?: string | null): Role => {
-  if (!userRole) return Role.VIEWER;
-
-  const upper = userRole.toUpperCase();
-  if (upper === 'ORG_ADMIN' || upper === 'ORG:ADMIN' || upper === 'ADMIN') return Role.ORG_ADMIN;
-  if (upper === 'PROJECT_ADMIN') return Role.PROJECT_ADMIN;
-  if (upper === 'MEMBER') return Role.MEMBER;
-  if (upper === 'VIEWER') return Role.VIEWER;
-
-  // Default to MEMBER for unknown roles (authenticated users get base access)
-  return Role.MEMBER;
-};
-
-/**
- * Clerk-based useCurrentUser hook
- *
- * This hook provides a compatibility layer between Clerk and the app's existing auth interface.
- * It uses Clerk's hooks (useUser, useAuth, useOrganization) and maps the data to match
- * the ExtendedAuthContext interface that the rest of the app expects.
- */
 export function useCurrentUser(): ExtendedAuthContext {
-  const { user: clerkUser, isLoaded: userLoaded } = useUser();
-  const { signOut, isLoaded: authLoaded } = useAuth();
-  const { organization: clerkOrg, isLoaded: orgLoaded } = useOrganization();
-
-  const [dbUserData, setDbUserData] = useState<{
-    organizationId?: string;
-    orgType?: string;
-    orgName?: string;
-    orgLogo?: string;
-    role?: string;
-    projectAssignments?: ProjectAssignment[];
-  } | null>(null);
-  const [isLoadingDbData, setIsLoadingDbData] = useState(true);
-
+  const [user, setUser] = useState<User | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [needsRegistration, setNeedsRegistration] = useState(false);
 
-  // Fetch additional user data from our database (organization info, role, etc.)
-  const fetchDbUserData = useCallback(async () => {
-    if (!clerkUser?.id) {
-      setDbUserData(null);
-      setIsLoadingDbData(false);
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-
-        // Check if user needs to complete registration
-        if (data.needsRegistration) {
-          setNeedsRegistration(true);
-          // Set default data so pages can render
-          setDbUserData({
-            organizationId: undefined,
-            orgType: 'sponsor', // Default to sponsor for new users
-            orgName: 'Complete Registration',
-            role: 'ORG_ADMIN',
-            projectAssignments: [],
-          });
-        } else if (data.user) {
-          setNeedsRegistration(false);
-          setDbUserData({
-            organizationId: data.user.organizationId || data.user.organization?.id,
-            orgType: data.user.organizationType || data.user.organization?.type,
-            orgName: data.user.organization?.name || 'Organization',
-            orgLogo: data.user.organization?.logo,
-            role: data.user.role,
-            projectAssignments: data.user.projectAssignments || [],
-          });
-        }
-      }
-    } catch (err) {
-      console.error('[Auth] Error fetching DB user data:', err);
-    } finally {
-      setIsLoadingDbData(false);
-    }
-  }, [clerkUser?.id]);
-
   useEffect(() => {
-    if (userLoaded && clerkUser) {
-      fetchDbUserData();
-    } else if (userLoaded && !clerkUser) {
-      setDbUserData(null);
-      setIsLoadingDbData(false);
+    const fetchUser = async () => {
+      setIsLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+          setUser(null);
+          setOrganization(null);
+          setIsLoading(false);
+          return;
+        }
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select(`
+            id,
+            email,
+            name,
+            role,
+            organization_id,
+            organizations:organization_id (
+              id,
+              name,
+              slug,
+              logo,
+              type
+            )
+          `)
+          .eq('id', authUser.id)
+          .single();
+        if (userError || !userData) {
+          setUser(null);
+          setOrganization(null);
+          setIsLoading(false);
+          return;
+        }
+        const orgs = userData.organizations as unknown;
+        const org = Array.isArray(orgs) ? orgs[0] : orgs;
+        const orgData = org as Organization | null | undefined;
+        setOrganization(orgData || null);
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          avatar: undefined,
+          role: userData.role,
+          organizationId: userData.organization_id,
+          organization: orgData || ({} as Organization),
+          projectAssignments: [],
+          createdAt: '',
+        });
+        setIsLoading(false);
+      } catch (err) {
+        setUser(null);
+        setOrganization(null);
+        setIsLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const canViewDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canEditDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canDeleteDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canShareDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canUploadDocument = useCallback(() => !!user, [user]);
+  const canManageTeam = useCallback(() => !!user && user.role === Role.ORG_ADMIN, [user]);
+  const canManageSettings = useCallback(() => !!user && hasMinimumRole(user.role, Role.PROJECT_ADMIN), [user]);
+  const hasProjectAccess = useCallback(() => true, []);
+
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('[Auth] login error', err);
+      return { success: false, error: 'Login failed' };
     }
-  }, [userLoaded, clerkUser, fetchDbUserData]);
-
-  const isLoading = !userLoaded || !authLoaded || isLoadingDbData;
-  const isAuthenticated = !!clerkUser;
-
-  // Build the user object from Clerk + DB data
-  const orgType = normalizeOrgType(dbUserData?.orgType);
-  const userRole = mapUserRoleToRole(dbUserData?.role);
-
-  // Build organization - may be undefined for new users
-  const organization: Organization | undefined = orgType ? {
-    id: dbUserData?.organizationId || clerkOrg?.id || 'org-pending',
-    name: dbUserData?.orgName || clerkOrg?.name || 'Organization',
-    slug: clerkOrg?.slug || 'org',
-    logo: dbUserData?.orgLogo || clerkOrg?.imageUrl,
-    type: orgType,
-  } : undefined;
-
-  // Build user - now works even without organization (for needsRegistration flow)
-  const user: User | null = clerkUser ? {
-    id: clerkUser.id,
-    email: clerkUser.emailAddresses[0]?.emailAddress || '',
-    name: clerkUser.fullName || clerkUser.firstName || 'User',
-    avatar: clerkUser.imageUrl,
-    role: userRole,
-    organizationId: organization?.id || 'pending',
-    organization: organization || {
-      id: 'pending',
-      name: 'Complete Registration',
-      slug: 'pending',
-      type: 'sponsor',
-    },
-    projectAssignments: dbUserData?.projectAssignments || [],
-    createdAt: clerkUser.createdAt?.toISOString() || new Date().toISOString(),
-    lastLoginAt: clerkUser.lastSignInAt?.toISOString(),
-  } : null;
-
-  // Permission methods
-  const canViewDocument = useCallback((documentOwnerId: string, projectId?: string): boolean => {
-    if (!user) return false;
-    if (user.role === Role.ORG_ADMIN) return true;
-    if (documentOwnerId === user.id) return true;
-    if (projectId) return hasProjectAccess(projectId, 'viewer');
-    return hasMinimumRole(user.role, Role.VIEWER);
-  }, [user]);
-
-  const canEditDocument = useCallback((documentOwnerId: string, projectId?: string): boolean => {
-    if (!user) return false;
-    if (user.role === Role.ORG_ADMIN) return true;
-    if (documentOwnerId === user.id) return true;
-    if (projectId && user.role === Role.PROJECT_ADMIN) return hasProjectAccess(projectId, 'admin');
-    if (projectId && user.role === Role.MEMBER) return hasProjectAccess(projectId, 'member');
-    return false;
-  }, [user]);
-
-  const canDeleteDocument = useCallback((documentOwnerId: string): boolean => {
-    if (!user) return false;
-    if (user.role === Role.ORG_ADMIN) return true;
-    return documentOwnerId === user.id && hasMinimumRole(user.role, Role.PROJECT_ADMIN);
-  }, [user]);
-
-  const canShareDocument = useCallback((documentOwnerId: string): boolean => {
-    if (!user) return false;
-    if (hasMinimumRole(user.role, Role.PROJECT_ADMIN)) return true;
-    return documentOwnerId === user.id;
-  }, [user]);
-
-  const canUploadDocument = useCallback((projectId?: string): boolean => {
-    if (!user) return false;
-    if (user.role === Role.VIEWER) return false;
-    if (hasMinimumRole(user.role, Role.PROJECT_ADMIN)) return true;
-    if (projectId) return hasProjectAccess(projectId, 'member');
-    return user.role === Role.MEMBER;
-  }, [user]);
-
-  const canManageTeam = useCallback((): boolean => user?.role === Role.ORG_ADMIN, [user]);
-  const canManageSettings = useCallback((): boolean => !!user && hasMinimumRole(user.role, Role.PROJECT_ADMIN), [user]);
-
-  const hasProjectAccess = useCallback((projectId: string, requiredRole: 'admin' | 'member' | 'viewer' = 'viewer'): boolean => {
-    if (!user) return false;
-    if (user.role === Role.ORG_ADMIN) return true;
-    const assignment = user.projectAssignments.find(p => p.projectId === projectId);
-    if (!assignment) return false;
-    const roleHierarchy = { admin: 3, member: 2, viewer: 1 };
-    return roleHierarchy[assignment.role] >= roleHierarchy[requiredRole];
-  }, [user]);
-
-  // Auth actions
-  const login = useCallback(async (_email: string, _password: string): Promise<{ success: boolean; error?: string }> => {
-    // With Clerk, login is handled by Clerk's SignIn component
-    // This is kept for interface compatibility but shouldn't be called directly
-    console.warn('[Auth] login() called but Clerk handles authentication via SignIn component');
-    return { success: false, error: 'Use Clerk SignIn component for authentication' };
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await signOut();
-      // Clerk handles the redirect
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      // Redirect to home
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
     } catch (err) {
       console.error('[Auth] logout error', err);
-      // Fallback redirect
       if (typeof window !== 'undefined') {
         window.location.href = '/signin';
       }
     }
-  }, [signOut]);
+  }, []);
 
   const refresh = useCallback(async () => {
-    await fetchDbUserData();
-  }, [fetchDbUserData]);
+    // No-op: refresh logic can be implemented if needed
+  }, []);
 
   const switchRole = useCallback((_role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
     // Role switching disabled; real role comes from database
-    console.warn('[Auth] switchRole is disabled; use Clerk Organizations for role management.');
+    console.warn('[Auth] switchRole is disabled; use database for role management.');
   }, []);
 
   return {
     user,
     isLoading,
-    isAuthenticated,
+    isAuthenticated: !!user,
     needsRegistration,
     canViewDocument,
     canEditDocument,
@@ -297,10 +210,7 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>, re
   };
 }
 
-// Re-export for backward compatibility - AuthProvider is no longer needed
-// as ClerkProvider handles everything, but we export a no-op for any imports
+// Re-export for backward compatibility
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // With Clerk, ClerkProvider in layout.tsx handles auth context
-  // This is a pass-through for backward compatibility
   return <>{children}</>;
 }

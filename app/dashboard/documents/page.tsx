@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -61,7 +61,7 @@ const STATUS_LABELS: Record<DocumentStatus, string> = {
   expired: 'Expired',
 };
 
-export default function DocumentsPage() {
+function DocumentsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -111,7 +111,7 @@ export default function DocumentsPage() {
           uploadedBy: doc.uploaded_by_name || doc.uploaded_by || '',
           uploadedDate: doc.created_at ? new Date(doc.created_at).toISOString().split('T')[0] : '',
           size: formatFileSize(doc.file_size),
-          version: doc.version || 1,
+          version: normalizeVersion(doc.version ?? doc.version_number ?? doc.doc_version ?? 1),
           aiFlags: doc.ai_flags || [],
           fileUrl: doc.file_url,
         }));
@@ -134,7 +134,8 @@ export default function DocumentsPage() {
     try {
       const response = await fetch('/api/deals', { credentials: 'include' }); // Get user's deals
       const deals = await response.json();
-      const projects = deals.map((deal: any) => ({
+      const dealArray = Array.isArray(deals) ? deals : deals?.deals || deals?.data || [];
+      const projects = dealArray.map((deal: any) => ({
         id: deal.id,
         name: deal.projectName || deal.project_name || 'Untitled Project'
       }));
@@ -158,6 +159,12 @@ export default function DocumentsPage() {
     approved: documents.filter(d => d.status === 'approved').length,
     aiFlags: documents.filter(d => d.aiFlags && d.aiFlags.length > 0).length,
   };
+
+  function normalizeVersion(value: unknown): number {
+    if (typeof value === 'number') return value;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 1;
+  }
 
   function mapCategory(cat: string): DocumentCategory {
     const valid: DocumentCategory[] = ['corporate', 'project', 'financial', 'real_estate', 'legal', 'qalicb', 'insurance', 'closing'];
@@ -796,5 +803,21 @@ export default function DocumentsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="p-8 flex items-center justify-center min-h-[400px]">
+      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <DocumentsPageContent />
+    </Suspense>
   );
 }

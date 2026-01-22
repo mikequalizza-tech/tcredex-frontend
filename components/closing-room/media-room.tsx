@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useCurrentUser } from "@/lib/auth/useCurrentUser";
 import {
   ControlBar,
   GridLayout,
@@ -30,16 +30,12 @@ export function MediaRoom({
   audio,
   onDisconnect,
 }: MediaRoomProps) {
-  const { user, isLoaded } = useUser();
+  const { user, isLoading } = useCurrentUser();
   const router = useRouter();
   const [token, setToken] = useState("");
 
   useEffect(() => {
-    const name =
-      user?.fullName ||
-      user?.firstName ||
-      user?.lastName ||
-      user?.primaryEmailAddress?.emailAddress?.split("@")[0];
+    const name = user?.name || user?.email?.split("@")[0];
 
     if (!name) return;
 
@@ -56,7 +52,7 @@ export function MediaRoom({
     })();
   }, [roomId, user]);
 
-  if (token === "" || !isLoaded) {
+  if (token === "" || isLoading) {
     return (
       <div className="flex flex-col flex-1 justify-center items-center bg-gray-900">
         <Loader2 className="h-7 w-7 text-indigo-500 animate-spin my-4" />

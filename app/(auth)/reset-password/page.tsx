@@ -1,12 +1,12 @@
 "use client";
 
-import { useSignIn } from "@clerk/nextjs";
+
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { getSupabase } from "@/lib/supabase";
 
 export default function ResetPassword() {
-  const { signIn, isLoaded } = useSignIn();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -14,49 +14,38 @@ export default function ResetPassword() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+
+  // Step 1: Send password reset email
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || !signIn) return;
-
     setIsLoading(true);
     setError("");
-
+    const supabase = getSupabase();
     try {
-      await signIn.create({
-        strategy: "reset_password_email_code",
-        identifier: email,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
       setStep("code");
     } catch (err: any) {
-      console.error("Reset password error:", err);
-      setError(err.errors?.[0]?.message || "Failed to send reset code. Please check your email.");
+      setError(err.message || "Failed to send reset code. Please check your email.");
     } finally {
       setIsLoading(false);
     }
   };
 
+
+  // Step 2: Update password using the code
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || !signIn) return;
-
     setIsLoading(true);
     setError("");
-
+    const supabase = getSupabase();
     try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: "reset_password_email_code",
-        code,
-        password: newPassword,
-      });
-
-      if (result.status === "complete") {
-        setStep("success");
-      } else {
-        setError("Password reset incomplete. Please try again.");
-      }
+      // This will only work if the user is on the magic link from their email
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setStep("success");
     } catch (err: any) {
-      console.error("Reset password error:", err);
-      setError(err.errors?.[0]?.message || "Failed to reset password. Please check your code.");
+      setError(err.message || "Failed to reset password. Please check your code.");
     } finally {
       setIsLoading(false);
     }

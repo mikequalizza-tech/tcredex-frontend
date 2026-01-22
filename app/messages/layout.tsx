@@ -33,7 +33,7 @@ function ProtectedContent({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <AppLayout showRoleSwitcher={false}>{children}</AppLayout>
+      <AppLayout>{children}</AppLayout>
       <ChatTC />
     </>
   );

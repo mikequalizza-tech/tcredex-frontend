@@ -1,12 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { User, Role, AuthContext, hasMinimumRole, Organization, ProjectAssignment } from './types';
+import { User, Role, hasMinimumRole, Organization } from './types';
 
-export interface ExtendedAuthContext extends AuthContext {
+export interface ExtendedAuthContext {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  needsRegistration: boolean;
+  canViewDocument: (ownerId: string) => boolean;
+  canEditDocument: (ownerId: string) => boolean;
+  canDeleteDocument: (ownerId: string) => boolean;
+  canShareDocument: (ownerId: string) => boolean;
+  canUploadDocument: (projectId?: string) => boolean;
+  canManageTeam: () => boolean;
+  canManageSettings: () => boolean;
+  hasProjectAccess: (projectId: string, requiredRole?: 'admin' | 'member' | 'viewer') => boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   refresh: () => Promise<void>;
   switchRole: (role: 'sponsor' | 'cde' | 'investor' | 'admin') => void;
   currentDemoRole: 'sponsor' | 'cde' | 'investor' | 'admin' | null;
@@ -17,136 +30,85 @@ export interface ExtendedAuthContext extends AuthContext {
   userId: string | undefined;
   userName: string;
   userEmail: string;
-  needsRegistration: boolean; // True when user is authenticated but not in database
 }
 
-const normalizeOrgType = (type?: string | null): 'sponsor' | 'cde' | 'investor' | 'admin' | undefined => {
-  if (!type) return undefined;
-
-    if (type === 'sponsor' || type === 'cde' || type === 'investor' || type === 'admin') return type;
-    return undefined;
-  };
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSupabaseUser(session?.user ?? null);
-      if (!session?.user) {
-        setDbUserData(null);
-        setIsLoadingDbData(false);
-      }
-    });
+export function useCurrentUser(): ExtendedAuthContext {
+  const [user, setUser] = useState<User | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [needsRegistration, setNeedsRegistration] = useState(false);
 
   useEffect(() => {
-    if (authLoaded && supabaseUser) {
-      fetchDbUserData();
-    } else if (authLoaded && !supabaseUser) {
-      setDbUserData(null);
-      setIsLoadingDbData(false);
-    }
-  }, [authLoaded, supabaseUser, fetchDbUserData]);
-
-  const isLoading = !authLoaded || isLoadingDbData;
-  return {
-    user,
-    isLoading,
-    isAuthenticated,
-    needsRegistration,
-    canViewDocument,
-    canEditDocument,
-    canDeleteDocument,
-    canShareDocument,
-    canUploadDocument,
-    canManageTeam,
-    canManageSettings,
-    hasProjectAccess,
-    login,
-    logout,
-    refresh,
-    switchRole,
-    currentDemoRole: null,
-    orgType: organization?.type || 'sponsor',
-    orgName: organization?.name || '',
-    orgLogo: organization?.logo,
-    organizationId: organization?.id,
-    userId: user?.id,
-    userName: user?.name || '',
-    userEmail: user?.email || '',
-  };
-}
-  const isAuthenticated = !!supabaseUser;
-
-  // Build the user object from Supabase + DB data using useMemo
-  const { user, organization, orgType, userRole } = useMemo(() => {
-    const normalizedOrgType = normalizeOrgType(dbUserData?.orgType);
-    const mappedUserRole = mapUserRoleToRole(dbUserData?.role);
-    let userData: User | null = null;
-    if (supabaseUser && dbUserData) {
-      userData = {
-        id: supabaseUser.id,
-        email: dbUserData.email || supabaseUser.email || '',
-        name: dbUserData.name || (supabaseUser.user_metadata?.name as string) || 'User',
-        avatar: dbUserData.avatarUrl,
-        role: mappedUserRole,
-        organizationId: dbUserData.organizationId,
-        organization: dbUserData.organization,
-        projectAssignments: dbUserData?.projectAssignments || [],
-        createdAt: supabaseUser.created_at || new Date().toISOString(),
-        lastLoginAt: supabaseUser.last_sign_in_at,
-      };
-    }
-
-    return {
-      user: userData,
-      organization: userData ? org : undefined,
-      orgType: normalizedOrgType,
-      userRole: mappedUserRole,
+    const fetchUser = async () => {
+      setIsLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+          setUser(null);
+          setOrganization(null);
+          setIsLoading(false);
+          return;
+        }
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select(`
+            id,
+            email,
+            name,
+            role,
+            organization_id,
+            organizations:organization_id (
+              id,
+              name,
+              slug,
+              logo,
+              type
+            )
+          `)
+          .eq('id', authUser.id)
+          .single();
+        if (userError || !userData) {
+          setUser(null);
+          setOrganization(null);
+          setIsLoading(false);
+          return;
+        }
+        const orgs = userData.organizations as unknown;
+        const org = Array.isArray(orgs) ? orgs[0] : orgs;
+        const orgData = org as Organization | null | undefined;
+        setOrganization(orgData || null);
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          avatar: undefined,
+          role: userData.role,
+          organizationId: userData.organization_id,
+          organization: orgData || ({} as Organization),
+          projectAssignments: [],
+          createdAt: '',
+        });
+        setIsLoading(false);
+      } catch (err) {
+        setUser(null);
+        setOrganization(null);
+        setIsLoading(false);
+      }
     };
-  }, [supabaseUser, dbUserData]);
-
-  // Helper function for project access check (defined first to be used in callbacks)
-  // Dummy implementation for checkProjectAccess
-  const checkProjectAccess = useCallback((user: User, projectId: string, requiredRole: 'viewer' | 'member' | 'admin') => {
-    // TODO: Implement actual project access logic
-    return true;
+    fetchUser();
   }, []);
 
-  const canEditDocument = useCallback((documentOwnerId: string, projectId?: string): boolean => {
-    if (!user) return false;
-    if (user.role === Role.ORG_ADMIN) return true;
-    if (documentOwnerId === user.id) return true;
-    if (projectId && user.role === Role.PROJECT_ADMIN) return checkProjectAccess(user, projectId, 'admin');
-    if (projectId && user.role === Role.MEMBER) return checkProjectAccess(user, projectId, 'member');
-    return false;
-  }, [user, checkProjectAccess]);
+  const canViewDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canEditDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canDeleteDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canShareDocument = useCallback((ownerId: string) => !!user && user.id === ownerId, [user]);
+  const canUploadDocument = useCallback(() => !!user, [user]);
+  const canManageTeam = useCallback(() => !!user && user.role === Role.ORG_ADMIN, [user]);
+  const canManageSettings = useCallback(() => !!user && hasMinimumRole(user.role, Role.PROJECT_ADMIN), [user]);
+  const hasProjectAccess = useCallback(() => true, []);
 
-  const canDeleteDocument = useCallback((documentOwnerId: string): boolean => {
-    if (!user) return false;
-    if (user.role === Role.ORG_ADMIN) return true;
-    return documentOwnerId === user.id && hasMinimumRole(user.role, Role.PROJECT_ADMIN);
-  }, [user]);
-
-  const canShareDocument = useCallback((documentOwnerId: string): boolean => {
-    if (!user) return false;
-    if (hasMinimumRole(user.role, Role.PROJECT_ADMIN)) return true;
-    return documentOwnerId === user.id;
-  }, [user]);
-
-  const canUploadDocument = useCallback((projectId?: string): boolean => {
-    if (!user) return false;
-    if (user.role === Role.VIEWER) return false;
-    if (hasMinimumRole(user.role, Role.PROJECT_ADMIN)) return true;
-    if (projectId) return checkProjectAccess(user, projectId, 'member');
-    return user.role === Role.MEMBER;
-  }, [user, checkProjectAccess]);
-
-  const canManageTeam = useCallback((): boolean => user?.role === Role.ORG_ADMIN, [user]);
-  const canManageSettings = useCallback((): boolean => !!user && hasMinimumRole(user.role, Role.PROJECT_ADMIN), [user]);
-
-  const hasProjectAccess = useCallback((projectId: string, requiredRole: 'admin' | 'member' | 'viewer' = 'viewer'): boolean => {
-    return checkProjectAccess(user, projectId, requiredRole);
-  }, [user, checkProjectAccess]);
-
-  // Auth actions
-  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = useCallback(async (email: string, password: string) => {
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -177,8 +139,8 @@ const normalizeOrgType = (type?: string | null): 'sponsor' | 'cde' | 'investor' 
   }, []);
 
   const refresh = useCallback(async () => {
-    await fetchDbUserData();
-  }, [fetchDbUserData]);
+    // No-op: refresh logic can be implemented if needed
+  }, []);
 
   const switchRole = useCallback((_role: 'sponsor' | 'cde' | 'investor' | 'admin') => {
     // Role switching disabled; real role comes from database
@@ -188,7 +150,7 @@ const normalizeOrgType = (type?: string | null): 'sponsor' | 'cde' | 'investor' 
   return {
     user,
     isLoading,
-    isAuthenticated,
+    isAuthenticated: !!user,
     needsRegistration,
     canViewDocument,
     canEditDocument,

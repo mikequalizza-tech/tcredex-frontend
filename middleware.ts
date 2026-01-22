@@ -1,3 +1,32 @@
+
+const PUBLIC_PREFIXES = [
+  '/sign-in',
+  '/sign-up',
+  '/support',
+  '/blog',
+  '/help',
+  '/programs',
+  '/r/',
+  '/api/auth',
+  '/api/register',
+  '/api/contact',
+  '/api/chat',  // ChatTC API
+  '/api/eligibility',
+  '/api/geo',
+  '/api/tracts',
+  '/api/map',
+  '/api/tiles',
+  '/api/pricing',
+  '/api/founders',
+  '/api/deals',
+  '/api/deals/(.*)',
+  '/api/cdes',
+  '/api/investors',
+  '/api/webhook',
+  '/api/webhook/(.*)',
+  '/api/onboarding',
+  '/api/closing-room',  // Allow closing room API
+];
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -42,8 +71,6 @@ const PUBLIC_ROUTES = [
   '/terms',
   '/founders',
   '/who-we-serve',
-<<<<<<< HEAD
-<<<<<<< HEAD
   '/programs(.*)',
   '/r/(.*)',  // QR/referral redirects
   '/onboarding',
@@ -53,52 +80,8 @@ const PUBLIC_ROUTES = [
   '/faq',
   '/newsletter',
   '/api/auth/(.*)',
-=======
-=======
->>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 ];
 
-const PUBLIC_PREFIXES = [
-  '/sign-in',
-  '/sign-up',
-  '/support',
-  '/blog',
-  '/help',
-  '/programs',
-  '/r/',
-  '/api/auth',
-<<<<<<< HEAD
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
-=======
->>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
-  '/api/register',
-  '/api/contact',
-  '/api/chat',  // ChatTC API
-  '/api/eligibility',
-  '/api/geo',
-  '/api/tracts',
-  '/api/map',
-  '/api/tiles',
-  '/api/pricing',
-  '/api/founders',
-  '/api/deals',
-  '/api/deals/(.*)',
-  '/api/cdes',
-  '/api/investors',
-<<<<<<< HEAD
-<<<<<<< HEAD
-  '/api/webhook/(.*)',
-  '/api/onboarding',
-  '/api/closing-room',  // Allow closing room API
-]);
-=======
-  '/api/webhook',
-];
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
-=======
-  '/api/webhook',
-];
->>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.includes(pathname)) return true;
@@ -108,8 +91,26 @@ function isPublicRoute(pathname: string): boolean {
 // ============================================================================
 // Supabase Middleware
 // ============================================================================
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Exclude static files, Next.js internals, and public assets from auth middleware
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/static') ||
+    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/icons') ||
+    pathname.startsWith('/fonts') ||
+    pathname.startsWith('/images') ||
+    pathname.startsWith('/manifest.json') ||
+    pathname.startsWith('/robots.txt') ||
+    pathname.startsWith('/sitemap') ||
+    pathname.startsWith('/api') ||
+    pathname.match(/\.(css|js|mjs|json|svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|otf)$/)
+  ) {
+    return NextResponse.next();
+  }
 
   // Handle QR/Referral redirects
   if (pathname.startsWith('/r/')) {
@@ -147,17 +148,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-  // Protect non-public routes - require authentication
-  if (!isPublicRoute(request)) {
-    await auth.protect();
-  }
-
-  // NOTE: Onboarding check removed from middleware - handled at page level
-  // The useCurrentUser hook sets needsRegistration flag for pages to handle
-});
-=======
+// (removed duplicate/legacy merge conflict block)
   // Create Supabase client for auth check
   let response = NextResponse.next({
     request: {
@@ -190,42 +181,6 @@ export async function middleware(request: NextRequest) {
   if (isPublicRoute(pathname)) {
     return response;
   }
-
-=======
-  // Create Supabase client for auth check
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value);
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  // Refresh session if exists
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Public routes - allow through
-  if (isPublicRoute(pathname)) {
-    return response;
-  }
-
->>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
   // Protected routes - redirect to signin if not authenticated
   if (!user) {
     const signinUrl = new URL('/signin', request.url);
@@ -266,14 +221,3 @@ export async function middleware(request: NextRequest) {
 
   return response;
 }
-<<<<<<< HEAD
->>>>>>> 6fd0f1a (Refactors authentication to Supabase Auth)
-=======
->>>>>>> 6fd0f1a07c44c11c9270fe4e21cbee294b8c729e
-
-export const config = {
-  matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
-  ],
-};

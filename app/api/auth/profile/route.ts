@@ -6,51 +6,23 @@
  * No organizations FK chain - organization_id + organization_type tells you which entity table
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = getSupabaseAdmin();
+export async function GET(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
 
-    // Get current user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (error || !user) {
+    return NextResponse.json({ error: error?.message || 'Not authenticated' }, { status: 401 });
+  }
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Get profile (role-driven only)
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, full_name, role')
-      .eq('id', user.id)
-      .single();
-
-    type ProfileData = {
-      id: string;
-      full_name: string | null;
-      role: string | null;
-    };
-    const profile = profileData as ProfileData | null;
-
-    if (profileError || !profile) {
-      // Return basic user info if profile doesn't exist
-      return NextResponse.json({
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.full_name || user.email?.split('@')[0],
-        role: user.user_metadata?.role || 'sponsor',
-      });
-    }
-
-      return NextResponse.json({
-        id: user.id,
-        email: user.email,
-        name: profile.full_name || user.email?.split('@')[0],
-        role: profile.role || 'sponsor',
-      });
-      id: user.id,
+  return NextResponse.json({
+    id: user.id,
+    email: user.email,
+    user_metadata: user.user_metadata,
+  });
+}

@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/api` : 'http://127.0.0.1:8080/api';
 
 interface TestUser {
   email: string;
@@ -62,10 +62,10 @@ async function register(user: TestUser): Promise<void> {
   const data = await response.json();
   expect(data.success).toBe(true);
   expect(data.user.id).toBeDefined();
-  expect(data.user.organization.id).toBeDefined();
+  expect(data.user.organizationId).toBeDefined();
 
   user.userId = data.user.id;
-  user.orgId = data.user.organization.id;
+  user.orgId = data.user.organizationId;
 }
 
 async function login(user: TestUser): Promise<void> {
@@ -472,7 +472,7 @@ describe('Auth & Roles System - Phase 1 Tests', () => {
       expect(loginResponse.status).toBe(200);
       const loginData = await loginResponse.json();
       expect(loginData.user.id).toBe(registerData.user.id);
-      expect(loginData.user.organization.id).toBe(registerData.user.organization.id);
+      expect(loginData.user.organizationId).toBe(registerData.user.organizationId);
     });
 
     it('7.2 Organization type should match role', async () => {
@@ -491,7 +491,7 @@ describe('Auth & Roles System - Phase 1 Tests', () => {
       });
 
       const data = await response.json();
-      expect(data.user.organization.type).toBe('cde');
+      expect(data.user.organizationType).toBe('cde');
     });
 
     it('7.3 User role should be ORG_ADMIN after registration', async () => {
@@ -511,6 +511,45 @@ describe('Auth & Roles System - Phase 1 Tests', () => {
 
       const data = await response.json();
       expect(data.user.role).toBe('ORG_ADMIN');
+
+    });
+
+    it('7.4 Should register via /auth/signup', async () => {
+      const user = {
+        email: `signup-${Date.now()}@test.com`,
+        password: 'TestPassword123!',
+        name: 'Signup Test',
+        organizationName: `Signup Org ${Date.now()}`,
+        role: 'investor' as const,
+      };
+      const response = await fetch(`${API_BASE}/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      });
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.user.organizationType).toBe('investor');
+    });
+
+    it('7.5 Should register via /onboarding', async () => {
+      const user = {
+        email: `onboarding-${Date.now()}@test.com`,
+        password: 'TestPassword123!',
+        name: 'Onboarding Test',
+        organizationName: `Onboarding Org ${Date.now()}`,
+        role: 'sponsor' as const,
+      };
+      const response = await fetch(`${API_BASE}/onboarding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      });
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.user.organizationType).toBe('sponsor');
     });
   });
 });

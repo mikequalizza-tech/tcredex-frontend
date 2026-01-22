@@ -34,7 +34,9 @@ NEXT_PUBLIC_SITE_URL=https://tcredex.com
 VERCEL_URL=auto-filled-by-vercel
 
 # API Configuration (if using separate backend)
-NEXT_PUBLIC_API_URL=https://api.tcredex.com
+# In development: http://127.0.0.1:8080 (or your backend port)
+# In production: https://api.tcredex.com
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8080
 ```
 
 ### Optional Environment Variables

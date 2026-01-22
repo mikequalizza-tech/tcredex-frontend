@@ -12,6 +12,7 @@ try {
 }
 
 const nextConfig = {
+  outputFileTracingRoot: __dirname,
   // Performance optimizations
   experimental: {
     optimizePackageImports: ['mapbox-gl', 'react-map-gl', '@supabase/supabase-js'],

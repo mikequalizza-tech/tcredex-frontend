@@ -20,70 +20,76 @@ export interface CurrentUserData {
 }
 
 export function useCurrentUser() {
-  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
-  const [hasQueryClient, setHasQueryClient] = useState(false);
+  const [user, setUser] = useState<CurrentUserData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
 
-  // Check if QueryClient exists (for static pages that don't have it)
   useEffect(() => {
-    setHasQueryClient(true);
+    const fetchUser = async () => {
+      setIsLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select(`
+            id,
+            email,
+            name,
+            role,
+            role_type,
+            organization_id,
+            organizations:organization_id (
+              id,
+              name,
+              slug,
+              type
+            )
+          `)
+          .eq("id", authUser.id)
+          .single();
+        if (userError || !userData) {
+          setUser(null);
+          setError(userError);
+          setIsLoading(false);
+          return;
+        }
+        const orgs = userData.organizations as unknown;
+        const org = Array.isArray(orgs) ? orgs[0] : orgs;
+        const orgData = org as { id: string; name: string; slug: string; type: string } | null | undefined;
+        setUser({
+          id: userData.id,
+          clerk_id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          role: userData.role,
+          organization_id: userData.organization_id,
+          organization: orgData ? {
+            id: orgData.id,
+            name: orgData.name,
+            slug: orgData.slug,
+            type: orgData.type as "sponsor" | "cde" | "investor",
+          } : null,
+        });
+        setIsLoading(false);
+      } catch (err) {
+        setError(err);
+        setUser(null);
+        setIsLoading(false);
+      }
+    };
+    fetchUser();
   }, []);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["current-user", clerkUser?.id],
-    queryFn: async (): Promise<CurrentUserData | null> => {
-      if (!clerkUser?.id) return null;
-
-      const supabase = createClient();
-      const { data: userData, error } = await supabase
-        .from("users")
-        .select(`
-          id,
-          clerk_id,
-          email,
-          name,
-          role,
-          organization_id,
-          organizations:organization_id (
-            id,
-            name,
-            slug,
-            type
-          )
-        `)
-        .eq("clerk_id", clerkUser.id)
-        .single();
-
-      if (error || !userData) return null;
-
-      // Supabase may return organization as array or object depending on relation
-      const orgs = userData.organizations as unknown;
-      const org = Array.isArray(orgs) ? orgs[0] : orgs;
-      const orgData = org as { id: string; name: string; slug: string; type: string } | null | undefined;
-
-      return {
-        id: userData.id,
-        clerk_id: userData.clerk_id,
-        email: userData.email,
-        name: userData.name,
-        role: userData.role,
-        organization_id: userData.organization_id,
-        organization: orgData ? {
-          id: orgData.id,
-          name: orgData.name,
-          slug: orgData.slug,
-          type: orgData.type as "sponsor" | "cde" | "investor",
-        } : null,
-      };
-    },
-    enabled: !!clerkUser?.id && clerkLoaded && hasQueryClient,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
   return {
-    user: data,
-    clerkUser,
-    isLoading: !clerkLoaded || isLoading,
+    user,
+    isLoading,
     error,
-    isAuthenticated: !!clerkUser,
+    isAuthenticated: !!user,
   };
 }

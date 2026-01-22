@@ -11,6 +11,13 @@ import { User } from "@supabase/supabase-js";
 import { LogOut, User as UserIcon } from "lucide-react";
 
 export default function Header() {
+
+    const handleSignOut = async () => {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      setUser(null);
+      router.push("/");
+    };
   const router = useRouter();
   const [platformOpen, setPlatformOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
@@ -21,19 +28,22 @@ export default function Header() {
   const resourcesRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-    const supabase = createClient();
 
-    // Get initial user
+  useEffect(() => {
+    const supabase = createClient();
+    let subscription: any;
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
       setLoading(false);
     });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
-    return () => subscription.unsubscribe();
+    subscription = data.subscription;
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

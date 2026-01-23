@@ -1,7 +1,2 @@
-onlyBuiltDependencies:
-  - e
-  - p
-  - r
-  - t
-  - u
-  - unrs-resolver
+packages:
+  - '.'

@@ -1,38 +1,135 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# tCredex Frontend
 
-## Getting Started
+The tCredex platform frontend - a Next.js application for managing New Markets Tax Credit (NMTC) deals, matching Community Development Entities (CDEs) with projects, and facilitating the deal closing process.
 
-First, run the development server:
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- pnpm 8+
+- Backend API running (see [tcredex-backend](https://github.com/mikequalizza-tech/tcredex-backend))
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Install pnpm globally if you haven't
+npm install -g pnpm
+
+# Install dependencies
+pnpm install
+
+# Copy environment variables
+cp .env.example .env.local
+
+# Edit .env.local with your configuration
+# IMPORTANT: Set NEXT_PUBLIC_API_URL=http://127.0.0.1:8080
+
+# Build the project
+pnpm build
+
+# Run development server
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📖 Documentation
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Complete development guide including:
+  - Frontend + Backend integration setup
+  - AUTH and Onboarding troubleshooting
+  - Common issues and solutions
+  - Testing procedures
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+## 🔑 Key Features
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+- **Authentication & Onboarding** - Supabase-based auth with role-specific onboarding
+- **Deal Management** - Create, track, and manage NMTC deals
+- **Auto-Matching** - AI-powered CDE matching based on deal characteristics
+- **Closing Room** - Real-time collaboration workspace for deal closing
+- **Document Management** - Upload, share, and manage deal documents
+- **Interactive Maps** - Census tract visualization and eligibility checking
 
-## Learn More
+## 🛠️ Tech Stack
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework:** Next.js 15 (App Router)
+- **UI:** React 19, TailwindCSS 4
+- **Auth:** Supabase Auth
+- **Database:** Supabase (PostgreSQL with PostGIS)
+- **Maps:** Mapbox GL JS
+- **Real-time:** Socket.io, LiveKit
+- **Deployment:** Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🏗️ Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```
+tcredex-frontend/
+├── app/              # Next.js app directory (routes)
+├── components/       # React components
+├── lib/             # Utilities, API clients, helpers
+├── public/          # Static assets
+├── styles/          # Global styles
+└── types/           # TypeScript type definitions
+```
 
-## Deploy on Vercel
+## ⚙️ Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Required environment variables (see `.env.example` for full list):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+# Backend API (CRITICAL - must match backend port)
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8080
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+## 🐛 Troubleshooting
+
+### AUTH/Onboarding Not Working?
+
+1. Ensure backend is running on port 8080
+2. Verify `NEXT_PUBLIC_API_URL=http://127.0.0.1:8080` in `.env.local`
+3. Check Supabase credentials are correct
+4. See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed troubleshooting
+
+### Build Failing?
+
+```bash
+# Clean and rebuild
+pnpm clean
+rm -rf node_modules pnpm-lock.yaml
+pnpm install
+pnpm build
+```
+
+## 📝 Available Scripts
+
+- `pnpm dev` - Start development server
+- `pnpm build` - Build for production
+- `pnpm start` - Start production server
+- `pnpm lint` - Run ESLint
+- `pnpm clean` - Clean build cache
+
+## 🤝 Contributing
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Test with backend running
+4. Submit a pull request
+
+## 📚 Learn More
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase Documentation](https://supabase.com/docs)
+- [TailwindCSS Documentation](https://tailwindcss.com/docs)
+
+## 🚢 Deployment
+
+The application is optimized for deployment on Vercel. See [VERCEL_DEPLOYMENT_GUIDE.md](./VERCEL_DEPLOYMENT_GUIDE.md) for details.
+
+---
+
+**Backend Repository:** [tcredex-backend](https://github.com/mikequalizza-tech/tcredex-backend)

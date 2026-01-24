@@ -2,7 +2,7 @@
  * tCredex API - Demo Login
  * POST /api/auth/demo-login
  *
- * SIMPLIFIED: Uses *_simplified tables - no organization FK joins
+ * SIMPLIFIED: Uses simplified schema tables (sponsors, investors, users, cdes_merged) - no organization FK joins
  * Password: "demo123" for all demo accounts
  */
 

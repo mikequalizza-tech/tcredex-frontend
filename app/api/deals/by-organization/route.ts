@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     if (!organizationType) {
       // Try to find organization type by checking each simplified table
       const { data: sponsor } = await supabase
-        .from('sponsors_simplified')
+        .from('sponsors')
         .select('id')
         .eq('organization_id', orgId)
         .single();
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           organizationType = 'cde';
         } else {
           const { data: investor } = await supabase
-            .from('investors_simplified')
+            .from('investors')
             .select('id')
             .eq('organization_id', orgId)
             .single();
@@ -59,9 +59,9 @@ export async function GET(request: NextRequest) {
 
     // Build conditions based on organization type
     if (organizationType === 'sponsor') {
-      // For sponsors, look up sponsor_id from sponsors_simplified
+      // For sponsors, look up sponsor_id from sponsors
       const { data: sponsorData } = await supabase
-        .from('sponsors_simplified')
+        .from('sponsors')
         .select('id')
         .eq('organization_id', orgId)
         .single();
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     } else if (organizationType === 'investor') {
       // For investors, find the investor record
       const { data: investorData } = await supabase
-        .from('investors_simplified')
+        .from('investors')
         .select('id')
         .eq('organization_id', orgId)
         .single();

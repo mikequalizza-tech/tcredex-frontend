@@ -2,7 +2,7 @@
  * tCredex API - Login
  * POST /api/auth/login
  *
- * SIMPLIFIED: Uses users_simplified table directly
+ * SIMPLIFIED: Uses users table directly
  * No organizations FK chain - organization_id + organization_type tells you which entity table
  */
 
@@ -11,7 +11,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24;
 
-// User record type for users_simplified
+// User record type for users
 type UserRecord = {
   id: string;
   clerk_id: string | null;
@@ -55,9 +55,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Fetch user record from users_simplified (no FK joins)
+    // Step 2: Fetch user record from users (no FK joins)
     const { data: userRecord, error: userError } = await supabase
-      .from('users_simplified')
+      .from('users')
       .select('*')
       .eq('id', authData.user.id)
       .single();
@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
     // Step 4: Get organization details from the appropriate table
     let organization = null;
     if (typedRecord.organization_id && typedRecord.organization_type) {
-      const tableName = typedRecord.organization_type === 'sponsor' ? 'sponsors_simplified'
-        : typedRecord.organization_type === 'investor' ? 'investors_simplified'
+      const tableName = typedRecord.organization_type === 'sponsor' ? 'sponsors'
+        : typedRecord.organization_type === 'investor' ? 'investors'
         : 'cdes_merged';
 
       const { data: org } = await supabase
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     // Update last login
     await supabase
-      .from('users_simplified')
+      .from('users')
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', typedRecord.id);
 

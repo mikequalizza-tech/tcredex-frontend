@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     let entityId = null;
     if (role === 'sponsor' || role === 'investor') {
       organizationId = crypto.randomUUID();
-      const table = role === 'sponsor' ? 'sponsors_simplified' : 'investors_simplified';
+      const table = role === 'sponsor' ? 'sponsors' : 'investors';
       const { data: orgData, error: orgError } = await supabase
         .from(table)
         .insert({
@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
           slug: uniqueSlug,
           primary_contact_name: name,
           primary_contact_email: email.toLowerCase(),
-          status: 'active',
         } as never)
         .select('id')
         .single();
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
     // Step 3: Create user record
     const { error: userError } = await supabase
-      .from('users_simplified')
+      .from('users')
       .insert({
         id: authData.user.id,
         email: email.toLowerCase(),

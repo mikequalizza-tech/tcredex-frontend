@@ -2,7 +2,7 @@
  * Drafts API (deals-backed)
  * Stores drafts on the deals table using status='draft' and draft_data
  *
- * SIMPLIFIED: Uses sponsors_simplified table
+ * SIMPLIFIED: Uses sponsors table
  * With new schema, sponsor.id is passed directly from registration (entityId)
  */
 
@@ -17,9 +17,9 @@ async function resolveSponsorId(
   fallbackName?: string,
   fallbackEmail?: string
 ) {
-  // First try sponsors_simplified
+  // First try sponsors
   const { data: sponsorRow } = await supabase
-    .from('sponsors_simplified')
+    .from('sponsors')
     .select('id')
     .eq('organization_id', organizationId)
     .single();
@@ -35,14 +35,13 @@ async function resolveSponsorId(
   const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
 
   const { data: newSponsor, error: sponsorInsertError } = await supabase
-    .from('sponsors_simplified')
+    .from('sponsors')
     .insert({
       organization_id: organizationId,
       name: fallbackName || 'Sponsor',
       slug: uniqueSlug,
       primary_contact_name: fallbackName || 'Sponsor',
       primary_contact_email: fallbackEmail,
-      status: 'active',
     } as never)
     .select('id')
     .single();

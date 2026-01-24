@@ -1,6 +1,6 @@
 /**
  * Debug endpoint to check auth state
- * SIMPLIFIED: Uses users_simplified - no organization FK joins
+ * SIMPLIFIED: Uses users - no organization FK joins
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -23,9 +23,9 @@ export async function GET(request: NextRequest) {
 
     const authUser = userResult.user
 
-    // Get user data from users_simplified table
+    // Get user data from users table
     const { data: user, error: userQueryError } = await supabase
-      .from('users_simplified')
+      .from('users')
       .select('*')
       .eq('id', authUser.id)
       .single()
@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
     // Get organization details if user has org
     let organization = null;
     if (typedUser?.organization_id && typedUser?.organization_type) {
-      const tableName = typedUser.organization_type === 'sponsor' ? 'sponsors_simplified'
-        : typedUser.organization_type === 'investor' ? 'investors_simplified'
+      const tableName = typedUser.organization_type === 'sponsor' ? 'sponsors'
+        : typedUser.organization_type === 'investor' ? 'investors'
         : 'cdes_merged';
       const { data: org, error: orgError } = await supabase
         .from(tableName)

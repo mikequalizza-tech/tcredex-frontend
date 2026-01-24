@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
           slug: uniqueSlug,
           primary_contact_name: name,
           primary_contact_email: email.toLowerCase(),
-          status: 'active',
         } as never)
         .select('id')
         .single();

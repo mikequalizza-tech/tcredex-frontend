@@ -42,7 +42,6 @@ async function resolveSponsorId(
       slug: uniqueSlug,
       primary_contact_name: fallbackName || 'Sponsor',
       primary_contact_email: fallbackEmail,
-      status: 'active',
     } as never)
     .select('id')
     .single();

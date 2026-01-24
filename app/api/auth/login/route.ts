@@ -2,7 +2,7 @@
  * tCredex API - Login
  * POST /api/auth/login
  *
- * SIMPLIFIED: Uses users_simplified table directly
+ * SIMPLIFIED: Uses users table directly
  * No organizations FK chain - organization_id + organization_type tells you which entity table
  */
 
@@ -11,7 +11,7 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24;
 
-// User record type for users_simplified
+// User record type for users
 type UserRecord = {
   id: string;
   clerk_id: string | null;

@@ -1,7 +1,7 @@
 /**
  * Team Members API
  * Manage team members within an organization
- * SIMPLIFIED: Uses users_simplified table
+ * SIMPLIFIED: Uses users table
  */
 
 import { NextRequest, NextResponse } from 'next/server';

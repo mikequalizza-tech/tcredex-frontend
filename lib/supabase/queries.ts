@@ -425,7 +425,7 @@ export interface InvestorDetail {
 }
 
 /**
- * Fetch a single investor by slug - uses investors_simplified table
+ * Fetch a single investor by slug - uses investors table
  */
 export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail | null> {
   const supabase = getSupabaseAdmin();

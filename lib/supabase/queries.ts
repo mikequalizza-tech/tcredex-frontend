@@ -432,7 +432,7 @@ export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail 
 
   // Try to find by slug first
   const { data, error } = await supabase
-    .from('investors_simplified')
+    .from('investors')
     .select('*')
     .eq('slug', slug)
     .single();
@@ -440,7 +440,7 @@ export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail 
   if (error || !data) {
     // Try by investor id as fallback
     const { data: byId, error: byIdError } = await supabase
-      .from('investors_simplified')
+      .from('investors')
       .select('*')
       .eq('id', slug)
       .single();

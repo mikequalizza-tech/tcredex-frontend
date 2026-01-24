@@ -19,7 +19,7 @@ async function resolveSponsorId(
 ) {
   // First try sponsors_simplified
   const { data: sponsorRow } = await supabase
-    .from('sponsors_simplified')
+    .from('sponsors')
     .select('id')
     .eq('organization_id', organizationId)
     .single();
@@ -35,7 +35,7 @@ async function resolveSponsorId(
   const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
 
   const { data: newSponsor, error: sponsorInsertError } = await supabase
-    .from('sponsors_simplified')
+    .from('sponsors')
     .insert({
       organization_id: organizationId,
       name: fallbackName || 'Sponsor',

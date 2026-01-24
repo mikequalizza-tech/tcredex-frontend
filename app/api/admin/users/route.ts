@@ -1,6 +1,6 @@
 /**
  * tCredex Admin API - Users Management
- * GET /api/admin/users - List all users from users_simplified, investors_simplified, sponsors_simplified
+ * GET /api/admin/users - List all users from users, investors, sponsors
  * SIMPLIFIED: Uses *_simplified tables - no organization FK joins
  */
 
@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
     const roleFilter = searchParams.get('role');
     const search = searchParams.get('search')?.toLowerCase();
 
-    // Fetch from users_simplified table (CDEs and admins)
+    // Fetch from users table (CDEs and admins)
     const { data: users, error: usersError } = await supabase
-      .from('users_simplified')
+      .from('users')
       .select('id, name, email, role, organization_id, organization_type, is_active, last_login_at')
       .order('created_at', { ascending: false });
 
@@ -61,8 +61,8 @@ export async function GET(request: NextRequest) {
         // Get organization name if user has org
         let orgName = 'Unknown Organization';
         if (user.organization_id && user.organization_type) {
-          const tableName = user.organization_type === 'sponsor' ? 'sponsors_simplified'
-            : user.organization_type === 'investor' ? 'investors_simplified'
+          const tableName = user.organization_type === 'sponsor' ? 'sponsors'
+            : user.organization_type === 'investor' ? 'investors'
             : 'cdes_merged';
           const { data: org } = await supabase
             .from(tableName)
@@ -96,10 +96,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from investors_simplified table
+    // Fetch from investors table
     if (!roleFilter || roleFilter === 'all' || roleFilter === 'investor') {
       const { data: investors, error: investorsError } = await supabase
-        .from('investors_simplified')
+        .from('investors')
         .select('id, name, primary_contact_name, primary_contact_email, status, organization_id, updated_at')
         .not('primary_contact_email', 'is', null)
         .order('created_at', { ascending: false });
@@ -143,10 +143,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from sponsors_simplified table
+    // Fetch from sponsors table
     if (!roleFilter || roleFilter === 'all' || roleFilter === 'sponsor') {
       const { data: sponsors, error: sponsorsError } = await supabase
-        .from('sponsors_simplified')
+        .from('sponsors')
         .select('id, name, primary_contact_name, primary_contact_email, status, organization_id, updated_at')
         .not('primary_contact_email', 'is', null)
         .order('created_at', { ascending: false });

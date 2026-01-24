@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
     // Try to find user in each simplified table by email
     // ===================================================================
 
-    // 1. Check investors_simplified table
+    // 1. Check investors table
     const { data: investorData } = await supabase
-      .from('investors_simplified')
+      .from('investors')
       .select('id, name, primary_contact_name, primary_contact_email, organization_id, slug')
       .eq('primary_contact_email', normalizedEmail)
       .single();
@@ -79,9 +79,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. Check sponsors_simplified table
+    // 2. Check sponsors table
     const { data: sponsorData } = await supabase
-      .from('sponsors_simplified')
+      .from('sponsors')
       .select('id, name, primary_contact_name, primary_contact_email, organization_id, slug')
       .eq('primary_contact_email', normalizedEmail)
       .single();
@@ -117,9 +117,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 3. Check users_simplified table (for CDEs and admins)
+    // 3. Check users table (for CDEs and admins)
     const { data: userData } = await supabase
-      .from('users_simplified')
+      .from('users')
       .select('id, email, name, role, organization_id, organization_type')
       .eq('email', normalizedEmail)
       .single();
@@ -139,8 +139,8 @@ export async function POST(request: NextRequest) {
       let orgName = null;
       let orgSlug = null;
       if (user.organization_id && user.organization_type) {
-        const tableName = user.organization_type === 'sponsor' ? 'sponsors_simplified'
-          : user.organization_type === 'investor' ? 'investors_simplified'
+        const tableName = user.organization_type === 'sponsor' ? 'sponsors'
+          : user.organization_type === 'investor' ? 'investors'
           : 'cdes_merged';
         const { data: org } = await supabase
           .from(tableName)

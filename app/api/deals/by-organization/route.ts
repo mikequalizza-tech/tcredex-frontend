@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     if (!organizationType) {
       // Try to find organization type by checking each simplified table
       const { data: sponsor } = await supabase
-        .from('sponsors_simplified')
+        .from('sponsors')
         .select('id')
         .eq('organization_id', orgId)
         .single();
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     if (organizationType === 'sponsor') {
       // For sponsors, look up sponsor_id from sponsors_simplified
       const { data: sponsorData } = await supabase
-        .from('sponsors_simplified')
+        .from('sponsors')
         .select('id')
         .eq('organization_id', orgId)
         .single();

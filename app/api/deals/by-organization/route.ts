@@ -1,6 +1,6 @@
 /**
  * Deals by Organization API
- * SIMPLIFIED: Uses *_simplified and cdes_merged tables - no organization FK joins
+ * SIMPLIFIED: Uses simplified schema tables (sponsors, investors, users, cdes_merged) - no organization FK joins
  */
 
 import { NextRequest, NextResponse } from 'next/server';

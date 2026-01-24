@@ -1,7 +1,7 @@
 /**
  * tCredex Admin API - Users Management
  * GET /api/admin/users - List all users from users, investors, sponsors
- * SIMPLIFIED: Uses *_simplified tables - no organization FK joins
+ * SIMPLIFIED: Uses simplified schema tables - no organization FK joins
  */
 
 import { NextRequest, NextResponse } from 'next/server';

@@ -1,7 +1,7 @@
 /**
  * Team Members API
  * Manage team members within an organization
- * SIMPLIFIED: Uses users_simplified table
+ * SIMPLIFIED: Uses users table
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
 
     const { data, error } = await supabase
-      .from('users_simplified')
+      .from('users')
       .select('id, email, name, role, title, avatar_url, is_active, last_login_at, created_at')
       .eq('organization_id', user.organizationId)
       .eq('is_active', true)
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user already exists in this org
     const { data: existing } = await supabase
-      .from('users_simplified')
+      .from('users')
       .select('id')
       .eq('email', email.toLowerCase())
       .eq('organization_id', user.organizationId)
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Create user record
     const { data, error } = await supabase
-      .from('users_simplified')
+      .from('users')
       .insert({
         email: email.toLowerCase(),
         name: name || email.split('@')[0],

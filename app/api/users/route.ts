@@ -1,7 +1,7 @@
 /**
  * tCredex Users API
  * User management with proper auth and org filtering
- * SIMPLIFIED: Uses users_simplified - no organization FK joins
+ * SIMPLIFIED: Uses users - no organization FK joins
  */
 
 import { NextRequest, NextResponse } from 'next/server';

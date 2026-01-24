@@ -2,7 +2,7 @@
  * tCredex API - Profile
  * GET /api/auth/profile
  *
- * SIMPLIFIED: Uses users_simplified table directly
+ * SIMPLIFIED: Uses users table directly
  * No organizations FK chain - organization_id + organization_type tells you which entity table
  */
 

@@ -425,14 +425,14 @@ export interface InvestorDetail {
 }
 
 /**
- * Fetch a single investor by slug - uses investors_simplified table
+ * Fetch a single investor by slug - uses investors table
  */
 export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail | null> {
   const supabase = getSupabaseAdmin();
 
   // Try to find by slug first
   const { data, error } = await supabase
-    .from('investors_simplified')
+    .from('investors')
     .select('*')
     .eq('slug', slug)
     .single();
@@ -440,7 +440,7 @@ export async function fetchInvestorBySlug(slug: string): Promise<InvestorDetail 
   if (error || !data) {
     // Try by investor id as fallback
     const { data: byId, error: byIdError } = await supabase
-      .from('investors_simplified')
+      .from('investors')
       .select('*')
       .eq('id', slug)
       .single();

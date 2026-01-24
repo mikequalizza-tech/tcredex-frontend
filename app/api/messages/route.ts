@@ -1,6 +1,6 @@
 /**
  * Messages API
- * SIMPLIFIED: Uses users_simplified - no organization FK joins
+ * SIMPLIFIED: Uses users - no organization FK joins
  */
 
 import { NextRequest, NextResponse } from 'next/server';

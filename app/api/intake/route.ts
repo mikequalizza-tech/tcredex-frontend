@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     // Prepare deal record
     const dealRecord = {
       project_name: intakeData.projectName,
-      sponsor_id: sponsorId,             // Direct link to sponsors_simplified.id
+      sponsor_id: sponsorId,             // Direct link to sponsors.id
       sponsor_name: intakeData.sponsorName,
       programs: intakeData.programs || ['NMTC'],
       address: intakeData.address,

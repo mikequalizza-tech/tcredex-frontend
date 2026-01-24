@@ -5,8 +5,10 @@
  * All business logic now runs on the backend - frontend just calls these APIs.
  */
 
+import { getBackendApiUrl } from '../config/env-validation';
+
 // Backend API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
+const API_BASE_URL = getBackendApiUrl();
 
 // =============================================================================
 // TYPES

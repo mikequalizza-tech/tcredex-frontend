@@ -8,6 +8,7 @@ import { CDEDealCard } from '@/lib/types/cde';
 import { Deal, ProgramType, ProgramLevel, DealStatus, TractType } from '@/lib/data/deals';
 import { logger } from '@/lib/utils/logger';
 import { getNMTCAllocation } from '@/lib/utils/fieldMapping';
+import { getBackendApiUrl } from '../config/env-validation';
 
 /**
  * Helper function to map allocation based on program type
@@ -32,7 +33,7 @@ function mapAllocationByProgram(deal: any, programType: ProgramType): number {
  */
 export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> {
   // Use backend API instead of direct Supabase call
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
+  const API_BASE_URL = getBackendApiUrl();
 
   try {
     const params = onlyVisible ? '?visible=true' : '';
@@ -253,7 +254,7 @@ export async function fetchDealsByOrganization(orgId: string, userEmail?: string
  */
 export async function fetchCDEs(): Promise<CDEDealCard[]> {
   // Use backend API instead of direct Supabase call
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3004';
+  const API_BASE_URL = getBackendApiUrl();
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/cdes`);

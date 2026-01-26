@@ -152,19 +152,8 @@ export default function AppLayout({
   // Get user info from auth context
   const { user, isLoading, orgType, orgName, orgLogo, userName, userEmail, currentDemoRole } = useCurrentUser();
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   // OPTIMIZATION: Memoize filtered nav items to avoid recalculating on every render
+  // NOTE: This must be called BEFORE any early returns to maintain hook order
   const filteredNavItems = useMemo(() => {
     return navItems.filter(item => {
       // Admin-only items
@@ -177,6 +166,18 @@ export default function AppLayout({
       return orgType && item.orgTypes.includes(orgType);
     });
   }, [currentDemoRole, orgType]);
+
+  // Show loading state (after all hooks are called)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const orgTypeLabels: Record<string, string> = {
     sponsor: 'Project Sponsor',

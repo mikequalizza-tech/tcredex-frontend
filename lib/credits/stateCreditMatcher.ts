@@ -103,11 +103,16 @@ export async function matchEligibleCredits(project: ProjectInput): Promise<State
     return [];
   }
 
-  // Query by state name (state_tax_credit_programs_staging is the SOT)
+  // Convert state abbreviation to full state name if needed
+  const stateName = getStateNameFromAbbrev(state);
+  const stateUpper = state.toUpperCase();
+  
+  // Query all rows first, then filter client-side for exact match
+  // This is necessary because Supabase ilike with % wildcards can match incorrectly
+  // (e.g., "AL" matches both "Alabama" and "California")
   const { data, error } = await supabase
     .from('state_tax_credit_programs_staging')
-    .select('*')
-    .ilike('state_name', `%${state}%`);
+    .select('*');
 
   if (error) {
     console.error('[matchEligibleCredits] Supabase query failed:', error.message);
@@ -118,9 +123,38 @@ export async function matchEligibleCredits(project: ProjectInput): Promise<State
     return [];
   }
 
+  // Client-side filtering to ensure exact state match
+  // Filter out any rows that don't match the exact state name or abbreviation
+  const filteredData = (data as RawCreditRow[]).filter(row => {
+    if (!row.state_name) return false;
+    
+    const rowStateName = row.state_name.trim();
+    const rowStateLower = rowStateName.toLowerCase();
+    const targetStateName = stateName.toLowerCase();
+    const targetStateAbbrev = stateUpper;
+    
+    // Exact match on full state name (case-insensitive)
+    if (rowStateLower === targetStateName) {
+      return true;
+    }
+    
+    // Match by abbreviation: get the abbreviation for the row's state name
+    // and compare with the target abbreviation
+    const rowAbbrev = getStateAbbrev(rowStateName);
+    if (rowAbbrev === targetStateAbbrev && targetStateAbbrev.length === 2) {
+      return true;
+    }
+    
+    return false;
+  });
+
+  if (filteredData.length === 0) {
+    return [];
+  }
+
   const matches: StateCreditMatch[] = [];
 
-  for (const row of data as RawCreditRow[]) {
+  for (const row of filteredData) {
     // Check each program type using correct column names from state_tax_credit_programs_staging
     if (programs.includes('HTC') && row.state_htc) {
       matches.push(buildCreditMatch(row, 'HTC', project));
@@ -192,6 +226,37 @@ const STATE_ABBREVS: Record<string, string> = {
 function getStateAbbrev(stateName?: string): string {
   if (!stateName) return 'XX';
   return STATE_ABBREVS[stateName] || stateName.slice(0, 2).toUpperCase();
+}
+
+// Reverse mapping: abbreviation to full state name
+const STATE_ABBREV_TO_NAME: Record<string, string> = {
+  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+  'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+  'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+  'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+  'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+  'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+  'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+  'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+  'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+  'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+  'DC': 'District of Columbia', 'PR': 'Puerto Rico',
+};
+
+function getStateNameFromAbbrev(stateInput: string): string {
+  // If it's already a full state name, return it
+  if (STATE_ABBREVS[stateInput]) {
+    return stateInput;
+  }
+  
+  // If it's an abbreviation, convert to full name
+  const upperInput = stateInput.toUpperCase();
+  if (STATE_ABBREV_TO_NAME[upperInput]) {
+    return STATE_ABBREV_TO_NAME[upperInput];
+  }
+  
+  // Fallback: return input as-is (might be a partial name)
+  return stateInput;
 }
 
 function getRate(row: RawCreditRow, creditType: CreditProgram): number | null {

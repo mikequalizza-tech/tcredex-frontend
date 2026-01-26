@@ -138,6 +138,7 @@ export type CDEImpactPriority =
 // What shows on the CDE Deal Card (compact view for Sponsors)
 export interface CDEDealCard {
   id: string;
+  organizationId?: string;             // CDE's organization_id from cdes_merged
   organizationName: string;
   missionSnippet: string;             // First 150 chars of mission
   remainingAllocation: number;
@@ -151,6 +152,10 @@ export interface CDEDealCard {
   primaryStates: string[];
   targetSectors: string[];
   impactPriorities: CDEImpactPriority[];
+  
+  // Service Area and Focus Areas
+  serviceArea?: string;                // From service_area column in cdes_merged
+  predominantMarket?: string;          // From predominant_market column in cdes_merged
   
   // Deal size
   dealSizeRange: {

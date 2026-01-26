@@ -200,32 +200,52 @@ function PipelineContent() {
       }
 
       try {
-        const response = await fetch(`/api/drafts?orgId=${encodeURIComponent(organizationId)}`);
-        const result = await response.json();
+        // Use fetchApi utility for consistent error handling and credentials
+        const { fetchApi } = await import('@/lib/api/fetch-utils');
+        
+        const result = await fetchApi<{ drafts?: any[]; draft?: any }>(`/api/drafts?orgId=${encodeURIComponent(organizationId)}`);
+        
+        if (!result.success) {
+          console.error('[Pipeline] Draft fetch failed:', result.error);
+          setDrafts([]);
+          setIsLoadingDrafts(false);
+          return;
+        }
 
-        if (result.draft) {
-          const draftDeal: PipelineDeal = {
-            id: result.draft.id,
-            projectName: result.draft.project_name || 'Untitled Draft',
-            sponsorName: result.draft.draft_data?.sponsorName || result.draft.intake_data?.sponsorName || 'Not specified',
-            city: result.draft.draft_data?.city || result.draft.intake_data?.city || '',
-            state: result.draft.draft_data?.state || result.draft.intake_data?.state || '',
-            programType: 'DRAFT',
-            allocationRequest: result.draft.draft_data?.totalProjectCost || result.draft.intake_data?.totalProjectCost || 0,
-            stage: 'draft',
-            matchScore: result.draft.readiness_score || 0,
-            tractType: [],
-            daysInStage: Math.floor((Date.now() - new Date(result.draft.updated_at).getTime()) / (1000 * 60 * 60 * 24)),
-            submittedDate: result.draft.created_at,
-            isDraft: true,
-            readinessScore: result.draft.readiness_score,
-          };
-          setDrafts([draftDeal]);
+        const draftData = result.data;
+
+        // Handle both single draft and array of drafts
+        const draftsList = draftData?.drafts || (draftData?.draft ? [draftData.draft] : []);
+        
+        if (draftsList.length > 0) {
+          const mappedDrafts: PipelineDeal[] = draftsList.map((draft: any) => {
+            // Get draft data - handle both draft_data and intake_data
+            const draftData = draft.draft_data || draft.intake_data || {};
+            
+            return {
+              id: draft.id,
+              projectName: draft.project_name || draftData.projectName || 'Untitled Draft',
+              sponsorName: draftData.sponsorName || draft.sponsor_name || 'Not specified',
+              city: draftData.city || draft.city || '',
+              state: draftData.state || draft.state || '',
+              programType: 'DRAFT',
+              allocationRequest: draftData.totalProjectCost || draft.total_project_cost || 0,
+              stage: 'draft',
+              matchScore: draft.readiness_score || 0,
+              tractType: [],
+              daysInStage: Math.floor((Date.now() - new Date(draft.updated_at || draft.created_at).getTime()) / (1000 * 60 * 60 * 24)),
+              submittedDate: draft.created_at,
+              isDraft: true,
+              readinessScore: draft.readiness_score,
+            };
+          });
+          setDrafts(mappedDrafts);
         } else {
           setDrafts([]);
         }
       } catch (error) {
         console.error('[Pipeline] Failed to load drafts:', error);
+        setDrafts([]);
       } finally {
         setIsLoadingDrafts(false);
       }

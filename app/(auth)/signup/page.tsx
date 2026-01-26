@@ -3,7 +3,6 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Building2, Briefcase, TrendingUp, Eye, EyeOff, Check } from "lucide-react";
 
 type RoleType = "sponsor" | "cde" | "investor";
@@ -89,36 +88,6 @@ function SignUpForm() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
-
-      // 1. Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            organization_name: formData.organizationName,
-            role: formData.role,
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${redirectTo}`,
-        },
-      });
-
-      if (authError) {
-        setError(authError.message);
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!authData.user) {
-        setError("Failed to create account");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // 2. Create organization and user via API (uses service role to bypass RLS)
       const userName = formData.firstName
         ? `${formData.firstName} ${formData.lastName || ""}`.trim()
         : formData.email.split("@")[0];
@@ -127,8 +96,8 @@ function SignUpForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: authData.user.id,
           email: formData.email,
+          password: formData.password,
           name: userName,
           role: formData.role,
           organizationName: formData.organizationName,
@@ -143,13 +112,22 @@ function SignUpForm() {
         return;
       }
 
-      // Success - check if email confirmation is required
-      if (authData.user.identities?.length === 0) {
-        // Email confirmation required
-        router.push("/signup/verify?email=" + encodeURIComponent(formData.email));
+      const result = await response.json();
+      
+      if (result.success) {
+        // Store success info for the success page
+        sessionStorage.setItem('signup_success', JSON.stringify({
+          email: formData.email,
+          name: userName,
+          role: formData.role,
+          organizationName: formData.organizationName,
+        }));
+        
+        // Redirect to success page
+        router.push('/signup/success');
       } else {
-        // Auto-confirmed, redirect to dashboard
-        router.push(redirectTo);
+        setError(result.error || 'Failed to complete signup');
+        setIsSubmitting(false);
       }
     } catch (err) {
       console.error("Signup error:", err);

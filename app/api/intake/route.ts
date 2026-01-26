@@ -10,6 +10,54 @@ import { processPostSubmission } from '@/lib/intake/postSubmission';
 const supabase = getSupabaseAdmin();
 
 // =============================================================================
+// Helper: Resolve sponsor_id from organization_id (create sponsor row if missing)
+// =============================================================================
+async function resolveSponsorId(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  organizationId: string,
+  fallbackName?: string,
+  fallbackEmail?: string
+): Promise<string> {
+  // First try to find existing sponsor by organization_id
+  const { data: sponsorRow } = await supabase
+    .from('sponsors')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .single();
+
+  if ((sponsorRow as any)?.id) {
+    return (sponsorRow as any).id as string;
+  }
+
+  // Create new sponsor if not found
+  const baseSlug = (fallbackName || 'sponsor')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .substring(0, 80);
+  const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
+
+  const { data: newSponsor, error: sponsorInsertError } = await supabase
+    .from('sponsors')
+    .insert({
+      organization_id: organizationId,
+      name: fallbackName || 'Sponsor',
+      slug: uniqueSlug,
+      primary_contact_name: fallbackName || 'Sponsor',
+      primary_contact_email: fallbackEmail,
+    } as never)
+    .select('id')
+    .single();
+
+  if (sponsorInsertError || !(newSponsor as any)?.id) {
+    console.error('[Intake] Sponsor creation error:', sponsorInsertError);
+    throw new Error('Unable to resolve sponsor record. Please ensure your organization is properly set up.');
+  }
+
+  return (newSponsor as any).id as string;
+}
+
+// =============================================================================
 // POST /api/intake - Submit intake form (creates or updates deal)
 // =============================================================================
 export async function POST(request: NextRequest) {
@@ -17,8 +65,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { dealId, intakeData, saveOnly } = body;
 
-    // Validate required sponsor ID
-    // With simplified schema, sponsorId IS the sponsor's primary key (no lookup needed)
+    // Validate required sponsor ID (this is actually organization_id from frontend)
     if (!intakeData.sponsorId) {
       console.error('POST /api/intake error: sponsorId is required');
       return NextResponse.json({
@@ -27,8 +74,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Use sponsor ID directly - no lookup needed with simplified schema
-    const sponsorId = intakeData.sponsorId as string;
+    // Resolve sponsor_id from organization_id (create sponsor record if needed)
+    const organizationId = intakeData.sponsorId as string;
+    const sponsorId = await resolveSponsorId(
+      supabase,
+      organizationId,
+      intakeData.sponsorName,
+      intakeData.personCompletingForm
+    );
 
     // Calculate readiness score
     const { score, tier, missingFields } = calculateReadiness(intakeData);

@@ -28,12 +28,41 @@ export async function GET(request: NextRequest) {
     const year = searchParams.get('year');
     const limit = parseInt(searchParams.get('limit') || '50');
 
+    // OPTIMIZATION: Select only needed columns instead of '*'
     // Query cdes_merged directly - no FK joins needed
     let query = supabase
       .from('cdes_merged')
-      .select('*')
+      .select(`
+        id,
+        organization_id,
+        name,
+        slug,
+        year,
+        total_allocation,
+        amount_remaining,
+        amount_finalized,
+        min_deal_size,
+        max_deal_size,
+        small_deal_fund,
+        service_area_type,
+        service_area,
+        primary_states,
+        rural_focus,
+        urban_focus,
+        contact_name,
+        contact_email,
+        contact_phone,
+        controlling_entity,
+        predominant_financing,
+        predominant_market,
+        innovative_activities,
+        non_metro_commitment,
+        deployment_deadline,
+        status,
+        created_at
+      `)
       .order('amount_remaining', { ascending: false })
-      .limit(limit);
+      .limit(Math.min(limit, 100)); // Enforce max limit
 
     // CRITICAL: Filter by organization based on user type
     if (user.organizationType === 'cde') {
@@ -90,6 +119,10 @@ export async function GET(request: NextRequest) {
       cdes,
       organizationId: user.organizationId,
       organizationType: user.organizationType,
+    }, {
+      headers: {
+        'Cache-Control': 'private, max-age=60', // Cache for 60 seconds
+      },
     });
   } catch (error) {
     return handleAuthError(error);

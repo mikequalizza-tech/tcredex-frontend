@@ -9,6 +9,7 @@ import { Deal, ProgramType, ProgramLevel, DealStatus, TractType } from '@/lib/da
 import { logger } from '@/lib/utils/logger';
 import { getNMTCAllocation } from '@/lib/utils/fieldMapping';
 import { getBackendApiUrl } from '../config/env-validation';
+import { fetchBackend, fetchApi } from '../api/fetch-utils';
 
 /**
  * Helper function to map allocation based on program type
@@ -33,19 +34,16 @@ function mapAllocationByProgram(deal: any, programType: ProgramType): number {
  */
 export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> {
   // Use backend API instead of direct Supabase call
-  const API_BASE_URL = getBackendApiUrl();
-
   try {
     const params = onlyVisible ? '?visible=true' : '';
-    const response = await fetch(`${API_BASE_URL}/api/deals${params}`);
+    const url = `/api/deals${params}`;
+    const result = await fetchApi<{ deals?: Deal[]; data?: { deals?: Deal[] } }>(url);
 
-    if (!response.ok) {
-      logger.error('Error fetching deals from backend', { status: response.status });
+    if (!result.success || !result.data) {
       return [];
     }
 
-    const result = await response.json();
-    const data = result.data?.deals || result.deals || [];
+    const data = result.data.data?.deals || result.data.deals || (Array.isArray(result.data) ? result.data : []);
 
     return data.map((deal: any) => {
       const programType = (deal.programs && deal.programs[0]) as ProgramType || 'NMTC';
@@ -90,7 +88,13 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
       };
     });
   } catch (error) {
-    logger.error('Error fetching deals', error);
+    logger.error('Error fetching deals', { 
+      error: error instanceof Error ? {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      } : error
+    });
     return [];
   }
 }
@@ -100,21 +104,25 @@ export async function fetchDeals(onlyVisible: boolean = false): Promise<Deal[]> 
  */
 export async function fetchDealById(id: string): Promise<Deal | null> {
   try {
-    const res = await fetch(`/api/deals?id=${encodeURIComponent(id)}`, { credentials: 'include' });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      logger.error('Error fetching deal by ID', data.error || res.statusText);
+    const result = await fetchApi<{ deal?: Record<string, any> }>(`/api/deals?id=${encodeURIComponent(id)}`);
+    
+    if (!result.success || !result.data) {
       return null;
     }
-    const json = await res.json();
-    const data = json.deal as Record<string, any> | null;
+
+    const data = result.data.deal as Record<string, any> | null;
     if (!data) return null;
+
+    // Get sponsor organization_id via join if available
+    const sponsorOrgId = (data as any).sponsors?.organization_id || 
+                         (data as any).sponsor_organization_id || 
+                         null;
 
     return {
       id: data.id,
       projectName: data.project_name,
       sponsorName: data.sponsor_name || 'Unknown Sponsor',
-      sponsorOrganizationId: data.sponsor_organization_id,
+      sponsorOrganizationId: sponsorOrgId,
       sponsorDescription: data.project_description,
       website: data.website,
       programType: (data.programs && data.programs[0]) as ProgramType || 'NMTC',
@@ -161,15 +169,15 @@ export async function fetchDealById(id: string): Promise<Deal | null> {
  */
 export async function fetchMarketplaceDeals(): Promise<Deal[]> {
   try {
-    const response = await fetch('/api/deals/marketplace');
-    if (!response.ok) {
-      logger.error('Error fetching marketplace deals', { status: response.status });
+    const result = await fetchApi<{ deals?: Deal[] }>('/api/deals/marketplace');
+    
+    if (!result.success || !result.data) {
       return [];
     }
-    const { deals } = await response.json();
-    return deals || [];
+
+    return result.data.deals || [];
   } catch (error) {
-    logger.error('Error fetching deals', error);
+    logger.error('Error fetching marketplace deals', error);
     return [];
   }
 }
@@ -188,60 +196,78 @@ export async function fetchDealsByOrganization(orgId: string, userEmail?: string
   try {
     // Use API route which runs on server with admin privileges
     const url = `/api/deals/by-organization?orgId=${encodeURIComponent(orgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
-    const response = await fetch(url);
+    const result = await fetchApi<{ deals?: Deal[] }>(url);
 
-    if (!response.ok) {
-      logger.error('Error fetching deals by organization', { status: response.status });
+    if (!result.success || !result.data) {
       return [];
     }
 
-    const result = await response.json();
-    const data = result.deals || [];
+    const data = result.data.deals || [];
 
     logger.info(`Found ${data.length} deals for organization ${orgId}`);
-    return data.map((deal: any) => ({
-      id: deal.id,
-      projectName: deal.project_name,
-      sponsorName: deal.sponsor_name || 'Unknown Sponsor',
-      sponsorDescription: deal.project_description,
-      website: deal.website,
-      programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
-      programLevel: (deal.program_level) as ProgramLevel || 'federal',
-      stateProgram: deal.state_program,
-      allocation: deal.programType === 'LIHTC'
-        ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
-        : deal.programType === 'HTC'
-        ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
-        : Number(deal.nmtc_financing_requested) || 0,
-      creditPrice: 0.76,
-      state: deal.state || '',
-      city: deal.city || '',
-      tractType: (deal.tract_types || []) as TractType[],
-      status: (deal.status || 'draft') as DealStatus,
-      description: deal.project_description,
-      communityImpact: deal.community_benefit,
-      projectHighlights: [],
-      useOfFunds: deal.total_project_cost ? [
-        { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
-        { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
-        { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
-      ].filter(item => item.amount > 0) : [],
-      timeline: [
-        { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
-        { milestone: 'Projected Completion', date: deal.projected_completion_date || 'TBD', completed: false },
-      ].filter(item => item.date !== 'TBD'),
-      foundedYear: 2020,
-      submittedDate: deal.created_at,
-      povertyRate: Number(deal.tract_poverty_rate) || 0,
-      medianIncome: Number(deal.tract_median_income) || 0,
-      jobsCreated: deal.jobs_created || 0,
-      visible: deal.visible ?? true,
-      coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
-      projectCost: Number(deal.total_project_cost) || 0,
-      financingGap: Number(deal.financing_gap) || 0,
-      censusTract: deal.census_tract,
-      unemployment: Number(deal.tract_unemployment) || 0,
-    }));
+    return data.map((deal: any) => {
+      // Determine completion date
+      const completionDate = deal.projected_completion_date || 
+                            deal.estimated_completion || 
+                            deal.completion_date;
+
+      // Determine shovel ready status
+      const shovelReady = deal.shovel_ready !== undefined 
+        ? Boolean(deal.shovel_ready)
+        : deal.site_control === 'owned' || deal.site_control === 'under_contract';
+
+      return {
+        id: deal.id,
+        projectName: deal.project_name,
+        sponsorName: deal.sponsor_name || 'Unknown Sponsor',
+        sponsorDescription: deal.project_description,
+        website: deal.website,
+        programType: (deal.programs && deal.programs[0]) as ProgramType || 'NMTC',
+        programLevel: (deal.program_level) as ProgramLevel || 'federal',
+        stateProgram: deal.state_program,
+        allocation: deal.programType === 'LIHTC'
+          ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
+          : deal.programType === 'HTC'
+          ? Number(deal.project_gross_htc) || Number(deal.htc_amount) || 0
+          : Number(deal.nmtc_financing_requested || deal.nmtc_request) || 0,
+        creditPrice: 0.76,
+        state: deal.state || '',
+        city: deal.city || '',
+        address: deal.address,
+        tractType: (deal.tract_types || deal.tract_type || []) as TractType[],
+        status: (deal.status || 'draft') as DealStatus,
+        description: deal.project_description,
+        communityImpact: deal.community_benefit,
+        projectHighlights: [],
+        useOfFunds: deal.total_project_cost ? [
+          { category: 'Construction', amount: Number(deal.construction_cost) || 0 },
+          { category: 'Acquisition', amount: Number(deal.acquisition_cost) || 0 },
+          { category: 'Soft Costs', amount: Number(deal.soft_costs) || 0 },
+        ].filter(item => item.amount > 0) : [],
+        timeline: [
+          { milestone: 'Construction Start', date: deal.construction_start_date || 'TBD', completed: !!deal.construction_start_date },
+          { milestone: 'Projected Completion', date: completionDate || 'TBD', completed: false },
+        ].filter(item => item.date !== 'TBD'),
+        foundedYear: 2020,
+        submittedDate: deal.created_at,
+        povertyRate: Number(deal.tract_poverty_rate || deal.poverty_rate) || 0,
+        medianIncome: Number(deal.tract_median_income || deal.median_income) || 0,
+        jobsCreated: deal.jobs_created || 0,
+        visible: deal.visible ?? true,
+        coordinates: deal.latitude && deal.longitude ? [deal.longitude, deal.latitude] : undefined,
+        projectCost: Number(deal.total_project_cost || deal.project_cost) || 0,
+        financingGap: Number(deal.financing_gap) || 0,
+        censusTract: deal.census_tract,
+        unemployment: Number(deal.tract_unemployment || deal.unemployment) || 0,
+        shovelReady: shovelReady,
+        completionDate: completionDate,
+        // Additional financial fields
+        stateNMTCAllocation: Number(deal.state_nmtc_allocation_request || deal.state_nmtc_allocation) || 0,
+        htcAmount: deal.programType === 'HTC' 
+          ? Number(deal.project_gross_htc || deal.htc_amount || deal.allocation) || 0
+          : Number(deal.project_gross_htc || deal.htc_amount) || 0,
+      };
+    });
   } catch (error) {
     logger.error('Error in fetchDealsByOrganization', error);
     return [];
@@ -253,52 +279,65 @@ export async function fetchDealsByOrganization(orgId: string, userEmail?: string
  * Returns CDE organizations from the cdes_merged table
  */
 export async function fetchCDEs(): Promise<CDEDealCard[]> {
-  // Use backend API instead of direct Supabase call
-  const API_BASE_URL = getBackendApiUrl();
-
+  // Use frontend API route which handles auth and calls backend if needed
   try {
-    const response = await fetch(`${API_BASE_URL}/api/cdes`);
+    const result = await fetchApi<{ cdes?: CDEDealCard[]; data?: { cdes?: CDEDealCard[] } }>('/api/cdes');
 
-    if (!response.ok) {
-      logger.error('Error fetching CDEs from backend', { status: response.status });
+    if (!result.success || !result.data) {
       return [];
     }
 
-    const result = await response.json();
-    const data = result.data?.cdes || result.cdes || [];
+    const data = result.data.data?.cdes || result.data.cdes || (Array.isArray(result.data) ? result.data : []);
 
     // Map CDE data to CDEDealCard format
+    // API returns normalized format from /api/cdes route
     return data.map((cde: any) => {
+      // Handle both API response format and direct database format
+      const orgId = cde.organization_id || cde.organizationId;
+      const name = cde.name || cde.organization_name || 'Unknown CDE';
+      const remainingAlloc = cde.remaining_allocation || cde.amount_remaining || 0;
+      const serviceArea = cde.service_area || cde.serviceArea || '';
+      const predominantMarket = cde.predominant_market || cde.predominantMarket || '';
+      
       return {
         id: cde.id,
-        organizationName: cde.name || 'Unknown CDE',
-        missionSnippet: cde.mission_statement || '',
-        remainingAllocation: Number(cde.remaining_allocation) || 0,
+        organizationId: orgId,
+        organizationName: name,
+        missionSnippet: cde.mission_statement || cde.description || '',
+        remainingAllocation: Number(remainingAlloc) || 0,
         allocationDeadline: cde.deployment_deadline || '',
-        primaryStates: cde.primary_states || (cde.state ? [cde.state] : []),
-        targetSectors: cde.target_sectors || [],
-        impactPriorities: cde.impact_priorities || [],
+        primaryStates: Array.isArray(cde.primary_states) ? cde.primary_states : (cde.state ? [cde.state] : []),
+        targetSectors: Array.isArray(cde.target_sectors) ? cde.target_sectors : [],
+        impactPriorities: Array.isArray(cde.impact_priorities) ? cde.impact_priorities : [],
+        serviceArea: serviceArea,
+        predominantMarket: predominantMarket,
         dealSizeRange: {
           min: Number(cde.min_deal_size) || 0,
           max: Number(cde.max_deal_size) || 0
         },
-        ruralFocus: cde.rural_focus || false,
-        urbanFocus: cde.urban_focus || false,
-        requireSeverelyDistressed: cde.require_severely_distressed || false,
-        htcExperience: cde.htc_experience || false,
-        smallDealFund: cde.small_deal_fund || false,
-        status: 'active',
-        lastUpdated: cde.updated_at || '',
+        ruralFocus: Boolean(cde.rural_focus),
+        urbanFocus: Boolean(cde.urban_focus ?? true), // Default to true if not specified
+        requireSeverelyDistressed: Boolean(cde.require_severely_distressed),
+        htcExperience: Boolean(cde.htc_experience),
+        smallDealFund: Boolean(cde.small_deal_fund),
+        status: cde.status || 'active',
+        lastUpdated: cde.updated_at || cde.created_at || '',
         // Extra fields
         website: cde.website || '',
         city: cde.city || '',
         state: cde.state || '',
-        contactName: cde.primary_contact_name || '',
-        contactEmail: cde.primary_contact_email || '',
+        contactName: cde.primary_contact_name || cde.contact_name || '',
+        contactEmail: cde.primary_contact_email || cde.contact_email || '',
       };
     });
   } catch (error) {
-    logger.error('Error fetching CDEs', error);
+    logger.error('Error fetching CDEs', { 
+      error: error instanceof Error ? {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      } : error
+    });
     return [];
   }
 }

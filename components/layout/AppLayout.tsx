@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -124,14 +124,14 @@ const AllocationsIcon = () => (
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: <HomeIcon /> },
-  { name: 'Messages', href: '/messages', icon: <MessagesIcon /> },
+  { name: 'Organization Info', href: '/dashboard/organization', icon: <SettingsIcon /> },
   { name: 'Submit Deal', href: '/deals/new', icon: <SubmitDealIcon />, orgTypes: ['sponsor'] },  // Only sponsors submit deals
   { name: 'Map', href: '/map', icon: <MapIcon /> },
   // { name: 'My Projects', href: '/dashboard/projects', icon: <ProjectsIcon />, orgTypes: ['sponsor'] }, // HIDDEN per user request
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: <PipelineIcon /> },  // All roles see pipeline (scoped to their deals)
   { name: 'Allocations', href: '/dashboard/allocations', icon: <AllocationsIcon />, orgTypes: ['cde'] },
   { name: 'AutoMatch AI', href: '/dashboard/automatch', icon: <AutoMatchIcon />, orgTypes: ['cde', 'investor'] },
-  { name: 'Marketplace', href: '/deals', icon: <DealsIcon /> },
+  { name: 'Deals', href: '/deals', icon: <DealsIcon /> },
   { name: 'Portfolio', href: '/dashboard/portfolio', icon: <PortfolioIcon />, orgTypes: ['investor'] },
   { name: 'Pricing Coach', href: '/pricing', icon: <PricingIcon /> },
   { name: 'Documents', href: '/dashboard/documents', icon: <DocumentsIcon /> },
@@ -164,17 +164,19 @@ export default function AppLayout({
     );
   }
 
-  // Filter nav items based on org type
-  const filteredNavItems = navItems.filter(item => {
-    // Admin-only items
-    if (item.adminOnly) {
-      return currentDemoRole === 'admin';
-    }
-    // No role restriction
-    if (!item.orgTypes) return true;
-    // Check org type
-    return orgType && item.orgTypes.includes(orgType);
-  });
+  // OPTIMIZATION: Memoize filtered nav items to avoid recalculating on every render
+  const filteredNavItems = useMemo(() => {
+    return navItems.filter(item => {
+      // Admin-only items
+      if (item.adminOnly) {
+        return currentDemoRole === 'admin';
+      }
+      // No role restriction
+      if (!item.orgTypes) return true;
+      // Check org type
+      return orgType && item.orgTypes.includes(orgType);
+    });
+  }, [currentDemoRole, orgType]);
 
   const orgTypeLabels: Record<string, string> = {
     sponsor: 'Project Sponsor',
@@ -342,14 +344,16 @@ export default function AppLayout({
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Internal Header */}
-        <InternalHeader
-          userRole={userRole}
-          userName={userName}
-          userEmail={userEmail}
-          orgName={orgName}
-          onMenuToggle={() => setMobileMenuOpen(true)}
-        />
+        {/* Internal Header - Hide on intake page (IntakeShell has its own header) */}
+        {!pathname?.startsWith('/intake') && (
+          <InternalHeader
+            userRole={userRole}
+            userName={userName}
+            userEmail={userEmail}
+            orgName={orgName}
+            onMenuToggle={() => setMobileMenuOpen(true)}
+          />
+        )}
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto flex flex-col">

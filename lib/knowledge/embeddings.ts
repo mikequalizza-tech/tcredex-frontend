@@ -17,10 +17,15 @@ export interface EmbeddingResult {
  * Generate embedding for a single text
  */
 export async function generateEmbedding(text: string): Promise<EmbeddingResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY not configured');
+  }
+  
+  // Validate key format (should start with sk- or sk-proj-)
+  if (!apiKey.startsWith('sk-')) {
+    throw new Error('OPENAI_API_KEY format invalid: must start with "sk-" or "sk-proj-"');
   }
 
   const response = await fetch('https://api.openai.com/v1/embeddings', {
@@ -37,8 +42,20 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult> 
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Embedding API error: ${error}`);
+    const errorText = await response.text();
+    let errorMessage = `Embedding API error: ${errorText}`;
+    
+    // Provide helpful guidance for common errors
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error?.code === 'invalid_api_key') {
+        errorMessage = `Invalid OpenAI API key. Project keys (sk-proj-*) may not work for embeddings. Please use a standard API key (sk-*) from https://platform.openai.com/account/api-keys`;
+      }
+    } catch {
+      // If error isn't JSON, use the original message
+    }
+    
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();
@@ -53,10 +70,15 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult> 
  * Generate embeddings for multiple texts (batch)
  */
 export async function generateEmbeddings(texts: string[]): Promise<EmbeddingResult[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY not configured');
+  }
+  
+  // Validate key format (should start with sk- or sk-proj-)
+  if (!apiKey.startsWith('sk-')) {
+    throw new Error('OPENAI_API_KEY format invalid: must start with "sk-" or "sk-proj-"');
   }
 
   // OpenAI supports batch embedding
@@ -74,8 +96,20 @@ export async function generateEmbeddings(texts: string[]): Promise<EmbeddingResu
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Embedding API error: ${error}`);
+    const errorText = await response.text();
+    let errorMessage = `Embedding API error: ${errorText}`;
+    
+    // Provide helpful guidance for common errors
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error?.code === 'invalid_api_key') {
+        errorMessage = `Invalid OpenAI API key. Project keys (sk-proj-*) may not work for embeddings. Please use a standard API key (sk-*) from https://platform.openai.com/account/api-keys`;
+      }
+    } catch {
+      // If error isn't JSON, use the original message
+    }
+    
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();

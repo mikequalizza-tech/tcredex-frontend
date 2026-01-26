@@ -52,20 +52,7 @@ export function useCurrentUser(): ExtendedAuthContext {
         }
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select(`
-            id,
-            email,
-            name,
-            role,
-            organization_id,
-            organizations:organization_id (
-              id,
-              name,
-              slug,
-              logo,
-              type
-            )
-          `)
+          .select('id, email, name, role, organization_id, role_type, organization_name, avatar_url, title, phone')
           .eq('id', authUser.id)
           .single();
         if (userError || !userData) {
@@ -74,18 +61,21 @@ export function useCurrentUser(): ExtendedAuthContext {
           setIsLoading(false);
           return;
         }
-        const orgs = userData.organizations as unknown;
-        const org = Array.isArray(orgs) ? orgs[0] : orgs;
-        const orgData = org as Organization | null | undefined;
-        setOrganization(orgData || null);
+        const organizationData = userData.organization_id ? {
+          id: userData.organization_id,
+          name: userData.organization_name || 'Organization',
+          slug: userData.organization_id,
+          type: (userData as any).role_type || 'sponsor',
+        } as Organization : null;
+        setOrganization(organizationData);
         setUser({
           id: userData.id,
           email: userData.email,
           name: userData.name,
-          avatar: undefined,
+          avatar: userData.avatar_url || undefined,
           role: userData.role,
           organizationId: userData.organization_id,
-          organization: orgData || ({} as Organization),
+          organization: organizationData || ({} as Organization),
           projectAssignments: [],
           createdAt: '',
         });
@@ -165,7 +155,7 @@ export function useCurrentUser(): ExtendedAuthContext {
     refresh,
     switchRole,
     currentDemoRole: null,
-    orgType: organization?.type || 'sponsor',
+    orgType: (organization?.type as any) || undefined,
     orgName: organization?.name || '',
     orgLogo: organization?.logo,
     organizationId: organization?.id,

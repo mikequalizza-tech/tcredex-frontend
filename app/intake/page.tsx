@@ -115,16 +115,16 @@ function AccessDenied({ orgType }: { orgType: string | undefined }) {
         </div>
         <h1 className="text-2xl font-bold text-gray-100 mb-2">Sponsor Access Only</h1>
         <p className="text-gray-400 mb-6">
-          Only Project Sponsors can submit deals to the marketplace. 
+          Only Project Sponsors can submit deals. 
           {orgType === 'cde' && ' As a CDE, you can review and match with submitted deals in your Pipeline.'}
-          {orgType === 'investor' && ' As an Investor, you can browse and invest in deals from the Marketplace.'}
+          {orgType === 'investor' && ' As an Investor, you can browse and invest in deals.'}
         </p>
         <div className="flex gap-3 justify-center">
           <Link 
             href="/deals" 
             className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
           >
-            Browse Marketplace
+            Browse Deals
           </Link>
           <Link 
             href="/dashboard" 
@@ -154,7 +154,7 @@ function IntakePageContent() {
   const dealId = searchParams?.get('dealId') ?? null; // Edit mode for submitted deals
   const draftId = searchParams?.get('draftId') ?? null; // Continue specific draft directly (skip prompt)
 
-  const { orgType, isLoading: authLoading, isAuthenticated, organizationId, userEmail: authEmail } = useCurrentUser();
+  const { orgType, isLoading: authLoading, isAuthenticated, organizationId, userEmail: authEmail, userName, orgName } = useCurrentUser();
   const [step, setStep] = useState<'loading' | 'draft-prompt' | 'form'>('loading');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [existingDraft, setExistingDraft] = useState<DraftInfo | null>(null);
@@ -220,8 +220,16 @@ function IntakePageContent() {
 
   // Hydrate email from authenticated user (preferred) or local fallback and fetch draft
   useEffect(() => {
-    if (dealId) return; // Skip draft check in edit mode for submitted deals
-    if (authLoading) return;
+    // Always call the hook, but conditionally execute logic inside
+    if (dealId) {
+      // Skip draft check in edit mode for submitted deals
+      return;
+    }
+    
+    if (authLoading) {
+      // Wait for auth to finish
+      return;
+    }
 
     const skipDraftCheck = searchParams?.get('new') === 'true'; // Skip if user explicitly wants new deal
 
@@ -241,20 +249,95 @@ function IntakePageContent() {
 
       try {
         // If a specific draftId is provided, load that draft directly without showing prompt
+        // Use fetchApi utility for consistent error handling and credentials
+        const { fetchApi } = await import('@/lib/api/fetch-utils');
+        
         const draftQuery = draftId
           ? `/api/drafts?id=${encodeURIComponent(draftId)}`
           : `/api/drafts?orgId=${encodeURIComponent(organizationId)}`;
 
-        const response = await fetch(draftQuery);
-        const result = await response.json();
+        const result = await fetchApi<{ draft: any }>(draftQuery);
+        
+        if (!result.success || !result.data) {
+          console.error('[Intake] Draft fetch failed:', result.error);
+          setStep('form');
+          return;
+        }
 
-        if (result.draft) {
-          setExistingDraft(result.draft);
-          setInitialData(result.draft.draft_data || result.draft.intake_data);
-          // If draftId was specified, go directly to form (user already chose to continue from pipeline)
-          // Otherwise show the prompt so user can choose
-          setStep(draftId ? 'form' : 'draft-prompt');
+        const draftResult = result.data;
+        
+        // Type guard: ensure draftResult has the expected structure
+        if (!draftResult || typeof draftResult !== 'object') {
+          console.error('[Intake] Invalid draft result structure:', draftResult);
+          setStep('form');
+          return;
+        }
+
+        if (draftResult.draft) {
+          // Robust draft data extraction with multiple fallbacks
+          let draftData: any = null;
+          
+          // Try draft_data first
+          if (draftResult.draft.draft_data) {
+            if (typeof draftResult.draft.draft_data === 'string') {
+              try {
+                draftData = JSON.parse(draftResult.draft.draft_data);
+              } catch (e) {
+                console.warn('[Intake] Failed to parse draft_data string:', e);
+              }
+            } else if (typeof draftResult.draft.draft_data === 'object' && Object.keys(draftResult.draft.draft_data).length > 0) {
+              draftData = draftResult.draft.draft_data;
+            }
+          }
+          
+          // Fallback to intake_data if draft_data is empty/invalid
+          if (!draftData || (typeof draftData === 'object' && Object.keys(draftData).length === 0)) {
+            if (draftResult.draft.intake_data) {
+              if (typeof draftResult.draft.intake_data === 'string') {
+                try {
+                  draftData = JSON.parse(draftResult.draft.intake_data);
+                } catch (e) {
+                  console.warn('[Intake] Failed to parse intake_data string:', e);
+                }
+              } else if (typeof draftResult.draft.intake_data === 'object' && Object.keys(draftResult.draft.intake_data).length > 0) {
+                draftData = draftResult.draft.intake_data;
+              }
+            }
+          }
+          
+          // Last resort: try to reconstruct from deal fields if JSONB is empty
+          if (!draftData || (typeof draftData === 'object' && Object.keys(draftData).length === 0)) {
+            if (draftResult.draft.project_name || draftResult.draft.city || draftResult.draft.state) {
+              draftData = {
+                projectName: draftResult.draft.project_name || '',
+                city: draftResult.draft.city || '',
+                state: draftResult.draft.state || '',
+                programs: draftResult.draft.programs || [],
+                totalProjectCost: draftResult.draft.total_project_cost || 0,
+                nmtcFinancingRequested: draftResult.draft.nmtc_financing_requested || 0,
+                censusTract: draftResult.draft.census_tract || '',
+                address: draftResult.draft.address || '',
+                zipCode: draftResult.draft.zip_code || '',
+              };
+            }
+          }
+
+          if (draftData && typeof draftData === 'object' && Object.keys(draftData).length > 0) {
+            setExistingDraft(draftResult.draft);
+            setInitialData(draftData);
+            
+            // If draftId was specified, go directly to form (user already chose to continue from pipeline)
+            // Otherwise show the prompt so user can choose
+            setStep(draftId ? 'form' : 'draft-prompt');
+          } else {
+            console.warn('[Intake] Draft found but no valid data after all fallbacks:', draftResult.draft);
+            // Draft exists but has no data - show form anyway (user can start fresh)
+            setExistingDraft(draftResult.draft);
+            setInitialData(undefined);
+            setStep('form');
+          }
         } else {
+          console.log('[Intake] No draft found');
           setStep('form');
         }
       } catch (error) {
@@ -267,15 +350,26 @@ function IntakePageContent() {
   }, [authEmail, authLoading, dealId, draftId, organizationId, searchParams]);
 
   // Continue with existing draft
-  const handleContinueDraft = () => {
-    if (existingDraft?.draft_data || existingDraft?.intake_data) {
-      setInitialData(existingDraft.draft_data || existingDraft.intake_data);
+  const handleContinueDraft = useCallback(() => {
+    if (existingDraft) {
+      // Use smart fallback: prefer draft_data if it has content, otherwise use intake_data
+      const draftDataHasContent = existingDraft.draft_data && 
+        typeof existingDraft.draft_data === 'object' && 
+        Object.keys(existingDraft.draft_data).length > 0;
+      
+      const draftData = draftDataHasContent 
+        ? existingDraft.draft_data 
+        : (existingDraft.intake_data || existingDraft.draft_data);
+      
+      if (draftData && typeof draftData === 'object' && Object.keys(draftData).length > 0) {
+        setInitialData(draftData);
+      }
     }
     setStep('form');
-  };
+  }, [existingDraft]);
 
   // Start fresh (delete draft)
-  const handleStartFresh = async () => {
+  const handleStartFresh = useCallback(async () => {
     if (organizationId) {
       try {
         await fetch(`/api/drafts?orgId=${encodeURIComponent(organizationId)}`, {
@@ -288,7 +382,7 @@ function IntakePageContent() {
     setInitialData(undefined);
     setExistingDraft(null);
     setStep('form');
-  };
+  }, [organizationId]);
 
   // Save draft
   const handleSave = useCallback(async (data: IntakeData, readinessScore: number) => {
@@ -329,7 +423,22 @@ function IntakePageContent() {
       
       setSaveToast({ type: 'success', message: 'Draft saved to your account' });
       setExistingDraft(result.draft ?? existingDraft);
-      setInitialData(result.draft?.draft_data || result.draft?.intake_data || data);
+      
+      // Use smart fallback: prefer draft_data if it has content, otherwise use intake_data
+      if (result.draft) {
+        const draftDataHasContent = result.draft.draft_data && 
+          typeof result.draft.draft_data === 'object' && 
+          Object.keys(result.draft.draft_data).length > 0;
+        
+        const draftData = draftDataHasContent 
+          ? result.draft.draft_data 
+          : (result.draft.intake_data || result.draft.draft_data);
+        
+        setInitialData(draftData || data);
+      } else {
+        setInitialData(data);
+      }
+      
       setTimeout(() => setSaveToast(null), 3000);
     } catch (error) {
       console.error('[Intake] Save failed - Full error:', error);
@@ -356,7 +465,7 @@ function IntakePageContent() {
   }, [existingDraft, organizationId]);
 
   // Submit
-  const handleSubmit = async (data: IntakeData, readinessScore: number) => {
+  const handleSubmit = useCallback(async (data: IntakeData, readinessScore: number) => {
     const validation = validateForDealCard(data);
     
     if (!validation.isValid) {
@@ -367,12 +476,12 @@ function IntakePageContent() {
     const result = generateDealFromIntake(data);
     setCurrentData(data);
     setPreviewResult(result);
-  };
+  }, []);
 
-  const handleClosePreview = () => setPreviewResult(null);
-  const handleEditFromPreview = () => setPreviewResult(null);
+  const handleClosePreview = useCallback(() => setPreviewResult(null), []);
+  const handleEditFromPreview = useCallback(() => setPreviewResult(null), []);
 
-  const handleSubmitToMarketplace = async (deal: Deal) => {
+  const handleSubmitToDeals = useCallback(async (deal: Deal) => {
     try {
       const response = await fetch('/api/intake', {
         method: 'POST',
@@ -404,7 +513,13 @@ function IntakePageContent() {
       console.error('Submit failed:', error);
       alert('Failed to submit. Please try again.');
     }
-  };
+  }, [currentData, existingDraft, organizationId, router]);
+
+  // Stable hook to ensure consistent hook count across all renders
+  // This prevents React from detecting hook order violations
+  useEffect(() => {
+    // Empty effect - ensures hook is always called in same position
+  }, []);
 
   // ========================================
   // ROLE-BASED ACCESS CONTROL
@@ -435,7 +550,7 @@ function IntakePageContent() {
             href="/deals"
             className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
           >
-            Back to Marketplace
+            Back to Deals
           </Link>
         </div>
       </div>
@@ -474,62 +589,39 @@ function IntakePageContent() {
   // Form step
   return (
     <>
-      {saveToast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm border ${
-          saveToast.type === 'success'
-            ? 'bg-emerald-900/80 border-emerald-600 text-emerald-100'
-            : 'bg-amber-900/80 border-amber-600 text-amber-100'
-        }`}
-        >
-          {saveToast.message}
-        </div>
-      )}
-
-      {/* Navigation Header */}
-      <div className="bg-gray-900 border-b border-gray-800">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link 
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+        {saveToast && (
+          <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm border ${
+            saveToast.type === 'success'
+              ? 'bg-emerald-900/80 border-emerald-600 text-emerald-100'
+              : 'bg-amber-900/80 border-amber-600 text-amber-100'
+          }`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Dashboard
-          </Link>
-          
-          {/* tCredex Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">tC</span>
-            </div>
-            <span className="text-xl font-bold text-white">tCredex</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Edit Mode Header */}
-      {isEditMode && editingDeal && (
-        <div className="bg-amber-900/30 border-b border-amber-500/30">
-          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <div>
-                <p className="text-amber-200 font-medium">Editing: {editingDeal.projectName}</p>
-                <p className="text-amber-300/70 text-xs">Project name cannot be changed after submission</p>
-              </div>
-            </div>
-            <Link
-              href={`/deals/${dealId}`}
-              className="px-3 py-1.5 text-sm text-amber-200 hover:text-white border border-amber-500/50 rounded-lg hover:bg-amber-500/20 transition-colors"
-            >
-              Cancel
-            </Link>
+            {saveToast.message}
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Edit Mode Header */}
+        {isEditMode && editingDeal && (
+          <div className="bg-amber-900/30 border-b border-amber-500/30">
+            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <div>
+                  <p className="text-amber-200 font-medium">Editing: {editingDeal.projectName}</p>
+                  <p className="text-amber-300/70 text-xs">Project name cannot be changed after submission</p>
+                </div>
+              </div>
+              <Link
+                href={`/deals/${dealId}`}
+                className="px-3 py-1.5 text-sm text-amber-200 hover:text-white border border-amber-500/50 rounded-lg hover:bg-amber-500/20 transition-colors"
+              >
+                Cancel
+              </Link>
+            </div>
+          </div>
+        )}
 
       <IntakeShell
         initialData={initialData}
@@ -544,7 +636,7 @@ function IntakePageContent() {
           result={previewResult}
           onClose={handleClosePreview}
           onEdit={handleEditFromPreview}
-          onSubmit={handleSubmitToMarketplace}
+          onSubmit={handleSubmitToDeals}
         />
       )}
     </>

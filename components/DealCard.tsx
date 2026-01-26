@@ -2,9 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Deal, STATUS_CONFIG, PROGRAM_COLORS } from '@/lib/data/deals';
-import { scoreDealFromRecord } from '@/lib/scoring/engine';
-import { useMemo } from 'react';
+import { Deal } from '@/lib/data/deals';
 
 interface DealCardProps {
   deal: Deal;
@@ -17,146 +15,175 @@ const formatCurrency = (amount: number | undefined) => {
   if (amount >= 1000000) {
     return `$${(amount / 1000000).toFixed(1)}M`;
   }
-  return `$${(amount / 1000).toFixed(0)}K`;
+  if (amount >= 1000) {
+    return `$${(amount / 1000).toFixed(0)}K`;
+  }
+  return `$${amount.toFixed(0)}`;
+};
+
+const formatDate = (date: string | undefined) => {
+  if (!date) return 'N/A';
+  try {
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  } catch {
+    return date;
+  }
+};
+
+// Extract deal ID for display (last 5 chars or full if short)
+const getDealIdDisplay = (id: string) => {
+  if (id.length <= 6) return id;
+  return `D${id.slice(-5)}`;
 };
 
 export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCardProps) {
-  const location = `${deal.city}, ${deal.state}`;
-  const financingGap = deal.financingGap ?? deal.allocation;
-  const programColor = PROGRAM_COLORS[deal.programType];
-  const statusConfig = STATUS_CONFIG[deal.status];
-
-  // Calculate tCredex Score
-  const score = useMemo(() => {
-    try {
-      return scoreDealFromRecord({
-        census_tract: deal.censusTract,
-        tract_poverty_rate: deal.povertyRate,
-        tract_median_income: deal.medianIncome,
-        tract_unemployment: deal.unemployment,
-        total_project_cost: deal.projectCost,
-        nmtc_financing_requested: deal.allocation,
-        jobs_created: deal.jobsCreated,
-        site_control: 'under_contract', // Default assumption
-        pro_forma_complete: true, // Default assumption for marketplace deals
-        third_party_reports: true, // Default assumption
-        committed_capital_pct: 70, // Default assumption
-        projected_completion_date: new Date().toISOString(),
-        project_type: deal.programType,
-        target_sectors: [deal.programType],
-      });
-    } catch (error) {
-      console.error('Error calculating score:', error);
-      return null;
-    }
-  }, [deal]);
-
-  const getTierColor = (tier: number) => {
-    switch (tier) {
-      case 1: return 'text-green-400 bg-green-900/30 border-green-700/50';
-      case 2: return 'text-amber-400 bg-amber-900/30 border-amber-700/50';
-      case 3: return 'text-red-400 bg-red-900/30 border-red-700/50';
-      default: return 'text-gray-400 bg-gray-900/30 border-gray-700/50';
-    }
-  };
-
-  const getTierLabel = (tier: number) => {
-    switch (tier) {
-      case 1: return 'Greenlight';
-      case 2: return 'Watchlist';
-      case 3: return 'Defer';
-      default: return 'Unscored';
-    }
-  };
+  const location = `${deal.city || ''}, ${deal.state || ''}`.trim();
+  const financingGap = deal.financingGap ?? 0;
+  const projectCost = deal.projectCost ?? 0;
+  
+  // Determine NMTC amounts - use explicit fields if available, otherwise estimate
+  const fedNMTC = deal.programType === 'NMTC' && deal.programLevel === 'federal' 
+    ? deal.allocation 
+    : deal.programType === 'NMTC' && deal.programLevel !== 'state'
+    ? deal.allocation 
+    : 0;
+  
+  const stateNMTC = deal.stateNMTCAllocation || 
+    (deal.programType === 'NMTC' && deal.programLevel === 'state' ? deal.allocation : 0);
+  
+  // HTC amount - use explicit field if available, otherwise check if HTC program
+  const htcAmount = deal.htcAmount || (deal.programType === 'HTC' ? deal.allocation : 0);
+  
+  // Shovel ready status
+  const shovelReady = deal.shovelReady ?? false;
+  
+  // Completion date
+  const completionDate = deal.completionDate || deal.timeline?.find(t => t.milestone.includes('Completion'))?.date;
 
   return (
-    <div className="max-w-sm bg-gray-900 rounded-xl shadow-lg overflow-hidden border border-gray-700/50 hover:border-indigo-500/50 transition-colors">
-      {/* Hero Image */}
-      {deal.heroImageUrl && (
-        <div className="relative h-40 bg-gray-800">
-          <Image
-            src={deal.heroImageUrl}
-            alt={deal.projectName}
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 to-transparent" />
-        </div>
-      )}
-
-      {/* Header row */}
-      <div className="p-4 flex justify-between items-start">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${programColor.bg} ${programColor.text}`}>
-              {deal.programType}
-            </span>
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusConfig.color}`}>
-              {statusConfig.label}
-            </span>
-            {/* tCredex Score Badge */}
-            {score && (
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getTierColor(score.tier)}`}>
-                {score.totalScore}/100 • {getTierLabel(score.tier)}
-              </span>
+    <div className="w-full max-w-sm bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+      {/* Header */}
+      <div className="p-4 pb-3 relative">
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className="text-xl font-bold text-white leading-tight mb-1">{deal.projectName}</h2>
+            <p className="text-sm text-gray-400">{location}</p>
+          </div>
+          {/* Logo/Icon in top right */}
+          <div className="flex-shrink-0">
+            {deal.logoUrl ? (
+              <div className="relative w-10 h-10 bg-white rounded overflow-hidden">
+                <Image
+                  src={deal.logoUrl}
+                  alt={deal.sponsorName || 'Logo'}
+                  fill
+                  className="object-contain p-1"
+                />
+              </div>
+            ) : (
+              <div className="w-10 h-10 bg-indigo-900/30 rounded flex items-center justify-center">
+                <span className="text-indigo-400 text-xs font-bold">TC</span>
+              </div>
             )}
           </div>
-          <Link href={`/deals/${deal.id}`} className="hover:text-indigo-400 transition-colors">
-            <h2 className="text-lg font-bold text-gray-100 leading-snug truncate">{deal.projectName}</h2>
-          </Link>
-          <p className="text-sm text-gray-400">{location}</p>
-        </div>
-        {/* Organization Logo or tCredex fallback */}
-        <div className="flex-shrink-0 ml-3">
-          {deal.logoUrl ? (
-            <div className="relative w-12 h-12 bg-white rounded-lg overflow-hidden">
-              <Image
-                src={deal.logoUrl}
-                alt={deal.sponsorName || 'Organization logo'}
-                fill
-                className="object-contain p-1"
-              />
-            </div>
-          ) : (
-            <Image
-              src="/brand/tcredex_transparent_256x64.png"
-              alt="tCredex Logo"
-              width={80}
-              height={20}
-              className="h-5 w-auto opacity-60"
-            />
-          )}
         </div>
       </div>
 
-      {/* Divider */}
-      <hr className="border-gray-700" />
-
-      {/* Details */}
-      <div className="p-4 text-sm text-gray-300 space-y-1">
-        {deal.sponsorName && <p><span className="text-gray-500">Sponsor:</span> {deal.sponsorName}</p>}
-        {deal.city && <p><span className="text-gray-500">City:</span> {deal.city}</p>}
-        {deal.state && <p><span className="text-gray-500">State:</span> {deal.state}</p>}
-        {deal.povertyRate !== undefined && <p><span className="text-gray-500">Poverty Rate:</span> {deal.povertyRate}%</p>}
-        {deal.medianIncome !== undefined && <p><span className="text-gray-500">Median Income:</span> ${deal.medianIncome.toLocaleString()}</p>}
-        
-        <hr className="border-gray-800 my-2" />
-        
-        <p><span className="text-gray-500">Allocation:</span> <span className="text-indigo-400 font-medium">{formatCurrency(deal.allocation)}</span></p>
-        <p><span className="text-gray-500">Program:</span> {deal.programType} ({deal.programLevel})</p>
-        
-        <hr className="border-gray-800 my-2" />
-        
-        <p className="text-green-400 font-semibold">
-          <span className="text-gray-500">Status:</span> {deal.status.replace('_', ' ')}
-        </p>
-        {deal.submittedDate && <p><span className="text-gray-500">Submitted:</span> {new Date(deal.submittedDate).toLocaleDateString()}</p>}
-        <p><span className="text-gray-500">Financing Gap:</span> <span className="text-orange-400 font-medium">{formatCurrency(financingGap)}</span></p>
-        <p><span className="text-gray-500">Deal ID:</span> <span className="font-mono text-xs">{deal.id}</span></p>
+      {/* Project Details Section */}
+      <div className="px-4 pb-3 space-y-1.5 text-sm">
+        <div className="flex">
+          <span className="text-gray-500 w-24 flex-shrink-0">Parent:</span>
+          <span className="text-gray-300">{deal.sponsorName || 'N/A'}</span>
+        </div>
+        {deal.address && (
+          <div className="flex">
+            <span className="text-gray-500 w-24 flex-shrink-0">Address:</span>
+            <span className="text-gray-300">{deal.address}</span>
+          </div>
+        )}
+        {deal.censusTract && (
+          <div className="flex">
+            <span className="text-gray-500 w-24 flex-shrink-0">Census Tract:</span>
+            <span className="text-gray-300 font-mono text-xs">{deal.censusTract}</span>
+          </div>
+        )}
+        {deal.povertyRate !== undefined && (
+          <div className="flex">
+            <span className="text-gray-500 w-24 flex-shrink-0">Poverty Rate:</span>
+            <span className="text-gray-300">{deal.povertyRate.toFixed(0)}%</span>
+          </div>
+        )}
+        {deal.medianIncome !== undefined && (
+          <div className="flex">
+            <span className="text-gray-500 w-24 flex-shrink-0">Median Income:</span>
+            <span className="text-gray-300">${deal.medianIncome.toLocaleString()}</span>
+          </div>
+        )}
+        {deal.unemployment !== undefined && (
+          <div className="flex">
+            <span className="text-gray-500 w-24 flex-shrink-0">Unemployment:</span>
+            <span className="text-gray-300">{deal.unemployment.toFixed(1)}%</span>
+          </div>
+        )}
       </div>
 
-      {/* CTA */}
-      <div className="p-4 pt-0">
+      {/* Financial Details Section */}
+      <div className="px-4 pb-3 space-y-1.5 text-sm border-t border-gray-800 pt-3">
+        {projectCost > 0 && (
+          <div className="flex">
+            <span className="text-gray-500 w-32 flex-shrink-0">Project Cost:</span>
+            <span className="text-sky-400 font-medium">{formatCurrency(projectCost)}</span>
+          </div>
+        )}
+        {fedNMTC > 0 && (
+          <div className="flex">
+            <span className="text-gray-500 w-32 flex-shrink-0">Fed NMTC Req:</span>
+            <span className="text-gray-300">{formatCurrency(fedNMTC)}</span>
+          </div>
+        )}
+        {stateNMTC > 0 && (
+          <div className="flex">
+            <span className="text-gray-500 w-32 flex-shrink-0">State NMTC Req:</span>
+            <span className="text-gray-300">{formatCurrency(stateNMTC)}</span>
+          </div>
+        )}
+        {htcAmount > 0 && (
+          <div className="flex">
+            <span className="text-gray-500 w-32 flex-shrink-0">HTC:</span>
+            <span className="text-gray-300">{formatCurrency(htcAmount)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Status and Milestones Section */}
+      <div className="px-4 pb-3 space-y-1.5 text-sm border-t border-gray-800 pt-3">
+        <div className="flex">
+          <span className="text-gray-500 w-32 flex-shrink-0">Shovel Ready:</span>
+          <span className={shovelReady ? 'text-green-400' : 'text-amber-400'}>
+            {shovelReady ? 'Yes ✓' : 'No'}
+          </span>
+        </div>
+        {completionDate && (
+          <div className="flex">
+            <span className="text-gray-500 w-32 flex-shrink-0">Completion:</span>
+            <span className="text-gray-300">{formatDate(completionDate)}</span>
+          </div>
+        )}
+        {financingGap > 0 && (
+          <div className="flex">
+            <span className="text-gray-500 w-32 flex-shrink-0">Financing Gap:</span>
+            <span className="text-orange-400 font-medium">{formatCurrency(financingGap)}</span>
+          </div>
+        )}
+        <div className="flex">
+          <span className="text-gray-500 w-32 flex-shrink-0">Deal ID:</span>
+          <span className="text-gray-300 font-mono text-xs">{getDealIdDisplay(deal.id)}</span>
+        </div>
+      </div>
+
+      {/* Action Button */}
+      <div className="px-4 pb-4 pt-2 border-t border-gray-800">
         {memoRequested ? (
           <button 
             disabled
@@ -167,7 +194,7 @@ export default function DealCard({ deal, onRequestMemo, memoRequested }: DealCar
         ) : (
           <button 
             onClick={() => onRequestMemo?.(deal.id)}
-            className="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-500 transition-colors"
+            className="w-full bg-purple-600 text-white font-semibold py-2.5 rounded-lg hover:bg-purple-500 transition-colors"
           >
             Request Allocation Memo
           </button>

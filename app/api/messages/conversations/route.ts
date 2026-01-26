@@ -18,11 +18,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'organizationId required' }, { status: 400 });
   }
 
-  // Handle Clerk org IDs (start with 'org_') - user needs registration, return empty
-  if (organizationId.startsWith('org_') || organizationId === 'pending') {
-    return NextResponse.json({ conversations: [] });
-  }
-
   try {
     const supabaseAdmin = getSupabaseAdmin();
 

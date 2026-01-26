@@ -20,10 +20,10 @@ export async function GET(request: NextRequest) {
   try {
     const supabaseAdmin = getSupabaseAdmin();
 
-    // Get deal to find sponsor org
+    // Get deal to find sponsor org (via sponsor_id join)
     const { data: deal } = await supabaseAdmin
       .from("deals")
-      .select("sponsor_organization_id, assigned_cde_id")
+      .select("sponsor_id, assigned_cde_id, sponsors!inner(organization_id)")
       .eq("id", dealId)
       .single();
 
@@ -32,9 +32,15 @@ export async function GET(request: NextRequest) {
     }
 
     const typedDeal = deal as {
-      sponsor_organization_id: string;
+      sponsor_id: string;
       assigned_cde_id: string | null;
+      sponsors: { organization_id: string } | null;
     };
+
+    const sponsorOrgId = typedDeal.sponsors?.organization_id;
+    if (!sponsorOrgId) {
+      return NextResponse.json({ error: "Deal sponsor not found" }, { status: 404 });
+    }
 
     const participants: {
       id: string;
@@ -48,13 +54,13 @@ export async function GET(request: NextRequest) {
     const { data: sponsorUsers } = await supabaseAdmin
       .from("users")
       .select("id, name, email")
-      .eq("organization_id", typedDeal.sponsor_organization_id);
+      .eq("organization_id", sponsorOrgId);
 
     // Get sponsor org name
     const { data: sponsorOrg } = await supabaseAdmin
       .from("sponsors")
       .select("primary_contact_name")
-      .eq("id", typedDeal.sponsor_organization_id)
+      .eq("organization_id", sponsorOrgId)
       .single();
 
     if (sponsorUsers) {

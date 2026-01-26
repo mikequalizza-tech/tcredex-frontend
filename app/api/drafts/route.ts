@@ -9,6 +9,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
+// Type for deal record with JSONB fields
+interface DealRecord {
+  id: string;
+  intake_data?: unknown;
+  draft_data?: unknown;
+  [key: string]: unknown;
+}
+
 // Resolve sponsor_id from organization_id (create sponsor row if missing)
 // NOTE: With simplified schema, this should rarely be needed - entityId from registration is the sponsor.id
 async function resolveSponsorId(
@@ -81,16 +89,54 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Draft not found' }, { status: 404 });
       }
 
-      return NextResponse.json({ draft: data });
+      // Type the data as DealRecord
+      const dealData = data as DealRecord | null;
+      if (!dealData) {
+        return NextResponse.json({ error: 'Draft not found' }, { status: 404 });
+      }
+
+      // Ensure JSONB fields are properly parsed
+      // Supabase returns JSONB as objects, but handle string case for safety
+      let intakeData = dealData.intake_data;
+      let draftData = dealData.draft_data;
+      
+      if (intakeData && typeof intakeData === 'string') {
+        try {
+          intakeData = JSON.parse(intakeData);
+        } catch (e) {
+          console.error('[Drafts] Failed to parse intake_data:', e);
+        }
+      }
+      
+      if (draftData && typeof draftData === 'string') {
+        try {
+          draftData = JSON.parse(draftData);
+        } catch (e) {
+          console.error('[Drafts] Failed to parse draft_data:', e);
+        }
+      }
+
+      const draft = {
+        ...dealData,
+        intake_data: intakeData,
+        draft_data: draftData,
+      };
+
+      return NextResponse.json({ draft });
     }
 
     // Query by sponsor_id directly (simplified) or fall back to organization lookup
+    // If no id specified, return all drafts (not just latest) for pipeline view
     let query = supabase
       .from('deals')
       .select('*')
       .eq('status', 'draft')
-      .order('updated_at', { ascending: false })
-      .limit(1);
+      .order('updated_at', { ascending: false });
+    
+    // Only limit to 1 if we're looking for the latest draft (no id, no sponsorId, just orgId)
+    if (!id && !sponsorId && orgId) {
+      query = query.limit(1);
+    }
 
     if (sponsorId) {
       query = query.eq('sponsor_id', sponsorId);
@@ -100,14 +146,92 @@ export async function GET(request: NextRequest) {
       query = query.eq('sponsor_id', resolvedSponsorId);
     }
 
-    const { data, error } = await query.maybeSingle();
+    // If we have an id, use single(). Otherwise, get all drafts (array)
+    let data: any = null;
+    let error: any = null;
+    
+    if (id) {
+      const result = await query.single();
+      data = result.data;
+      error = result.error;
+    } else {
+      const result = await query;
+      data = result.data;
+      error = result.error;
+    }
 
     if (error && error.code !== 'PGRST116') {
       console.error('[Drafts] Load error:', error);
       return NextResponse.json({ error: 'Failed to load draft' }, { status: 500 });
     }
 
-    return NextResponse.json({ draft: data || null });
+    if (!data) {
+      return NextResponse.json({ draft: null, drafts: [] });
+    }
+
+    // Handle both single draft and array of drafts
+    if (Array.isArray(data)) {
+      // Multiple drafts - return as array
+      const drafts = data.map((dealData: DealRecord) => {
+        let intakeData = dealData.intake_data;
+        let draftData = dealData.draft_data;
+        
+        if (intakeData && typeof intakeData === 'string') {
+          try {
+            intakeData = JSON.parse(intakeData);
+          } catch (e) {
+            console.error('[Drafts] Failed to parse intake_data:', e);
+          }
+        }
+        
+        if (draftData && typeof draftData === 'string') {
+          try {
+            draftData = JSON.parse(draftData);
+          } catch (e) {
+            console.error('[Drafts] Failed to parse draft_data:', e);
+          }
+        }
+
+        return {
+          ...dealData,
+          intake_data: intakeData,
+          draft_data: draftData,
+        };
+      });
+
+      return NextResponse.json({ drafts, draft: drafts[0] || null });
+    } else {
+      // Single draft
+      const dealData = data as DealRecord;
+
+      // Ensure JSONB fields are properly parsed
+      let intakeData = dealData.intake_data;
+      let draftData = dealData.draft_data;
+      
+      if (intakeData && typeof intakeData === 'string') {
+        try {
+          intakeData = JSON.parse(intakeData);
+        } catch (e) {
+          console.error('[Drafts] Failed to parse intake_data:', e);
+        }
+      }
+      
+      if (draftData && typeof draftData === 'string') {
+        try {
+          draftData = JSON.parse(draftData);
+        } catch (e) {
+          console.error('[Drafts] Failed to parse draft_data:', e);
+        }
+      }
+
+      const draft = {
+        ...dealData,
+        intake_data: intakeData,
+        draft_data: draftData,
+      };
+
+      return NextResponse.json({ draft, drafts: [draft] });
+    }
   } catch (error) {
     console.error('[Drafts] Error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

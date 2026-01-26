@@ -56,6 +56,9 @@ export interface Deal {
   unemployment?: number;
   shovelReady?: boolean;
   completionDate?: string;
+  // Additional financial fields for deal cards
+  stateNMTCAllocation?: number;  // State NMTC allocation request
+  htcAmount?: number;  // HTC amount (if HTC program)
   // Profile media fields
   logoUrl?: string;
   heroImageUrl?: string;

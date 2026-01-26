@@ -25,10 +25,17 @@ export function getSupabase(): SupabaseClient<Database> {
 let supabaseAdminClient: SupabaseClient<Database> | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient<Database> {
+  // On the browser, never expose the service key; fall back to anon client to avoid runtime crashes.
+  if (typeof window !== 'undefined') {
+    return getSupabase();
+  }
+
   if (!supabaseAdminClient) {
-    // Use service key if available, otherwise fall back to anon key
-    const key = supabaseServiceKey || supabaseAnonKey;
-    supabaseAdminClient = createClient<Database>(supabaseUrl, key, {
+    if (!supabaseServiceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for admin operations');
+    }
+
+    supabaseAdminClient = createClient<Database>(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,

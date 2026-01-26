@@ -73,44 +73,47 @@ export default function NewDealPage() {
     const sponsorId = organizationId || user?.id;
 
     if (!sponsorId) {
+      const error = new Error('No organization ID available. Please try logging out and back in.');
       console.error('No sponsorId available - user may not be properly authenticated');
-      alert('Unable to save: No organization ID available. Please try logging out and back in.');
-      return;
+      throw error; // Re-throw so IntakeShell knows save failed
     }
 
-    try {
-      // Enrich data with user/org info
-      // sponsor_id = organization ID so all team members see the same deals
-      const enrichedData = {
-        ...data,
-        sponsorId: sponsorId,  // Organization ID (or user ID fallback) - shared by all team members
-        sponsorOrganizationId: sponsorId,
-        sponsorName: data.sponsorName || orgName || userName,
-        personCompletingForm: userEmail || userName,
-      };
+    // Enrich data with user/org info
+    // sponsor_id = organization ID so all team members see the same deals
+    const enrichedData = {
+      ...data,
+      sponsorId: sponsorId,  // Organization ID (or user ID fallback) - shared by all team members
+      sponsorOrganizationId: sponsorId,
+      sponsorName: data.sponsorName || orgName || userName,
+      personCompletingForm: userEmail || userName,
+    };
 
-      // Use /api/intake which properly maps IntakeData to deal record
-      const response = await fetch('/api/intake', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          intakeData: enrichedData,
-          saveOnly: true  // Save as draft without submitting
-        })
-      });
+    // Use /api/intake which properly maps IntakeData to deal record
+    const response = await fetch('/api/intake', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        intakeData: enrichedData,
+        saveOnly: true  // Save as draft without submitting
+      })
+    });
 
-      if (!response.ok) {
+    if (!response.ok) {
+      let errorMessage = 'Failed to save draft';
+      try {
         const error = await response.json();
-        throw new Error(error.message || error.error || 'Failed to save draft');
+        errorMessage = error.message || error.error || errorMessage;
+      } catch {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
       }
-
-      const result = await response.json();
-      console.log('Draft saved:', result);
-    } catch (error) {
-      console.error('Save failed:', error);
-      alert('Failed to save draft. Please try again.');
+      console.error('Save failed:', { status: response.status, error: errorMessage });
+      throw new Error(errorMessage); // Re-throw so IntakeShell knows save failed
     }
+
+    const result = await response.json();
+    console.log('Draft saved successfully:', result);
+    // Success - IntakeShell will handle resetting hasChanges state
   };
 
   const handleSubmit = async (data: IntakeData, readinessScore: number) => {

@@ -169,9 +169,11 @@ export async function verifyDealAccess(
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
 
+  // Get deal with sponsor information via join
+  // Use left join in case sponsor doesn't exist (shouldn't happen but be safe)
   const { data: deal, error } = await supabase
     .from('deals')
-    .select('sponsor_organization_id, assigned_cde_id, status')
+    .select('sponsor_id, assigned_cde_id, status, sponsors(organization_id)')
     .eq('id', dealId)
     .single();
 
@@ -180,9 +182,10 @@ export async function verifyDealAccess(
   }
 
   const typedDeal = deal as {
-    sponsor_organization_id: string;
+    sponsor_id: string;
     assigned_cde_id: string | null;
     status: string;
+    sponsors: { organization_id: string } | null;
   };
 
   // System admin can access everything
@@ -191,7 +194,7 @@ export async function verifyDealAccess(
   }
 
   // Sponsor can access their own deals
-  if (user.organizationType === 'sponsor' && typedDeal.sponsor_organization_id === user.organizationId) {
+  if (user.organizationType === 'sponsor' && typedDeal.sponsors?.organization_id === user.organizationId) {
     return;
   }
 

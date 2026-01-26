@@ -11,6 +11,7 @@ import { Deal } from '@/lib/data/deals';
 import { CDEDealCard } from '@/lib/types/cde';
 import AppLayout from '@/components/layout/AppLayout';
 import { scoreDealFromRecord } from '@/lib/scoring/engine';
+import CDEDetailModal from '@/components/cde/CDEDetailModal';
 
 // Types
 type ProgramType = 'NMTC' | 'HTC' | 'LIHTC' | 'OZ';
@@ -107,6 +108,8 @@ export default function MarketplacePage() {
   const [stateFilter, setStateFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedCDE, setSelectedCDE] = useState<CDEDealCard | null>(null);
+  const [showCDEModal, setShowCDEModal] = useState(false);
   const itemsPerPage = 50;
 
   // MapFilterRail state
@@ -290,7 +293,7 @@ export default function MarketplacePage() {
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-gray-400">Loading Marketplace...</p>
+          <p className="text-sm text-gray-400">Loading Deals...</p>
         </div>
       </div>
     );
@@ -428,29 +431,32 @@ export default function MarketplacePage() {
               <span className="font-medium text-emerald-400">{formatCurrency(cde.remainingAllocation)}</span>
             </td>
             <td className="px-4 py-3">
-              <div className="flex flex-wrap gap-1">
-                {cde.primaryStates?.slice(0, 3).map(state => (
-                  <span key={state} className="px-1.5 py-0.5 bg-gray-800 rounded text-xs text-gray-400">{state}</span>
-                ))}
-                {(cde.primaryStates?.length || 0) > 3 && (
-                  <span className="px-1.5 py-0.5 bg-gray-800 rounded text-xs text-gray-500">+{(cde.primaryStates?.length || 0) - 3}</span>
-                )}
-              </div>
+              {cde.serviceArea ? (
+                <span className="text-sm text-gray-300">{cde.serviceArea}</span>
+              ) : (
+                <span className="text-sm text-gray-500 italic">Not specified</span>
+              )}
             </td>
             <td className="px-4 py-3 text-sm text-gray-300">
               {formatCurrency(cde.dealSizeRange?.min || 0)} - {formatCurrency(cde.dealSizeRange?.max || 0)}
             </td>
             <td className="px-4 py-3">
-              <div className="flex flex-wrap gap-1">
-                {cde.targetSectors?.slice(0, 2).map(sector => (
-                  <span key={sector} className="px-1.5 py-0.5 bg-indigo-900/30 text-indigo-300 rounded text-xs">{sector}</span>
-                ))}
-              </div>
+              {cde.predominantMarket ? (
+                <span className="text-sm text-gray-300">{cde.predominantMarket}</span>
+              ) : (
+                <span className="text-sm text-gray-500 italic">Not specified</span>
+              )}
             </td>
             <td className="px-4 py-3">
-              <Link href={`/cde/${cde.id}`} className="text-indigo-400 hover:text-indigo-300 text-sm font-medium">
+              <button
+                onClick={() => {
+                  setSelectedCDE(cde);
+                  setShowCDEModal(true);
+                }}
+                className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
+              >
                 {marketplace.requestButtonLabel} →
-              </Link>
+              </button>
             </td>
           </tr>
         ))}
@@ -773,6 +779,16 @@ export default function MarketplacePage() {
 
       <MarketplaceFooter />
       </div>
+
+      {/* CDE Detail Modal */}
+      <CDEDetailModal
+        isOpen={showCDEModal}
+        onClose={() => {
+          setShowCDEModal(false);
+          setSelectedCDE(null);
+        }}
+        cde={selectedCDE}
+      />
     </AppLayout>
   );
 }

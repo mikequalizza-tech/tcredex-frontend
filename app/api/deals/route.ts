@@ -34,27 +34,47 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
       }
 
-      return NextResponse.json({ deal: data }, { status: 200 });
+      return NextResponse.json({ deal: data }, { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'private, max-age=60', // Cache for 60 seconds
+        },
+      });
     }
 
     // List deals with org filtering
     const status = searchParams.get('status');
     const state = searchParams.get('state');
     const program = searchParams.get('program');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    // OPTIMIZATION: Enforce maximum limit to prevent large queries
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
 
     // Build query with org filtering based on user type
+    // Include sponsor info for organization_id lookup
     let query = supabase
       .from('deals')
-      .select('*', { count: 'exact' })
+      .select('*, sponsors(organization_id)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     // CRITICAL: Filter by organization and role
     if (user.organizationType === 'sponsor') {
       // Sponsors see only their own deals
-      query = query.eq('sponsor_organization_id', user.organizationId);
+      // Need to join through sponsors table to get organization_id
+      // First, get the sponsor_id for this organization
+      const { data: sponsorData } = await supabase
+        .from('sponsors')
+        .select('id')
+        .eq('organization_id', user.organizationId)
+        .single();
+      
+      if (sponsorData) {
+        query = query.eq('sponsor_id', sponsorData.id);
+      } else {
+        // No sponsor record found, return empty
+        return NextResponse.json({ deals: [], total: 0, limit, offset });
+      }
     } else if (user.organizationType === 'cde') {
       // CDEs see: assigned deals + public deals
       query = query.or(
@@ -82,6 +102,10 @@ export async function GET(request: NextRequest) {
       total: count,
       limit,
       offset,
+    }, {
+      headers: {
+        'Cache-Control': 'private, max-age=30', // Cache for 30 seconds
+      },
     });
   } catch (error) {
     return handleAuthError(error);
@@ -122,12 +146,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get sponsor_id for this organization
+    const { data: sponsorData } = await supabase
+      .from('sponsors')
+      .select('id')
+      .eq('organization_id', user.organizationId)
+      .single();
+
+    if (!sponsorData) {
+      return NextResponse.json(
+        { error: 'Sponsor record not found for your organization' },
+        { status: 404 }
+      );
+    }
+
     // Insert deal with user's organization as sponsor
     const { data, error } = await supabase
       .from('deals')
       .insert({
         project_name: body.project_name,
-        sponsor_organization_id: user.organizationId, // CRITICAL: Use user's org
+        sponsor_id: sponsorData.id, // CRITICAL: Use sponsor_id, not organization_id
         sponsor_name: body.sponsor_name,
         programs: body.programs || ['NMTC'],
         program_level: body.program_level || 'federal',

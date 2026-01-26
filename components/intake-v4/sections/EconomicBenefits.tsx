@@ -259,7 +259,7 @@ export function EconomicBenefits({ data, onChange }: EconomicBenefitsProps) {
       <div className="border-t border-gray-800 pt-6">
         <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
           <span className="text-xl">💡</span>
-          Need for Tax Credit Subsidy <span className="text-red-400">*</span>
+          Need for Tax Credit Financing <span className="text-red-400">*</span>
         </h3>
         <textarea
           value={data.needForNMTC || ''}

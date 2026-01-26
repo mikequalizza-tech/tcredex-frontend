@@ -166,10 +166,26 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
     if (lookupStage === 'idle') return null;
     if (lookupStage === 'error' && (eligibilityResult || data.censusTract)) return null;
     
+    // Determine program-specific eligibility text
+    const getEligibilityText = () => {
+      if (!data.programs || data.programs.length === 0) {
+        return 'Checking eligibility...';
+      }
+      const programNames: Record<ProgramType, string> = {
+        'NMTC': 'NMTC',
+        'HTC': 'HTC',
+        'LIHTC': 'LIHTC',
+        'OZ': 'Opportunity Zone',
+        'Brownfield': 'Brownfield'
+      };
+      const selectedPrograms = data.programs.map(p => programNames[p] || p).join('/');
+      return `Checking ${selectedPrograms} eligibility...`;
+    };
+    
     const stages = {
       geocoding: { text: 'Getting coordinates...', icon: '📍' },
       tract: { text: 'Finding census tract...', icon: '🗺️' },
-      eligibility: { text: 'Checking NMTC eligibility...', icon: '🔍' },
+      eligibility: { text: getEligibilityText(), icon: '🔍' },
       done: { text: 'Complete!', icon: '✅' },
       error: { text: lookupError || 'Error', icon: '❌' },
     };
@@ -337,7 +353,21 @@ export function LocationTract({ data, onChange }: LocationTractProps) {
                   ? 'bg-green-600 text-white' 
                   : 'bg-yellow-600 text-white'
               }`}>
-                {eligibilityResult.eligible ? '✓ NMTC Eligible' : '⚠ Not Eligible'}
+                {eligibilityResult.eligible 
+                  ? (() => {
+                      const programNames: Record<ProgramType, string> = {
+                        'NMTC': 'NMTC',
+                        'HTC': 'HTC',
+                        'LIHTC': 'LIHTC',
+                        'OZ': 'Opportunity Zone',
+                        'Brownfield': 'Brownfield'
+                      };
+                      const selectedPrograms = (data.programs || []).length > 0
+                        ? data.programs!.map(p => programNames[p] || p).join('/')
+                        : 'Tax Credit';
+                      return `✓ ${selectedPrograms} Eligible`;
+                    })()
+                  : '⚠ Not Eligible'}
               </div>
             )}
           </div>

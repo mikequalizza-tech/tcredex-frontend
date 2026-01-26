@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { requireAuth, handleAuthError } from '@/lib/api/auth-middleware';
 
 // GET - Fetch organization by ID
 export async function GET(request: NextRequest) {
-  const supabase = getSupabaseAdmin();
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ error: 'Organization ID required' }, { status: 400 });
-  }
-
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Organization ID required' }, { status: 400 });
+    }
+
+    // CRITICAL: Users can only access their own organization (unless admin)
+    if (id !== user.organizationId && user.organizationType !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
     const { data, error } = await (supabase as any)
       .from('organizations')
       .select('*')
@@ -25,16 +33,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ organization: data });
   } catch (error) {
-    console.error('[Organization] Error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return handleAuthError(error);
   }
 }
 
 // PUT - Update organization
 export async function PUT(request: NextRequest) {
-  const supabase = getSupabaseAdmin();
-
   try {
+    // CRITICAL: Require authentication
+    const user = await requireAuth(request);
+    const supabase = getSupabaseAdmin();
+
     const body = await request.json();
     const {
       id,
@@ -53,6 +62,11 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'Organization ID required' }, { status: 400 });
+    }
+
+    // CRITICAL: Users can only update their own organization (unless admin)
+    if (id !== user.organizationId && user.organizationType !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Build update object with only provided fields
@@ -86,7 +100,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ organization: data, success: true });
   } catch (error) {
-    console.error('[Organization] Error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return handleAuthError(error);
   }
 }

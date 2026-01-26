@@ -10,6 +10,8 @@
 
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { findMatches } from '@/lib/automatch/engine';
+import { calculateDealScore, DealScore } from '@/lib/scoring/sectionC';
+import { ScoringInput, ProjectSector, SiteControlStatus } from '@/types/scoring';
 
 const supabase = getSupabaseAdmin();
 
@@ -52,96 +54,86 @@ export interface TractData {
 }
 
 // =============================================================================
-// SECTION C SCORING (Simplified - uses tract data from deal)
+// TRANSFORM DEAL DATA TO SCORING INPUT
 // =============================================================================
 
-function calculateSectionCScore(deal: Record<string, any>): {
-  totalScore: number;
-  tier: 'TIER_1_GREENLIGHT' | 'TIER_2_WATCHLIST' | 'TIER_3_DEFER';
-  breakdown: {
-    distress: number;
-    impact: number;
-    readiness: number;
-    missionFit: number;
-  };
-} {
-  // Extract tract data from deal
-  const povertyRate = deal.tract_poverty_rate || 0;
-  const severelyDistressed = deal.tract_severely_distressed || false;
+function transformDealToScoringInput(deal: Record<string, any>): ScoringInput {
+  // Map project type to sector
+  const projectType = (deal.project_type || '').toLowerCase();
+  let sector: ProjectSector = 'other';
+  if (projectType.includes('health') || projectType.includes('medical')) sector = 'healthcare';
+  else if (projectType.includes('education') || projectType.includes('school')) sector = 'education';
+  else if (projectType.includes('childcare') || projectType.includes('daycare')) sector = 'childcare';
+  else if (projectType.includes('grocery') || projectType.includes('food')) sector = 'food_access';
+  else if (projectType.includes('community') || projectType.includes('facility')) sector = 'community_facility';
+  else if (projectType.includes('manufacturing')) sector = 'manufacturing';
+  else if (projectType.includes('mixed')) sector = 'mixed_use';
+  else if (projectType.includes('housing') || projectType.includes('residential')) sector = 'housing';
+  else if (projectType.includes('retail')) sector = 'retail';
+  else if (projectType.includes('hotel') || projectType.includes('hospitality')) sector = 'hospitality';
+  else if (projectType.includes('office')) sector = 'office';
 
-  // PILLAR 1: Economic Distress (0-40 points)
-  let distress = 0;
-  if (povertyRate >= 40) distress += 10;
-  else if (povertyRate >= 30) distress += 8;
-  else if (povertyRate >= 20) distress += 6;
-  else if (povertyRate >= 15) distress += 4;
+  // Map site control
+  const siteControlStr = (deal.site_control || '').toLowerCase();
+  let siteControl: SiteControlStatus = 'none';
+  if (siteControlStr.includes('owned') || siteControlStr === 'owned') siteControl = 'owned';
+  else if (siteControlStr.includes('contract') || siteControlStr === 'under contract') siteControl = 'under_contract';
+  else if (siteControlStr.includes('option') || siteControlStr.includes('loi')) siteControl = 'option_loi';
+  else if (siteControlStr.includes('identified') || siteControlStr.includes('selected')) siteControl = 'identified';
 
-  if (severelyDistressed) distress += 15;
-  if (deal.tract_eligible) distress += 10;
-  // Non-metro bonus
-  if (deal.tract_non_metro) distress += 5;
-  distress = Math.min(distress, 40);
+  // Calculate leverage ratio
+  const nmtcRequest = Number(deal.nmtc_financing_requested) || Number(deal.fed_nmtc_allocation_request) || 0;
+  const totalCost = Number(deal.total_project_cost) || 0;
+  const leverageRatio = nmtcRequest > 0 ? (totalCost - nmtcRequest) / nmtcRequest : 0;
 
-  // PILLAR 2: Impact Potential (0-35 points)
-  let impact = 0;
-  const jobs = deal.jobs_created || deal.permanent_jobs_fte || 0;
-  if (jobs >= 100) impact += 15;
-  else if (jobs >= 50) impact += 12;
-  else if (jobs >= 25) impact += 8;
-  else if (jobs >= 10) impact += 5;
-
-  // Community benefit
-  if (deal.community_benefit && deal.community_benefit.length > 100) impact += 10;
-  else if (deal.community_benefit) impact += 5;
-
-  // Essential services (healthcare, education, food access)
-  const essentialSectors = ['healthcare', 'education', 'grocery', 'community_facility'];
-  if (essentialSectors.some(s => deal.project_type?.toLowerCase().includes(s))) {
-    impact += 10;
-  }
-  impact = Math.min(impact, 35);
-
-  // PILLAR 3: Project Readiness (0-15 points)
-  let readiness = 0;
-  if (deal.site_control === 'Owned' || deal.site_control === 'Under Contract') readiness += 5;
-  else if (deal.site_control === 'Option') readiness += 3;
-
-  if (deal.phase_i_environmental === 'Complete') readiness += 4;
-  else if (deal.phase_i_environmental === 'In Progress') readiness += 2;
-
-  if (deal.zoning_approval === 'Approved') readiness += 3;
-  else if (deal.zoning_approval === 'In Progress') readiness += 2;
-
-  if (deal.construction_start_date) readiness += 3;
-  readiness = Math.min(readiness, 15);
-
-  // PILLAR 4: Mission Fit (0-10 points)
-  // This would normally compare to CDE preferences, but we'll use generic scoring
-  let missionFit = 5; // Base score
-  if (deal.affordable_housing_units > 0) missionFit += 3;
-  if (deal.permanent_jobs_fte > 25) missionFit += 2;
-  missionFit = Math.min(missionFit, 10);
-
-  const totalScore = distress + impact + readiness + missionFit;
-
-  // Determine tier
-  let tier: 'TIER_1_GREENLIGHT' | 'TIER_2_WATCHLIST' | 'TIER_3_DEFER';
-  if (distress >= 28 && impact >= 23) {
-    tier = 'TIER_1_GREENLIGHT';
-  } else if (totalScore >= 60) {
-    tier = 'TIER_2_WATCHLIST';
-  } else {
-    tier = 'TIER_3_DEFER';
-  }
+  // Determine catalytic potential
+  const jobs = Number(deal.jobs_created) || Number(deal.permanent_jobs_fte) || 0;
+  const catalyticPotential: 'high' | 'medium' | 'low' = 
+    jobs >= 50 ? 'high' : jobs >= 25 ? 'medium' : 'low';
 
   return {
-    totalScore,
-    tier,
-    breakdown: {
-      distress,
-      impact,
-      readiness,
-      missionFit,
+    deal_id: deal.id,
+    tract: {
+      geoid: deal.census_tract || '',
+      poverty_rate: Number(deal.tract_poverty_rate) || Number(deal.poverty_rate) || 0,
+      median_family_income: Number(deal.tract_median_income) || Number(deal.median_income) || 50000,
+      unemployment_rate: Number(deal.tract_unemployment) || Number(deal.unemployment_rate) || 0,
+      state_mfi: Number(deal.state_mfi) || 50000,
+      is_lic_eligible: deal.tract_eligible || false,
+      is_severely_distressed: deal.tract_severely_distressed || false,
+      is_qct: deal.tract_eligible || false,
+      is_opportunity_zone: deal.opportunity_zone || false,
+      is_persistent_poverty_county: deal.is_persistent_poverty_county || false,
+      is_non_metro: deal.is_non_metro || deal.tract_non_metro || false,
+      is_high_migration: deal.is_high_migration || false,
+      is_tribal_area: deal.is_tribal_area || false,
+      is_rcap: deal.is_rcap || false,
+      is_acp: deal.is_acp || false,
+      is_high_opportunity_area: deal.is_high_opportunity_area || false,
+    },
+    project: {
+      sector,
+      state: deal.state || '',
+      county: deal.county || undefined,
+      total_project_cost: totalCost,
+      nmtc_request: nmtcRequest,
+      permanent_jobs: Number(deal.permanent_jobs_fte) || Number(deal.jobs_created) || 0,
+      construction_jobs: Number(deal.construction_jobs_fte) || undefined,
+      serves_lmi_directly: deal.serves_lmi_directly || deal.affordable_housing_units > 0 || false,
+      employs_lmi_residents: deal.employs_lmi_residents || false,
+      has_local_support: deal.has_local_support || deal.community_benefit ? true : false,
+      leverage_ratio: leverageRatio,
+      catalytic_potential: catalyticPotential,
+    },
+    readiness: {
+      site_control: siteControl,
+      has_pro_forma: !!deal.pro_forma || !!deal.has_pro_forma,
+      pro_forma_complete: deal.pro_forma_complete || false,
+      has_appraisal: deal.has_appraisal || deal.appraisal_complete || false,
+      has_phase_i: deal.phase_i_environmental === 'Complete' || deal.has_phase_i || false,
+      has_market_study: deal.has_market_study || deal.market_study_complete || false,
+      committed_sources_pct: Number(deal.committed_sources_pct) || Number(deal.committed_capital_pct) || 0,
+      timeline_feasible: !!deal.projected_completion_date || !!deal.projected_closing_date || false,
     },
   };
 }
@@ -170,36 +162,53 @@ export async function processPostSubmission(dealId: string): Promise<PostSubmiss
       throw new Error('Deal not found');
     }
 
-    // 2. Calculate Section C Score
+    // 2. Calculate Section C Score using the full 4-pillar engine
     try {
-      const scoring = calculateSectionCScore(deal);
+      // Transform deal data to ScoringInput format
+      const scoringInput = transformDealToScoringInput(deal);
+      
+      // Calculate score using the proper Section C engine
+      const score: DealScore = calculateDealScore(scoringInput);
 
       // Save to deal_scores table
       await supabase.from('deal_scores').upsert({
         deal_id: dealId,
-        total_score: scoring.totalScore,
-        distress_score: scoring.breakdown.distress,
-        impact_score: scoring.breakdown.impact,
-        readiness_score: scoring.breakdown.readiness,
-        mission_fit_score: scoring.breakdown.missionFit,
-        tier: scoring.tier,
-        model_version: '1.0.0',
-        calculated_at: new Date().toISOString(),
+        total_score: score.total_score,
+        tier: score.tier,
+        distress_total: score.distress.total,
+        distress_breakdown: score.distress.breakdown,
+        distress_percentile: score.distress.percentile,
+        impact_total: score.impact.total,
+        impact_breakdown: score.impact.breakdown,
+        impact_percentile: score.impact.percentile,
+        readiness_total: score.readiness.total,
+        readiness_breakdown: score.readiness.breakdown,
+        readiness_percentile: score.readiness.percentile,
+        mission_fit_total: score.mission_fit.total,
+        mission_fit_breakdown: score.mission_fit.breakdown,
+        mission_fit_cde_id: score.mission_fit.cde_id,
+        eligibility_flags: score.eligibility_flags,
+        reason_codes: score.reason_codes,
+        score_explanation: score.score_explanation,
+        model_version: score.model_version,
+        input_snapshot: score.input_snapshot,
+        computed_at: score.computed_at,
+        updated_at: new Date().toISOString(),
       } as never, { onConflict: 'deal_id' });
 
-      // Update deal with scoring tier
+      // Update deal with scoring tier and total score
       await supabase
         .from('deals')
         .update({
-          scoring_tier: scoring.tier,
-          section_c_score: scoring.totalScore,
+          scoring_tier: score.tier,
+          section_c_score: score.total_score,
         } as never)
         .eq('id', dealId);
 
       result.scoring = {
         success: true,
-        totalScore: scoring.totalScore,
-        tier: scoring.tier,
+        totalScore: score.total_score,
+        tier: score.tier,
       };
 
       // Log to ledger
@@ -209,7 +218,15 @@ export async function processPostSubmission(dealId: string): Promise<PostSubmiss
         entity_type: 'deal',
         entity_id: dealId,
         action: 'scoring_calculated',
-        payload_json: scoring,
+        payload_json: {
+          total_score: score.total_score,
+          tier: score.tier,
+          distress: score.distress.total,
+          impact: score.impact.total,
+          readiness: score.readiness.total,
+          mission_fit: score.mission_fit.total,
+          model_version: score.model_version,
+        },
         hash: Date.now().toString(16),
       } as never);
 

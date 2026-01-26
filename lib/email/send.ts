@@ -12,9 +12,8 @@
 import * as templates from './templates';
 
 // Email provider configuration
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+// Note: These are read at runtime in API routes, not at module load time
 const FROM_EMAIL = process.env.EMAIL_FROM || 'tCredex <noreply@tcredex.com>';
-const IS_DEV = process.env.NODE_ENV === 'development';
 
 interface SendEmailParams {
   to: string | string[];
@@ -30,31 +29,37 @@ interface SendEmailParams {
 async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; id?: string; error?: string }> {
   const { to, subject, html, text, replyTo } = params;
   
-  // In development, just log the email
-  if (IS_DEV && !RESEND_API_KEY) {
-    console.log('\n📧 [EMAIL - DEV MODE]');
-    console.log('To:', to);
+  // Check if RESEND_API_KEY is configured
+  const apiKey = process.env.RESEND_API_KEY;
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  // In development without API key, just log the email
+  if (isDev && !apiKey) {
+    console.log('\n📧 [EMAIL - DEV MODE - NO API KEY]');
+    console.log('To:', Array.isArray(to) ? to.join(', ') : to);
     console.log('Subject:', subject);
+    console.log('From:', FROM_EMAIL);
     console.log('---');
     console.log(text || 'HTML email - check templates');
     console.log('---\n');
     return { success: true, id: 'dev-' + Date.now() };
   }
 
-  if (!RESEND_API_KEY) {
-    console.error('RESEND_API_KEY not configured');
-    return { success: false, error: 'Email service not configured' };
+  if (!apiKey) {
+    console.error('[Email] RESEND_API_KEY not configured in environment variables');
+    return { success: false, error: 'Email service not configured - RESEND_API_KEY missing' };
   }
 
   try {
-    console.log(`[Email] Sending to: ${Array.isArray(to) ? to.join(', ') : to}`);
+    console.log(`\n[Email] 📧 Sending email...`);
+    console.log(`[Email] To: ${Array.isArray(to) ? to.join(', ') : to}`);
     console.log(`[Email] Subject: ${subject}`);
     console.log(`[Email] From: ${FROM_EMAIL}`);
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -70,20 +75,21 @@ async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; i
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('[Email] Send failed:', {
+      console.error('[Email] ❌ Send failed:', {
         status: response.status,
         statusText: response.statusText,
         error: data,
-        to,
+        to: Array.isArray(to) ? to.join(', ') : to,
         subject
       });
-      return { success: false, error: data.message || 'Failed to send email' };
+      return { success: false, error: data.message || data.error || 'Failed to send email' };
     }
 
-    console.log(`[Email] Sent successfully! ID: ${data.id}`);
+    console.log(`[Email] ✅ Sent successfully! ID: ${data.id}`);
+    console.log(`[Email] Response:`, JSON.stringify(data, null, 2));
     return { success: true, id: data.id };
   } catch (error) {
-    console.error('[Email] Send exception:', error);
+    console.error('[Email] ❌ Send exception:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

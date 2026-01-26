@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     type UserRecord = {
       id: string;
       organization_id: string | null;
-      organization_type: string | null;
+      role_type: string | null;
       name: string | null;
       role: string | null;
     };
@@ -41,13 +41,13 @@ export async function GET(request: NextRequest) {
 
     // Get organization details if user has org
     let organization = null;
-    if (typedUser?.organization_id && typedUser?.organization_type) {
-      const tableName = typedUser.organization_type === 'sponsor' ? 'sponsors'
-        : typedUser.organization_type === 'investor' ? 'investors'
-        : 'cdes_merged';
+    if (typedUser?.organization_id && typedUser?.role_type) {
+      const tableName = typedUser.role_type === 'sponsor' ? 'sponsors'
+        : typedUser.role_type === 'investor' ? 'investors'
+        : 'cdes';
       const { data: org, error: orgError } = await supabase
         .from(tableName)
-        .select('name, slug')
+        .select('primary_contact_name')
         .eq('organization_id', typedUser.organization_id)
         .single();
 
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         hasProfile: !!user,
         hasOrgId: !!typedUser?.organization_id,
         orgId: typedUser?.organization_id,
-        orgType: typedUser?.organization_type
+        orgType: typedUser?.role_type
       }
     })
   } catch (error) {

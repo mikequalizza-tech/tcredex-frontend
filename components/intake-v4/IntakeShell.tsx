@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import { ProgressRail } from './ProgressRail';
 import { SectionRenderer } from './SectionRenderer';
 import { ReadinessMeter } from './ReadinessMeter';
+import InternalFooter from '@/components/layout/InternalFooter';
 
 export type { 
   ProgramType, 
@@ -27,14 +29,25 @@ interface IntakeShellProps {
 }
 
 export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMode, lockedProjectName }: IntakeShellProps) {
-  const [data, setData] = useState<IntakeData>(() => ({
-    programs: [],
-    documents: [],
-    projectImages: [],
-    financingSources: [],
-    projectTeam: [],
-    ...initialData,
-  }));
+  // Initialize data with initialData if provided, otherwise use defaults
+  const [data, setData] = useState<IntakeData>(() => {
+    const baseData: IntakeData = {
+      programs: [],
+      documents: [],
+      projectImages: [],
+      financingSources: [],
+      projectTeam: [],
+    };
+    
+    if (initialData && typeof initialData === 'object' && Object.keys(initialData).length > 0) {
+      return {
+        ...baseData,
+        ...initialData,
+      };
+    }
+    
+    return baseData;
+  });
   
   const [programs, setPrograms] = useState<ProgramType[]>(initialData?.programs || []);
   const [activeSection, setActiveSection] = useState('basics');
@@ -43,17 +56,42 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMo
   const [readinessScore, setReadinessScore] = useState(0);
   const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [agreementChecked, setAgreementChecked] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Sync initialData when it arrives (for draft loading)
   useEffect(() => {
     if (initialData && Object.keys(initialData).length > 0) {
-      setData(prev => ({
-        ...prev,
-        ...initialData,
-      }));
-      if (initialData.programs) {
+      console.log('[IntakeShell] Loading initialData:', {
+        hasData: !!initialData,
+        keys: Object.keys(initialData),
+        programs: initialData.programs,
+      });
+      
+      // Merge initialData into current data, preserving defaults
+      setData(prev => {
+        const merged = {
+          programs: [],
+          documents: [],
+          projectImages: [],
+          financingSources: [],
+          projectTeam: [],
+          ...prev,
+          ...initialData,
+        };
+        console.log('[IntakeShell] Merged data:', {
+          projectName: merged.projectName,
+          programs: merged.programs,
+          city: merged.city,
+          state: merged.state,
+        });
+        return merged;
+      });
+      
+      if (initialData.programs && Array.isArray(initialData.programs)) {
         setPrograms(initialData.programs);
       }
+    } else {
+      console.log('[IntakeShell] No initialData or empty:', initialData);
     }
   }, [initialData]);
 
@@ -99,11 +137,17 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMo
     if (!onSave) return;
     
     setIsSaving(true);
+    setSaveMessage(null);
     try {
       await onSave(data, readinessScore);
       setHasChanges(false);
+      setSaveMessage({ type: 'success', text: 'Draft saved successfully' });
+      setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       console.error('Save failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save draft. Please try again.';
+      setSaveMessage({ type: 'error', text: errorMessage });
+      setTimeout(() => setSaveMessage(null), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -160,11 +204,20 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMo
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-gray-950 flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur border-b border-gray-800">
         <div className="max-w-[1800px] mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
+            <Link 
+              href="/dashboard" 
+              className="text-gray-400 hover:text-white transition-colors"
+              title="Back to Dashboard"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </Link>
             <h1 className="text-xl font-bold text-gray-100">
               {data.projectName || 'New Project Intake'}
             </h1>
@@ -210,6 +263,30 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMo
         </div>
       </header>
 
+      {/* Save Toast Notification */}
+      {saveMessage && (
+        <div className="fixed top-20 right-4 z-50 animate-in slide-in-from-top-2">
+          <div className={`px-4 py-3 rounded-lg shadow-lg border ${
+            saveMessage.type === 'success'
+              ? 'bg-emerald-900/90 border-emerald-700 text-emerald-100'
+              : 'bg-red-900/90 border-red-700 text-red-100'
+          }`}>
+            <div className="flex items-center gap-2">
+              {saveMessage.type === 'success' ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              <span className="text-sm font-medium">{saveMessage.text}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content - 3 Column Layout */}
       <main className="max-w-[1800px] mx-auto px-4 py-6">
         <div className="grid grid-cols-12 gap-6">
@@ -244,6 +321,9 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMo
           </aside>
         </div>
       </main>
+
+      {/* Footer */}
+      <InternalFooter />
 
       {/* Bottom Action Bar (Mobile) */}
       <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 p-4 lg:hidden">
@@ -290,7 +370,7 @@ export function IntakeShell({ initialData, onSave, onSubmit, projectId, isEditMo
 
               <div className="space-y-4 text-sm text-gray-300">
                 <p>
-                  By submitting this project to the tCredex marketplace, you ("Sponsor") agree to the following terms:
+                  By submitting this project to tCredex, you ("Sponsor") agree to the following terms:
                 </p>
 
                 <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">

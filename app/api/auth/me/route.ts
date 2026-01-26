@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         role,
         organization_id,
         role_type,
+        organization_name,
         avatar_url,
         title,
         phone,
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
         name: userRecord.name,
         role: userRecord.role,
         organizationId: userRecord.organization_id,
+        organizationName: userRecord.organization_name,
         roleType: userRecord.role_type,
         avatar: userRecord.avatar_url,
         title: userRecord.title,
@@ -88,6 +90,7 @@ async function buildUserResponse(
     role: string;
     organization_id: string | null;
     role_type: string | null;
+    organization_name?: string | null;
     avatar_url?: string;
     title?: string;
     phone?: string;
@@ -115,35 +118,36 @@ async function buildUserResponse(
 
     const { data: orgData } = await supabase
       .from(roleTable)
-      .select('id, primary_contact_name, primary_contact_email')
-      .eq('id', userRecord.organization_id)
+      .select('organization_id, primary_contact_name, primary_contact_email')
+      .eq('organization_id', userRecord.organization_id)
       .single();
 
     if (orgData) {
       organization = {
-        id: orgData.id,
+        id: orgData.organization_id,
         name: orgData.primary_contact_name || 'Organization',
         type: userRecord.role_type,
       };
     }
   }
 
-  return NextResponse.json({
-    user: {
-      id: userRecord.id,
-      email: userRecord.email,
-      name: userRecord.name,
-      role: userRecord.role,
-      roleType: userRecord.role_type,
-      organizationId: userRecord.organization_id,
-      organization,
-      avatar: userRecord.avatar_url,
-      title: userRecord.title,
-      phone: userRecord.phone,
-      isActive: userRecord.is_active,
-      emailVerified: userRecord.email_verified,
-      lastLoginAt: userRecord.last_login_at,
-      createdAt: userRecord.created_at,
-    },
-  });
+    return NextResponse.json({
+      user: {
+        id: userRecord.id,
+        email: userRecord.email,
+        name: userRecord.name,
+        role: userRecord.role,
+        roleType: userRecord.role_type,
+        organizationId: userRecord.organization_id,
+        organizationName: userRecord.organization_name || organization?.name || null,
+        organization,
+        avatar: userRecord.avatar_url,
+        title: userRecord.title,
+        phone: userRecord.phone,
+        isActive: userRecord.is_active,
+        emailVerified: userRecord.email_verified,
+        lastLoginAt: userRecord.last_login_at,
+        createdAt: userRecord.created_at,
+      },
+    });
 }

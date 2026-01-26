@@ -128,7 +128,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: 'home', visibleTo: ['sponsor', 'cde', 'investor'], requiresAuth: true },
-  { id: 'marketplace', label: 'Marketplace', href: '/deals', icon: 'shopping-cart', visibleTo: ['sponsor', 'cde', 'investor'], requiresAuth: false },
+  { id: 'marketplace', label: 'Deals', href: '/deals', icon: 'shopping-cart', visibleTo: ['sponsor', 'cde', 'investor'], requiresAuth: false },
   { id: 'pipeline', label: 'Pipeline', href: '/dashboard/pipeline', icon: 'funnel', visibleTo: ['sponsor', 'cde', 'investor'], requiresAuth: true },
   { id: 'map', label: 'Map', href: '/map', icon: 'map', visibleTo: ['sponsor', 'cde', 'investor'], requiresAuth: false },
   { id: 'deals', label: 'My Deals', href: '/dashboard/deals', icon: 'document', visibleTo: ['sponsor'], requiresAuth: true },

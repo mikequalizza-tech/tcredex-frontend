@@ -1,6 +1,7 @@
 'use client';
 
 import { IntakeData } from '../IntakeShell';
+import { ProgramType } from '@/types/intake';
 
 interface ProjectCostsProps {
   data: IntakeData;
@@ -138,11 +139,23 @@ export function ProjectCosts({ data, onChange }: ProjectCostsProps) {
         </div>
       </div>
 
-      {/* Requested Allocation - Only for NMTC deals */}
-      {data.programs?.includes('NMTC') && (
+      {/* Requested Allocation - Show for applicable programs */}
+      {data.programs && data.programs.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">
-            Requested NMTC Allocation
+            {(() => {
+              const programNames: Record<ProgramType, string> = {
+                'NMTC': 'Requested NMTC Allocation',
+                'HTC': 'Requested HTC Credit Amount',
+                'LIHTC': 'Requested LIHTC Allocation',
+                'OZ': 'OZ Investment Amount',
+                'Brownfield': 'Brownfield Credit Amount'
+              };
+              if (data.programs.length === 1) {
+                return programNames[data.programs[0]] || 'Requested Allocation';
+              }
+              return 'Requested Tax Credit Allocation';
+            })()}
           </label>
           <div className="relative">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>

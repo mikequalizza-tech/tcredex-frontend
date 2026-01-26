@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userMessage = messages[messages.length - 1]?.content || '';
-    const openaiKey = process.env.OPENAI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY?.trim();
 
     // If no API key, use fallback responses
     if (!openaiKey) {

@@ -1,6 +1,6 @@
 ---
 title: "tCredex System Overview"
-updatedAt: "2025-01-19"
+updatedAt: "2026-01-26"
 summary: "A complete site map and explanation of how all parts of tCredex work together."
 ---
 
@@ -37,74 +37,293 @@ tCredex is built around three core systems that work together:
 
 ### Public Pages (No Login Required)
 
+#### Marketing & Information
 | Page | URL | Purpose |
 |------|-----|---------|
 | Home | `/` | Landing page, platform overview |
 | About | `/about` | Company and mission |
-| Blog | `/blog` | Tax credit industry articles |
-| Help Center | `/help` | Documentation and guides |
-| Contact | `/contact` | Support and inquiries |
-| Sign Up | `/signup` | Create new account |
+| Features | `/features` | Platform features |
+| How It Works | `/how-it-works` | Platform explanation |
+| Who We Serve | `/who-we-serve` | Target audience |
+| Founders | `/founders` | Founders page |
+| Pricing | `/pricing` | Pricing information |
+| FAQ | `/faq` | Frequently asked questions |
+| Terms | `/terms` | Terms of service |
+| Privacy | `/privacy` | Privacy policy |
+
+#### Authentication
+| Page | URL | Purpose |
+|------|-----|---------|
 | Sign In | `/signin` | Login for existing users |
+| Sign Up | `/signup` | Create new account |
+| Sign Up Success | `/signup/success` | Account creation success page |
+| Reset Password | `/reset-password` | Password reset |
+| Onboarding | `/onboarding` | Onboarding flow |
+
+#### Content
+| Page | URL | Purpose |
+|------|-----|---------|
+| Blog | `/blog` | Tax credit industry articles |
+| Blog Post | `/blog/[slug]` | Individual blog post |
+| Help Center | `/help` | Documentation and guides |
+| Help Article | `/help/[slug]` | Individual help article |
+| Contact | `/contact` | Support and inquiries |
+| Contact AIV | `/contact-aiv` | Contact AIV team |
+| Support | `/support` | Support page |
+| Support Request | `/support/request` | Submit support request |
+| Newsletter | `/newsletter` | Newsletter signup |
+
+#### Programs
+| Page | URL | Purpose |
+|------|-----|---------|
+| Programs | `/programs` | Program overview |
+| NMTC | `/programs/nmtc` | NMTC program details |
+| HTC | `/programs/htc` | HTC program details |
+| LIHTC | `/programs/lihtc` | LIHTC program details |
+| Opportunity Zones | `/programs/oz` | Opportunity Zones details |
+| Brownfield | `/programs/brownfield` | Brownfield program details |
+
+#### Utilities
+| Page | URL | Purpose |
+|------|-----|---------|
+| Matching | `/matching` | Matching engine overview |
+| AutoMatch | `/automatch` | AutoMatch AI overview |
+| Tract Map | `/tract-map` | Tract mapping tool |
+| Ledger Integrity | `/ledger-integrity` | Ledger verification tool |
+| Role Test | `/role-test` | Role testing page |
 
 ### Map & Research (Browse Without Login)
 
 | Page | URL | Purpose |
 |------|-----|---------|
 | Map | `/map` | Interactive eligibility map |
-| Marketplace | `/marketplace` | Browse public DealCards |
-| CDE Directory | `/cdes` | Browse CDEs with allocation |
-| Investor Directory | `/investors` | Browse active investors |
+| Marketplace | `/deals` | Browse deals, CDEs, and investors (role-based view) |
+| Deal Detail | `/deals/[id]` | View deal details |
+| Deal Card Preview | `/deals/[id]/card` | Preview DealCard |
+| Deal Profile | `/deals/[id]/profile` | Full deal profile view |
+| CDE Directory | `/cde` | Browse CDEs with allocation |
+| CDE Profile | `/cde/[slug]` | Public CDE profile page |
+| Investor Directory | `/investor` | Browse active investors |
+| Investor Profile | `/investor/[slug]` | Public investor profile page |
 
 ### Sponsor Pages (Requires Sponsor Login)
 
+#### Dashboard & Management
 | Page | URL | Purpose |
 |------|-----|---------|
-| Dashboard | `/dashboard` | Sponsor home base |
-| Intake Form | `/intake` | Submit new project |
-| My Projects | `/projects` | Manage all projects |
-| Project Detail | `/projects/[id]` | Single project view |
-| DealCard Preview | `/deals/[id]/card` | Preview DealCard |
-| Matches | `/matches` | View CDE/Investor matches |
-| Closing Room | `/closing/[id]` | Deal workspace |
-| Settings | `/settings` | Account and team |
+| Dashboard | `/dashboard` | Sponsor home base with stats and interest data |
+| Pipeline | `/dashboard/pipeline` | View all deals in various stages |
+| Organization Info | `/dashboard/organization` | Manage organization profile and preferences |
+| Team | `/dashboard/team` | Team member management |
+| Settings | `/dashboard/settings` | Account settings |
+| Notifications | `/dashboard/notifications` | Notifications center |
+
+#### Projects
+| Page | URL | Purpose |
+|------|-----|---------|
+| Projects | `/dashboard/projects` | Projects listing |
+| New Project | `/dashboard/projects/new` | Create new project |
+| Project Detail | `/dashboard/projects/[id]` | Project detail |
+| Project Timeline | `/dashboard/projects/[id]/timeline` | Project timeline |
+| Project Matches | `/dashboard/projects/[id]/matches` | View CDE/Investor matches |
+| Project Documents | `/dashboard/projects/[id]/documents` | Project documents |
+
+#### Deal Submission
+| Page | URL | Purpose |
+|------|-----|---------|
+| Intake Form | `/intake` | Submit new project (also accessible via `/deals/new`) |
+| New Deal | `/deals/new` | New deal creation (redirects to intake) |
+
+#### Marketplace & Deals
+| Page | URL | Purpose |
+|------|-----|---------|
+| Marketplace | `/deals` | Browse CDEs and investors |
+| Deal Detail | `/deals/[id]` | View deal details |
+| Deal Edit | `/deals/[id]/edit` | Edit deal information (own deals only) |
+| Deal Card Preview | `/deals/[id]/card` | Preview DealCard |
+| Deal Profile | `/deals/[id]/profile` | Full deal profile view |
+| Deal Room Channel | `/deals/[id]/room/[channelId]` | Deal room channel |
+
+#### Documents
+| Page | URL | Purpose |
+|------|-----|---------|
+| Documents | `/dashboard/documents` | Document management |
+| New Document | `/dashboard/documents/new` | Create new document |
+| Upload Document | `/dashboard/documents/upload` | Upload document |
+| Document Detail | `/dashboard/documents/[id]` | View document |
+| Shared Documents | `/dashboard/documents/shared` | Shared documents |
+
+#### Closing Room
+| Page | URL | Purpose |
+|------|-----|---------|
+| Closing Room | `/closing-room` | Closing room workspace |
+| Closing Room Detail | `/closing-room/[id]` | Specific deal closing room |
+
+#### Messaging
+| Page | URL | Purpose |
+|------|-----|---------|
+| Messages | `/messages` | Messaging center |
 
 ### CDE Pages (Requires CDE Login)
 
+#### Dashboard & Management
 | Page | URL | Purpose |
 |------|-----|---------|
 | Dashboard | `/dashboard` | CDE home base |
-| Pipeline | `/pipeline` | Projects in evaluation |
-| Allocation | `/allocation` | Track allocation balance |
-| Browse Projects | `/marketplace` | Find new projects |
-| Project Detail | `/deals/[id]` | Evaluate DealCard |
-| Issue LOI | `/loi/[id]` | Create LOI for project |
-| Closing Room | `/closing/[id]` | Deal workspace |
-| Settings | `/settings` | Profile and preferences |
+| Pipeline | `/dashboard/pipeline` | Projects in evaluation (role-filtered) |
+| Allocations | `/dashboard/allocations` | Track allocation balance |
+| Organization Info | `/dashboard/organization` | Manage CDE profile and matching criteria |
+| AutoMatch AI | `/dashboard/automatch` | AI-powered deal matching |
+| Team | `/dashboard/team` | Team member management |
+| Settings | `/dashboard/settings` | Account settings |
+| Notifications | `/dashboard/notifications` | Notifications center |
+
+#### Profile
+| Page | URL | Purpose |
+|------|-----|---------|
+| CDE Profile | `/cde/[slug]` | Public CDE profile page |
+| CDE Profile Edit | `/cde/profile/edit` | Edit CDE profile |
+
+#### Marketplace & Deals
+| Page | URL | Purpose |
+|------|-----|---------|
+| Marketplace | `/deals` | Browse available projects/deals |
+| Deal Detail | `/deals/[id]` | Evaluate DealCard |
+| Deal Profile | `/deals/[id]/profile` | Full deal profile view |
+| Deal Room Channel | `/deals/[id]/room/[channelId]` | Deal room channel |
+
+#### Documents
+| Page | URL | Purpose |
+|------|-----|---------|
+| Documents | `/dashboard/documents` | Document management |
+| New Document | `/dashboard/documents/new` | Create new document |
+| Upload Document | `/dashboard/documents/upload` | Upload document |
+| Document Detail | `/dashboard/documents/[id]` | View document |
+| Shared Documents | `/dashboard/documents/shared` | Shared documents |
+
+#### Closing Room
+| Page | URL | Purpose |
+|------|-----|---------|
+| Closing Room | `/closing-room` | Closing room workspace |
+| Closing Room Detail | `/closing-room/[id]` | Specific deal closing room |
+
+#### Messaging
+| Page | URL | Purpose |
+|------|-----|---------|
+| Messages | `/messages` | Messaging center |
 
 ### Investor Pages (Requires Investor Login)
 
+#### Dashboard & Management
 | Page | URL | Purpose |
 |------|-----|---------|
 | Dashboard | `/dashboard` | Investor home base |
-| Pipeline | `/pipeline` | Deals in evaluation |
-| Portfolio | `/portfolio` | Closed investments |
-| Browse Deals | `/marketplace` | Find opportunities |
+| Pipeline | `/dashboard/pipeline` | Deals in evaluation (role-filtered) |
+| Portfolio | `/dashboard/portfolio` | Closed investments |
+| Organization Info | `/dashboard/organization` | Manage investor profile and investment criteria |
+| AutoMatch AI | `/dashboard/automatch` | AI-powered deal matching |
+| Team | `/dashboard/team` | Team member management |
+| Settings | `/dashboard/settings` | Account settings |
+| Notifications | `/dashboard/notifications` | Notifications center |
+
+#### Profile
+| Page | URL | Purpose |
+|------|-----|---------|
+| Investor Profile | `/investor/[slug]` | Public investor profile page |
+
+#### Marketplace & Deals
+| Page | URL | Purpose |
+|------|-----|---------|
+| Marketplace | `/deals` | Browse available opportunities |
 | Deal Detail | `/deals/[id]` | Evaluate opportunity |
-| Issue Commitment | `/commitment/[id]` | Create commitment |
-| Closing Room | `/closing/[id]` | Deal workspace |
-| Settings | `/settings` | Criteria and preferences |
+| Deal Profile | `/deals/[id]/profile` | Full deal profile view |
+| Deal Room Channel | `/deals/[id]/room/[channelId]` | Deal room channel |
+
+#### Documents
+| Page | URL | Purpose |
+|------|-----|---------|
+| Documents | `/dashboard/documents` | Document management |
+| New Document | `/dashboard/documents/new` | Create new document |
+| Upload Document | `/dashboard/documents/upload` | Upload document |
+| Document Detail | `/dashboard/documents/[id]` | View document |
+| Shared Documents | `/dashboard/documents/shared` | Shared documents |
+
+#### Closing Room
+| Page | URL | Purpose |
+|------|-----|---------|
+| Closing Room | `/closing-room` | Closing room workspace |
+| Closing Room Detail | `/closing-room/[id]` | Specific deal closing room |
+
+#### Messaging
+| Page | URL | Purpose |
+|------|-----|---------|
+| Messages | `/messages` | Messaging center |
 
 ### Admin Pages (Platform Admins Only)
 
 | Page | URL | Purpose |
 |------|-----|---------|
 | Admin Dashboard | `/admin` | Platform overview |
-| Organizations | `/admin/organizations` | Manage orgs |
-| Users | `/admin/users` | Manage users |
-| Deals | `/admin/deals` | All deals |
-| CDEs | `/admin/cdes` | CDE management |
-| Analytics | `/admin/analytics` | Platform metrics |
+| Admin Users | `/admin/users` | User management |
+| Admin Deals | `/admin/deals` | All deals management |
+| Admin CDEs | `/admin/cdes` | CDE management |
+| Admin Investors | `/admin/investors` | Investor management |
+| Admin Reports | `/admin/reports` | Platform reports |
+| Admin Settings | `/admin/settings` | Admin settings |
+| Admin Knowledge | `/admin/knowledge` | Knowledge base management |
+| Admin Knowledge Setup | `/admin/knowledge/setup` | Knowledge base setup |
+| Admin Knowledge Upload | `/admin/knowledge/upload` | Upload knowledge documents |
+| Admin Map Debug | `/admin/map-debug` | Map debugging tools |
+
+---
+
+## Route Notes
+
+### Route Parameters
+
+**Dynamic Routes:**
+- `/deals/[id]` - `id` is the deal UUID
+- `/deals/[id]/room/[channelId]` - `id` is deal UUID, `channelId` is channel identifier
+- `/dashboard/projects/[id]` - `id` is project UUID
+- `/dashboard/documents/[id]` - `id` is document UUID
+- `/closing-room/[id]` - `id` is closing room UUID
+- `/cde/[slug]` - `slug` is CDE slug
+- `/investor/[slug]` - `slug` is investor slug
+- `/blog/[slug]` - `slug` is blog post slug
+- `/help/[slug]` - `slug` is help article slug
+
+**Query Parameters:**
+- `/intake?draftId=xxx` - Load specific draft
+- `/intake?dealId=xxx` - Edit mode for submitted deal
+- `/intake?new=true` - Skip draft check (force new)
+
+### Route Access Notes
+
+- **Marketplace (`/deals`)**: Shows different content based on role:
+  - Sponsors see: CDEs and Investors
+  - CDEs see: Available deals/projects
+  - Investors see: Available opportunities
+  - Public users see: Public deals only
+
+- **Dashboard (`/dashboard`)**: Content varies by role:
+  - Sponsors: Stats, interest data, deals pipeline
+  - CDEs: Allocation tracking, deal pipeline, AutoMatch
+  - Investors: Portfolio, deal pipeline, AutoMatch
+
+- **Pipeline (`/dashboard/pipeline`)**: Role-filtered:
+  - Sponsors: Their own deals in all stages
+  - CDEs: Deals they've engaged with
+  - Investors: Deals they've expressed interest in
+
+### Deprecated/Legacy Routes
+
+These routes may exist but are not the primary paths:
+- `/marketplace` → Use `/deals` instead
+- `/projects` → Use `/dashboard/projects` (sponsors)
+- `/pipeline` → Use `/dashboard/pipeline`
+- `/allocation` → Use `/dashboard/allocations` (CDEs)
+- `/matches` → Use `/dashboard/projects/[id]/matches` (sponsors)
+- `/closing/[id]` → Use `/closing-room/[id]`
 
 ---
 

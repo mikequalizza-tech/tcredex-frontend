@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
     const creditType = searchParams.get('credit_type');
     const minInvestment = searchParams.get('min_investment');
     const craMotivated = searchParams.get('cra_motivated');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    // OPTIMIZATION: Enforce maximum limit to prevent large queries
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
 
     let query = supabase
       .from('investors')
@@ -39,9 +40,7 @@ export async function GET(request: NextRequest) {
         target_credit_types,
         target_states,
         accredited,
-        status,
-        created_at,
-        organization:organizations(id, name, slug, city, state)
+        created_at
       `)
       .order('max_investment', { ascending: false })
       .limit(limit);
@@ -50,10 +49,8 @@ export async function GET(request: NextRequest) {
     if (user.organizationType === 'investor') {
       // Investors see only their own profile
       query = query.eq('organization_id', user.organizationId);
-    } else if (user.organizationType === 'sponsor' || user.organizationType === 'cde') {
-      // Sponsors and CDEs see all active investors (public view)
-      query = query.eq('status', 'active');
     }
+    // Sponsors and CDEs see all investors (no status filter - investors table doesn't have status column)
     // Admin sees all investors (no filter)
 
     if (creditType) query = query.contains('target_credit_types', [creditType]);
@@ -68,6 +65,10 @@ export async function GET(request: NextRequest) {
       investors: data,
       organizationId: user.organizationId,
       organizationType: user.organizationType,
+    }, {
+      headers: {
+        'Cache-Control': 'private, max-age=60', // Cache for 60 seconds
+      },
     });
   } catch (error) {
     return handleAuthError(error);
@@ -109,7 +110,6 @@ export async function POST(request: NextRequest) {
         target_credit_types: body.target_credit_types || ['NMTC'],
         target_states: body.target_states,
         accredited: body.accredited ?? true,
-        status: 'active',
       } as never)
       .select()
       .single();

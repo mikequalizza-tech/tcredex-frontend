@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
     // 3. Check users table (for CDEs and admins)
     const { data: userData } = await supabase
       .from('users')
-      .select('id, email, name, role, organization_id, organization_type')
+      .select('id, email, name, role, organization_id, role_type')
       .eq('email', normalizedEmail)
       .single();
 
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       name: string | null;
       role: string | null;
       organization_id: string | null;
-      organization_type: string | null;
+      role_type: string | null;
     };
     const user = userData as UserData | null;
 
@@ -138,10 +138,10 @@ export async function POST(request: NextRequest) {
       // Get org details from appropriate table
       let orgName = null;
       let orgSlug = null;
-      if (user.organization_id && user.organization_type) {
-        const tableName = user.organization_type === 'sponsor' ? 'sponsors'
-          : user.organization_type === 'investor' ? 'investors'
-          : 'cdes_merged';
+      if (user.organization_id && user.role_type) {
+        const tableName = user.role_type === 'sponsor' ? 'sponsors'
+          : user.role_type === 'investor' ? 'investors'
+          : 'cdes';
         const { data: org } = await supabase
           .from(tableName)
           .select('name, slug')
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const orgType = user.organization_type || 'cde';
+      const orgType = user.role_type || 'cde';
       return NextResponse.json({
         success: true,
         user: {

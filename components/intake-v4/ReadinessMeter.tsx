@@ -161,7 +161,7 @@ export function ReadinessMeter({ data, programs, onScoreChange }: ReadinessMeter
         <div className="text-xs text-gray-500 mt-1">
           {currentTier >= 3 ? 'Ready for closing room' :
            currentTier >= 2 ? 'Ready for CDE matching' :
-           currentTier >= 1 ? 'Ready for marketplace' :
+           currentTier >= 1 ? 'Ready to submit' :
            'Complete Tier 1 fields'}
         </div>
       </div>
@@ -297,7 +297,21 @@ export function ReadinessMeter({ data, programs, onScoreChange }: ReadinessMeter
             
             {data.requestedAllocation && (
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Requested NMTC</span>
+                <span className="text-xs text-gray-400">
+                  {(() => {
+                    const programNames: Record<ProgramType, string> = {
+                      'NMTC': 'Requested NMTC',
+                      'HTC': 'Requested HTC',
+                      'LIHTC': 'Requested LIHTC',
+                      'OZ': 'OZ Investment',
+                      'Brownfield': 'Brownfield Credit'
+                    };
+                    if (programs.length === 1) {
+                      return programNames[programs[0]] || 'Requested Allocation';
+                    }
+                    return 'Requested Allocation';
+                  })()}
+                </span>
                 <span className="text-sm font-semibold text-emerald-400">
                   ${(data.requestedAllocation || 0).toLocaleString()}
                 </span>

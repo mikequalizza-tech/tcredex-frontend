@@ -21,7 +21,8 @@ type UserRecord = {
   phone: string | null;
   title: string | null;
   organization_id: string | null;
-  organization_type: string | null;
+  role_type: string | null;
+  organization_name: string | null;
   role: string;
   is_active: boolean;
   email_verified: boolean;
@@ -82,28 +83,36 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Get organization details from the appropriate table
     let organization = null;
-    if (typedRecord.organization_id && typedRecord.organization_type) {
-      const tableName = typedRecord.organization_type === 'sponsor' ? 'sponsors'
-        : typedRecord.organization_type === 'investor' ? 'investors'
-        : 'cdes_merged';
+    const orgType = typedRecord.role_type;
+    if (typedRecord.organization_id && orgType) {
+      const tableName = orgType === 'sponsor'
+        ? 'sponsors'
+        : orgType === 'investor'
+          ? 'investors'
+          : 'cdes';
 
       const { data: org } = await supabase
         .from(tableName)
-        .select('name, slug, website, logo_url, verified, status')
+        .select('primary_contact_name, primary_contact_email')
         .eq('organization_id', typedRecord.organization_id)
         .single();
 
       if (org) {
         organization = {
           id: typedRecord.organization_id,
-          name: org.name,
-          slug: org.slug,
-          type: typedRecord.organization_type,
-          logo: org.logo_url,
-          website: org.website,
-          verified: org.verified || false,
+          name: typedRecord.organization_name || org.primary_contact_name || 'Organization',
+          type: orgType,
+          contactEmail: org.primary_contact_email || null,
         };
       }
+    }
+    if (!organization && typedRecord.organization_id && orgType) {
+      organization = {
+        id: typedRecord.organization_id,
+        name: typedRecord.organization_name || 'Organization',
+        type: orgType,
+        contactEmail: null,
+      };
     }
 
     // Step 5: Return user data
@@ -115,7 +124,7 @@ export async function POST(request: NextRequest) {
         name: typedRecord.name,
         role: typedRecord.role,
         organizationId: typedRecord.organization_id,
-        organizationType: typedRecord.organization_type,
+        organizationType: orgType,
         organization,
         avatar: typedRecord.avatar_url,
         title: typedRecord.title,

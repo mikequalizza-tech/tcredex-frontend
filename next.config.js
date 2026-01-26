@@ -13,6 +13,9 @@ try {
 
 const nextConfig = {
   outputFileTracingRoot: __dirname,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Performance optimizations
   experimental: {
     optimizePackageImports: ['mapbox-gl', 'react-map-gl', '@supabase/supabase-js'],

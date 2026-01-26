@@ -56,7 +56,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Verify deal exists and sender owns it
     const { data: dealData, error: dealError } = await supabase
       .from('deals')
-      .select('id, project_name, sponsor_organization_id')
+      .select('id, project_name, sponsor_id, sponsors!inner(organization_id)')
       .eq('id', dealId)
       .single();
 
@@ -67,7 +67,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 });
     }
 
-    if (deal.sponsor_organization_id !== senderOrgId) {
+    // Check if sender owns this deal via sponsor's organization_id
+    const sponsorOrgId = deal.sponsors?.organization_id;
+    if (sponsorOrgId !== senderOrgId) {
       return NextResponse.json(
         { error: 'Only the deal owner can send outreach' },
         { status: 403 }

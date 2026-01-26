@@ -1,10 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
-import PostImg10 from "@/public/images/post-thumb-10.jpg";
-import PostImg11 from "@/public/images/post-thumb-11.jpg";
-import PostImg12 from "@/public/images/post-thumb-12.jpg";
-import PostAuthor04 from "@/public/images/post-author-04.jpg";
-import PostAuthor05 from "@/public/images/post-author-05.jpg";
+import PostImg10 from "@/public/images/post-thumb-15.jpg";
+import PostImg11 from "@/public/images/post-thumb-15.jpg";
+import PostImg12 from "@/public/images/post-thumb-15.jpg";
+import PostAuthor04 from "@/public/images/post-author-01.jpg";
+import PostAuthor05 from "@/public/images/post-author-02.jpg";
 
 export default function RelatedPosts() {
   return (

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useCurrentUser } from '@/lib/auth';
+import { Role } from '@/lib/auth/types';
 
 type MemberRole = 'owner' | 'admin' | 'member' | 'viewer';
 
@@ -39,7 +40,7 @@ const STATUS_COLORS = {
 };
 
 export default function TeamPage() {
-  const { userName, userEmail, orgName, orgType, organizationId } = useCurrentUser();
+  const { user, userName, userEmail, orgName, orgType, organizationId } = useCurrentUser();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -183,8 +184,23 @@ export default function TeamPage() {
     }
   };
 
-  // Current user's role (demo - in reality would come from auth)
-  const currentUserRole: MemberRole = 'owner'; // TODO: Get from auth context
+  // Map auth Role to team MemberRole
+  const roleToMemberRole = (role: Role | undefined): MemberRole => {
+    switch (role) {
+      case Role.ORG_ADMIN:
+        return 'owner';
+      case Role.PROJECT_ADMIN:
+        return 'admin';
+      case Role.MEMBER:
+        return 'member';
+      case Role.VIEWER:
+        return 'viewer';
+      default:
+        return 'member';
+    }
+  };
+
+  const currentUserRole: MemberRole = roleToMemberRole(user?.role);
   const canEditOrg = currentUserRole === 'owner' || currentUserRole === 'admin';
 
   // Close menu when clicking outside

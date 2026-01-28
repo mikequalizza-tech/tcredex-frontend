@@ -77,6 +77,71 @@ interface ExpiringTermSheet {
   expiryStatus: 'expired' | 'critical' | 'warning' | 'ok';
 }
 
+type DiscordChannelType = 'TEXT' | 'AUDIO' | 'VIDEO';
+type DiscordMemberRole = 'ADMIN' | 'MODERATOR' | 'GUEST';
+
+interface DiscordMember {
+  id: string;
+  userId: string;
+  serverId: string;
+  clerkId?: string | null;
+  role: DiscordMemberRole;
+  createdAt?: string | null;
+}
+
+interface DiscordChannel {
+  id: string;
+  name: string;
+  type: DiscordChannelType;
+  serverId: string;
+  description?: string | null;
+  isPrivate?: boolean;
+  createdAt?: string | null;
+}
+
+interface DiscordServer {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  inviteCode?: string;
+  ownerId?: string;
+  organizationId?: string | null;
+  dealId?: string | null;
+  serverType?: string;
+  createdAt?: string | null;
+  channels: DiscordChannel[];
+  members: DiscordMember[];
+}
+
+interface DiscordMessage {
+  id: string;
+  content: string;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileType?: string | null;
+  deleted?: boolean;
+  edited?: boolean;
+  memberId: string;
+  channelId: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  member?: DiscordMember;
+}
+
+interface NotificationData {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  read: boolean;
+  read_at: string | null;
+  action_url: string | null;
+  created_at: string | null;
+}
+
 // =============================================================================
 // API CLIENT
 // =============================================================================
@@ -464,28 +529,32 @@ class BackendApiClient {
     });
   }
 
-  async getServer(id: string) {
-    return this.request(`/api/discord/servers/${id}`);
+  async getServer(id: string): Promise<ApiResponse<DiscordServer>> {
+    return this.request<DiscordServer>(`/api/discord/servers/${id}`);
   }
 
-  async getServerByInviteCode(code: string) {
-    return this.request(`/api/discord/servers/invite/${code}`);
+  async getServerByInviteCode(code: string): Promise<ApiResponse<DiscordServer>> {
+    return this.request<DiscordServer>(`/api/discord/servers/invite/${code}`);
   }
 
-  async getUserServers(userId: string) {
-    return this.request(`/api/discord/users/${userId}/servers`);
+  async getDiscordServersByUser(userId: string): Promise<ApiResponse<DiscordServer[]>> {
+    return this.getUserServers(userId);
   }
 
-  async getOrganizationServers(orgId: string) {
-    return this.request(`/api/discord/organizations/${orgId}/servers`);
+  async getUserServers(userId: string): Promise<ApiResponse<DiscordServer[]>> {
+    return this.request<DiscordServer[]>(`/api/discord/users/${userId}/servers`);
   }
 
-  async getDealServers(dealId: string) {
-    return this.request(`/api/discord/deals/${dealId}/servers`);
+  async getOrganizationServers(orgId: string): Promise<ApiResponse<DiscordServer[]>> {
+    return this.request<DiscordServer[]>(`/api/discord/organizations/${orgId}/servers`);
   }
 
-  async updateServer(id: string, data: { name?: string; imageUrl?: string }) {
-    return this.request(`/api/discord/servers/${id}`, {
+  async getDealServers(dealId: string): Promise<ApiResponse<DiscordServer[]>> {
+    return this.request<DiscordServer[]>(`/api/discord/deals/${dealId}/servers`);
+  }
+
+  async updateServer(id: string, data: { name?: string; imageUrl?: string }): Promise<ApiResponse<DiscordServer>> {
+    return this.request<DiscordServer>(`/api/discord/servers/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -511,19 +580,19 @@ class BackendApiClient {
     name: string;
     type: 'TEXT' | 'AUDIO' | 'VIDEO';
     serverId: string;
-  }) {
-    return this.request('/api/discord/channels', {
+  }): Promise<ApiResponse<DiscordChannel>> {
+    return this.request<DiscordChannel>('/api/discord/channels', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async getServerChannels(serverId: string) {
-    return this.request(`/api/discord/servers/${serverId}/channels`);
+  async getServerChannels(serverId: string): Promise<ApiResponse<DiscordChannel[]>> {
+    return this.request<DiscordChannel[]>(`/api/discord/servers/${serverId}/channels`);
   }
 
-  async updateChannel(id: string, data: { name?: string }) {
-    return this.request(`/api/discord/channels/${id}`, {
+  async updateChannel(id: string, data: { name?: string }): Promise<ApiResponse<DiscordChannel>> {
+    return this.request<DiscordChannel>(`/api/discord/channels/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -543,22 +612,22 @@ class BackendApiClient {
     serverId: string;
     userId: string;
     role?: 'ADMIN' | 'MODERATOR' | 'GUEST';
-  }) {
-    return this.request('/api/discord/members', {
+  }): Promise<ApiResponse<DiscordMember>> {
+    return this.request<DiscordMember>('/api/discord/members', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async joinServerByInvite(inviteCode: string, userId: string) {
-    return this.request(`/api/discord/servers/join/${inviteCode}`, {
+  async joinServerByInvite(inviteCode: string, userId: string): Promise<ApiResponse<DiscordMember>> {
+    return this.request<DiscordMember>(`/api/discord/servers/join/${inviteCode}`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
     });
   }
 
-  async updateMemberRole(memberId: string, role: 'ADMIN' | 'MODERATOR' | 'GUEST') {
-    return this.request(`/api/discord/members/${memberId}/role`, {
+  async updateMemberRole(memberId: string, role: 'ADMIN' | 'MODERATOR' | 'GUEST'): Promise<ApiResponse<DiscordMember>> {
+    return this.request<DiscordMember>(`/api/discord/members/${memberId}/role`, {
       method: 'PATCH',
       body: JSON.stringify({ role }),
     });
@@ -586,20 +655,45 @@ class BackendApiClient {
     channelId: string;
     memberId: string;
     fileUrl?: string;
-  }) {
-    return this.request('/api/discord/messages', {
+  }): Promise<ApiResponse<DiscordMessage>> {
+    return this.request<DiscordMessage>('/api/discord/messages', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async getChannelMessages(channelId: string, cursor?: string) {
-    const params = cursor ? `?cursor=${cursor}` : '';
-    return this.request(`/api/discord/channels/${channelId}/messages${params}`);
+  async sendDiscordMessage(data: {
+    content: string;
+    channelId: string;
+    memberId: string;
+    fileUrl?: string;
+  }): Promise<ApiResponse<DiscordMessage>> {
+    return this.sendMessage(data);
   }
 
-  async updateMessage(id: string, content: string) {
-    return this.request(`/api/discord/messages/${id}`, {
+  async getChannelMessages(
+    channelId: string,
+    cursor?: string
+  ): Promise<ApiResponse<{ messages: DiscordMessage[]; nextCursor: string | null }>> {
+    const params = cursor ? `?cursor=${cursor}` : '';
+    return this.request<{ messages: DiscordMessage[]; nextCursor: string | null }>(
+      `/api/discord/channels/${channelId}/messages${params}`
+    );
+  }
+
+  async getDiscordChannelMessages(
+    channelId: string,
+    options?: { cursor?: string; limit?: number }
+  ): Promise<ApiResponse<{ messages: DiscordMessage[]; nextCursor: string | null }>> {
+    const params = new URLSearchParams();
+    if (options?.cursor) params.append('cursor', options.cursor);
+    if (options?.limit) params.append('limit', String(options.limit));
+    const query = params.toString();
+    return this.request(`/api/discord/channels/${channelId}/messages${query ? `?${query}` : ''}`);
+  }
+
+  async updateMessage(id: string, content: string): Promise<ApiResponse<DiscordMessage>> {
+    return this.request<DiscordMessage>(`/api/discord/messages/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ content }),
     });
@@ -736,6 +830,39 @@ class BackendApiClient {
       body: JSON.stringify({ dealId }),
     });
   }
+
+  // ===========================================================================
+  // NOTIFICATIONS
+  // ===========================================================================
+
+  async getNotifications(
+    userId: string,
+    options?: { page?: number; limit?: number; unreadOnly?: boolean }
+  ): Promise<ApiResponse<{ notifications: NotificationData[] }>> {
+    const params = new URLSearchParams({ userId });
+    if (options?.page) params.append('page', String(options.page));
+    if (options?.limit) params.append('limit', String(options.limit));
+    if (options?.unreadOnly !== undefined) {
+      params.append('unreadOnly', String(options.unreadOnly));
+    }
+
+    const result = await this.request<NotificationData[]>(`/api/notifications?${params.toString()}`);
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return {
+      success: true,
+      data: { notifications: result.data || [] },
+    };
+  }
+
+  async markNotificationAsRead(id: string, userId: string) {
+    return this.request(`/api/notifications/${id}/read`, {
+      method: 'PUT',
+      body: JSON.stringify({ userId }),
+    });
+  }
 }
 
 // =============================================================================
@@ -757,4 +884,8 @@ export type {
   FeeResult,
   DebarmentResult,
   ExpiringTermSheet,
+  DiscordServer,
+  DiscordChannel,
+  DiscordMessage,
+  NotificationData,
 };
